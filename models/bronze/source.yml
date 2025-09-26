@@ -1,0 +1,60 @@
+version: 2
+
+sources:
+  - name: public
+    description: "Raw Supabase tables"
+    database: postgres
+    schema: public
+    tables:
+      - name: user_profiles_with_stats
+        description: "User profile information"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+      - name: user_preferences
+        description: "User preference settings"
+      - name: user_sessions
+        description: "User app sessions and swipe interactions"
+
+      # Experience & Content
+      - name: experience_cards
+        description: "AI-generated places and experiences"
+      - name: featured_cards
+        description: "Featured/partnership places"
+      - name: featured_categories
+        description: "Categories for featured content"
+      - name: featured_cards_category_mapping
+        description: "Mapping between featured cards and categories"
+
+      # AI/Dextr System
+      - name: dextr_queries
+        description: "AI chatbot queries from users"
+      - name: dextr_packs
+        description: "Generated card packs from AI queries"
+      - name: dextr_pack_cards
+        description: "Individual cards within generated packs"
+
+      # User Actions
+      - name: featured_section_actions
+        description: "User interactions in featured section"
+      - name: core_card_actions
+        description: "All user actions on experience cards"
+
+      # Multiplayer Features
+      - name: multiplayer_sessions
+        description: "Group planning sessions"
+      - name: session_participants
+        description: "Users participating in multiplayer sessions"
+      - name: session_places
+        description: "Places added to multiplayer sessions"
+      - name: session_votes
+        description: "User votes on places in multiplayer sessions"
+
+      # Personal Organization
+      - name: boards
+        description: "User-created boards/wishlists"
+      - name: board_places
+        description: "Places saved to user boards"
