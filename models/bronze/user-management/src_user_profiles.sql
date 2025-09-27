@@ -4,8 +4,6 @@ select
     username,
     full_name,
     created_at,
-    onboarding_completed,
-    follower_count,
-    following_count
+    onboarding_completed
 from 
-    {{ source('public', 'user_profiles_with_stats') }}
+    {{ source('public', 'user_profiles') }}
