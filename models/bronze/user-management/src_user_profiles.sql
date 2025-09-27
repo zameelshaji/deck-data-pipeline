@@ -1,5 +1,5 @@
 select 
-    id,
+    id as user_id,
     email,
     username,
     full_name,

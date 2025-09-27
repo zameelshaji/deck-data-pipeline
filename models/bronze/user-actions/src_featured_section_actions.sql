@@ -3,7 +3,7 @@ select
     user_id,
     session_id,
 
-    action_context::jsonb ->> 'featuredPlaceName' as card_id,
+    action_context::jsonb ->> 'featuredPlaceId' as card_id,
     action_context::jsonb ->> 'position' as position,
     action_type,
 
