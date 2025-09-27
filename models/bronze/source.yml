@@ -6,7 +6,7 @@ sources:
     database: postgres
     schema: public
     tables:
-      - name: user_profiles_with_stats
+      - name: user_profiles
         description: "User profile information"
         columns:
           - name: id
