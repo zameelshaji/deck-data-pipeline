@@ -1,4 +1,4 @@
-SELECT 
+select
     id as multiplayer_id,
     creator_id,
     title,
@@ -10,4 +10,4 @@ SELECT
     source_type,
     source_board_id,
     ai_prompt
-FROM {{ source('public', 'multiplayer_sessions') }}
+from {{ source("public", "multiplayer_sessions") }}

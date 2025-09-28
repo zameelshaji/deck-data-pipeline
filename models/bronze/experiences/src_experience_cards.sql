@@ -1,4 +1,4 @@
-select 
+select
     card_id,
     name,
     category,
@@ -29,5 +29,4 @@ select
     created_at,
     user_ratings_total,
     types
-from
-    {{ source('public', 'experience_cards') }}
+from {{ source("public", "experience_cards") }}

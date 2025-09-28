@@ -1,7 +1,7 @@
 -- User master table with all attributes
 select 
     -- Core identity
-    up.user_id,
+    up.id as user_id,
     up.email,
     up.username,
     up.full_name,
@@ -25,4 +25,4 @@ from
     {{ ref ('src_user_profiles')}} as up
 left join 
     {{ ref ('src_user_preferences')}} as upr
-    on up.user_id = upr.user_id
+    on up.id = upr.user_id
