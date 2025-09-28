@@ -1,0 +1,97 @@
+version: 2
+
+models:
+  - name: daily_active_users
+    description: "Daily active user metrics with engagement breakdown and growth indicators"
+    columns:
+      - name: activity_date
+        description: "Date of activity"
+        tests:
+          - not_null
+          - unique
+      - name: daily_active_users
+        description: "Count of unique users with any activity on this date"
+        tests:
+          - not_null
+      - name: ai_active_users
+        description: "Count of users who used AI features on this date"
+      - name: dau_7day_avg
+        description: "7-day rolling average of daily active users"
+      - name: dau_wow_growth_percent
+        description: "Week-over-week growth percentage"
+      - name: ai_adoption_rate
+        description: "Percentage of DAU who used AI features"
+
+  - name: user_acquisition_funnel
+    description: "User acquisition and onboarding funnel analysis by signup date"
+    columns:
+      - name: signup_date
+        description: "Date of user signup"
+        tests:
+          - not_null
+          - unique
+      - name: signups
+        description: "Number of new signups on this date"
+      - name: onboarding_completion_rate
+        description: "Percentage who completed onboarding"
+      - name: ai_adoption_rate
+        description: "Percentage who used AI features (ever)"
+      - name: week_1_activation_rate
+        description: "Percentage active in first week after signup"
+
+  - name: dextr_performance
+    description: "AI system performance and user satisfaction metrics"
+    columns:
+      - name: query_date
+        description: "Date of AI queries"
+        tests:
+          - not_null
+          - unique
+      - name: total_queries
+        description: "Total AI queries on this date"
+      - name: avg_like_rate
+        description: "Average like rate for AI-generated content"
+      - name: pack_success_rate
+        description: "Percentage of queries that resulted in successful packs"
+      - name: avg_processing_time
+        description: "Average AI response time in seconds"
+      - name: power_user_percentage
+        description: "Percentage of users making 6+ queries"
+
+  - name: content_performance
+    description: "Content performance across all card types and sources"
+    columns:
+      - name: metric_type
+        description: "Type of metric: individual_cards or category_performance"
+      - name: card_id
+        description: "Unique card identifier (for individual cards)"
+      - name: card_type
+        description: "Type of card: experience or featured"
+      - name: like_rate
+        description: "Percentage of swipes that were positive"
+      - name: conversion_rate
+        description: "Percentage of impressions that led to conversion actions"
+      - name: engagement_score
+        description: "Weighted engagement score based on action values"
+
+  - name: executive_summary
+    description: "High-level executive dashboard with key business metrics"
+    columns:
+      - name: report_date
+        description: "Date this report was generated"
+        tests:
+          - not_null
+      - name: daily_active_users
+        description: "Average DAU in last 30 days"
+      - name: dau_growth_percent
+        description: "Average week-over-week DAU growth"
+      - name: week_1_retention_rate
+        description: "Average week 1 retention rate"
+      - name: ai_satisfaction_rate
+        description: "Average AI feature satisfaction rate"
+      - name: overall_health_score
+        description: "Composite business health score (0-100)"
+      - name: growth_health
+        description: "Qualitative growth assessment"
+      - name: ai_health
+        description: "Qualitative AI feature health assessment"
