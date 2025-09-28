@@ -1,4 +1,4 @@
-select 
+select
     id,
     name,
 
@@ -26,5 +26,4 @@ select
     serves_breakfast,
     created_at,
     updated_at
-from 
-    {{ source('public', 'featured_cards') }}
+from {{ source("public", "featured_cards") }}

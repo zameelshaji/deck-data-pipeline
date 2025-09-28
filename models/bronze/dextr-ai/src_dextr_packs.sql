@@ -1,4 +1,4 @@
-select 
+select
     pack_id,
     pack_name,
     generated_timestamp,
@@ -8,5 +8,4 @@ select
     pack_context::jsonb ->> 'experience_cards' as experience_cards_count,
     total_cards,
     created_at
-from
-    {{ source('public', 'dextr_packs') }}
+from {{ source("public", "dextr_packs") }}
