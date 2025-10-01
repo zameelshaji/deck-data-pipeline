@@ -107,13 +107,13 @@ with
     )
 
 select
-    *,
+    c.*,
     -- -- Standardized categorization
     case
-        when event_name in ('saved', 'share', 'swipe_right', 'swipe_left')
+        when c.event_name in ('saved', 'share', 'swipe_right', 'swipe_left')
         then 'Content Curation'
         when
-            event_name in (
+            c.event_name in (
                 'opened_website',
                 'book_button_click',
                 'click_directions',
@@ -121,10 +121,10 @@ select
                 'click_phone'
             )
         then 'Conversion Action'
-        when event_name in ('dextr_query', 'mini_dextr')
+        when c.event_name in ('dextr_query', 'mini_dextr')
         then 'AI Interaction'
         when
-            event_name in (
+            c.event_name in (
                 'Impression',
                 'category_clicked',
                 'detail_view_open',
@@ -157,4 +157,5 @@ select
 -- EXTRACT(dow FROM event_timestamp) as day_of_week,
 -- DATE_TRUNC('week', event_timestamp) as event_week,
 -- DATE_TRUNC('month', event_timestamp) as event_month
-from combined
+from combined c
+inner join {{ref ('src_user_profiles')}} p on p.user_id = c.user_id
