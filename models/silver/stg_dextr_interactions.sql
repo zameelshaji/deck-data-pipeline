@@ -62,3 +62,4 @@ select
 
 from query_pack_performance qpp
 left join pack_engagement pe on qpp.pack_id = pe.pack_id
+inner join {{ref ('src_user_profiles')}} p on p.user_id = qpp.user_id

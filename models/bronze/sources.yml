@@ -58,3 +58,9 @@ sources:
         description: "User-created boards/wishlists"
       - name: board_places
         description: "Places saved to user boards"
+
+      # Referrals
+      - name: referral_codes
+        description: "User referral codes for inviting others"
+      - name: referral_usages
+        description: "Tracking of referral code usage during onboarding"
