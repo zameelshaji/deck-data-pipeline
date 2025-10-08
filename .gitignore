@@ -3,3 +3,8 @@
 target/
 dbt_packages/
 logs/
+
+# Dashboard secrets and virtual environment
+dashboard/.streamlit/secrets.toml
+dashboard/venv/
+.streamlit/secrets.toml
