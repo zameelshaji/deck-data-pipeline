@@ -1,0 +1,4 @@
+dashboard.py
+requirements.txt
+.streamlit/
+  secrets.toml
