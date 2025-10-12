@@ -1,0 +1,5 @@
+supplier_id,supplier_name,card_id,partnership_type,is_active,onboarding_date,commission_rate
+1,Sample Restaurant A,card_id_1,Premium Partner,TRUE,2024-01-15,0.15
+2,Sample Venue B,card_id_2,Standard Partner,TRUE,2024-02-01,0.10
+3,Sample Experience C,card_id_3,Premium Partner,TRUE,2024-03-10,0.15
+4,Sample Activity D,card_id_4,Standard Partner,FALSE,2023-12-05,0.10
