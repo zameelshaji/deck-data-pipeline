@@ -187,6 +187,12 @@ recent_performance as (
 
         count(case
             when ce.event_timestamp >= current_date - interval '7 days'
+                and ce.event_name in ('swipe_right', 'swipe_left', 'saved', 'share')
+            then 1
+        end) as intent_actions_last_7d,
+
+        count(case
+            when ce.event_timestamp >= current_date - interval '7 days'
                 and ce.event_category = 'Conversion Action'
             then 1
         end) as conversions_last_7d,
@@ -197,6 +203,12 @@ recent_performance as (
                 and ce.event_category = 'Content Discovery'
             then ce.user_id
         end) as viewers_last_30d,
+
+        count(case
+            when ce.event_timestamp >= current_date - interval '30 days'
+                and ce.event_name in ('swipe_right', 'swipe_left', 'saved', 'share')
+            then 1
+        end) as intent_actions_last_30d,
 
         count(case
             when ce.event_timestamp >= current_date - interval '30 days'
@@ -213,6 +225,12 @@ recent_performance as (
 
         count(case
             when ce.event_timestamp >= current_date - interval '90 days'
+                and ce.event_name in ('swipe_right', 'swipe_left', 'saved', 'share')
+            then 1
+        end) as intent_actions_last_90d,
+
+        count(case
+            when ce.event_timestamp >= current_date - interval '90 days'
                 and ce.event_category = 'Conversion Action'
             then 1
         end) as conversions_last_90d
@@ -226,10 +244,13 @@ recent_performance as (
 select
     spc.*,
     rp.viewers_last_7d,
+    rp.intent_actions_last_7d,
     rp.conversions_last_7d,
     rp.viewers_last_30d,
+    rp.intent_actions_last_30d,
     rp.conversions_last_30d,
     rp.viewers_last_90d,
+    rp.intent_actions_last_90d,
     rp.conversions_last_90d
 from supplier_performance_calculated spc
 left join recent_performance rp on spc.card_id = rp.card_id
