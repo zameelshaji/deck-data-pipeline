@@ -1,5 +1,6 @@
+# DECK Analytics Dashboard Requirements
 streamlit==1.32.0
+plotly>=5.0,<6.0
 pandas==2.2.1
-sqlalchemy>=2.0.43
-psycopg[binary]>=3.2.2
-plotly>=5.18.0
+psycopg2-binary>=2.9.0
+sqlalchemy>=2.0.0

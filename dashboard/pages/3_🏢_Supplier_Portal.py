@@ -10,13 +10,18 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from utils.data_loader import load_supplier_performance
+from utils.styling import apply_deck_branding, add_deck_footer
 
 # Page configuration
 st.set_page_config(
     page_title="DECK Analytics - Supplier Portal",
     page_icon="🏢",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# Apply DECK branding
+apply_deck_branding()
 
 # Title
 st.title("🏢 Supplier Performance Portal")
@@ -88,7 +93,7 @@ try:
             st.metric(
                 label="Engagement Score",
                 value=f"{engagement_score:.1f}/10" if pd.notna(engagement_score) else "N/A",
-                help="Weighted score based on all interactions"
+                help="Weighted score (0-10 scale) based on all user interactions: impressions, swipes, saves, shares, and conversions. Higher is better."
             )
 
         st.divider()
@@ -111,13 +116,20 @@ try:
             x=funnel_values,
             textinfo="value+percent initial",
             textposition="inside",
-            marker=dict(color=["lightblue", "lightgreen", "lightyellow"])
+            textfont=dict(size=14, color='white', family='Inter'),
+            marker=dict(
+                color=['#FF4FA3', '#E91E8C', '#C7177A'],
+                line=dict(width=3, color='white')
+            )
         ))
 
         funnel_fig.update_layout(
-            title=None,
+            title="",
             showlegend=False,
-            height=300
+            height=300,
+            plot_bgcolor='#FFFFFF',
+            paper_bgcolor='#FAFAFA',
+            font={'color': '#1A1A1A', 'family': 'Inter, sans-serif'}
         )
         st.plotly_chart(funnel_fig, use_container_width=True)
 
@@ -252,24 +264,13 @@ try:
                 st.metric("Phone Clicks", f"{int(supplier_detail['phone_clicks']):,}" if pd.notna(supplier_detail['phone_clicks']) else "N/A")
 
         # Performance Classification
-        with st.expander("🏆 Performance Classification", expanded=True):
-            col1, col2, col3 = st.columns(3)
+        with st.expander("🏆 Performance Metrics", expanded=True):
+            col1, col2 = st.columns(2)
 
             with col1:
-                performance_tier = supplier_detail['performance_tier']
-                if performance_tier == "Top Performer":
-                    st.success(f"🌟 {performance_tier}")
-                elif performance_tier == "Strong Performer":
-                    st.info(f"💪 {performance_tier}")
-                elif performance_tier == "Average Performer":
-                    st.warning(f"📊 {performance_tier}")
-                else:
-                    st.error(f"📉 {performance_tier}")
-
-            with col2:
                 st.metric("Engagement Score", f"{supplier_detail['engagement_score']:.1f}/10" if pd.notna(supplier_detail['engagement_score']) else "N/A")
 
-            with col3:
+            with col2:
                 st.metric("User Conversion Rate", f"{supplier_detail['user_conversion_rate']:.1f}%" if pd.notna(supplier_detail['user_conversion_rate']) else "N/A")
 
     else:
@@ -285,8 +286,12 @@ try:
             st.metric("Total Suppliers", f"{len(supplier_data):,}")
 
         with col2:
-            top_performers = supplier_data[supplier_data['performance_tier'] == 'Top Performer']
-            st.metric("Top Performers", f"{len(top_performers):,}")
+            avg_engagement = supplier_data['engagement_score'].mean()
+            st.metric(
+                "Avg Engagement Score",
+                f"{avg_engagement:.1f}/10" if pd.notna(avg_engagement) else "N/A",
+                help="Average engagement score across all suppliers (0-10 scale)"
+            )
 
         with col3:
             total_impressions = supplier_data['total_impressions'].sum()
@@ -299,9 +304,20 @@ try:
         st.divider()
 
         # Leaderboard table
-        st.markdown("#### Supplier Performance Table")
+        st.markdown("#### 📊 Supplier Performance Table")
+        st.caption("💡 Click column headers to sort. Hover over rows to highlight.")
 
-        # Prepare display dataframe
+        # Add metric explanations
+        with st.expander("ℹ️ Metric Definitions"):
+            st.markdown("""
+            - **CTR (Click-Through Rate)**: Percentage of impressions that led to intent actions (swipes, saves, shares)
+            - **Conv Rate (Conversion Rate)**: Percentage of impressions that led to conversions (website visits, bookings, etc.)
+            - **Engagement Score**: Weighted score (0-10) based on all user interactions
+
+            ⚠️ **Note**: High CTR (near 100%) for suppliers with very few impressions may indicate data quality issues or outliers.
+            """)
+
+        # Prepare display dataframe with raw values for sorting
         display_df = supplier_data[[
             'card_name',
             'total_impressions',
@@ -309,8 +325,7 @@ try:
             'total_conversions',
             'click_through_rate',
             'overall_conversion_rate',
-            'engagement_score',
-            'performance_tier'
+            'engagement_score'
         ]].copy()
 
         # Rename columns for better display
@@ -321,39 +336,62 @@ try:
             'Conversions',
             'CTR %',
             'Conv Rate %',
-            'Engagement Score',
-            'Tier'
+            'Engagement Score'
         ]
 
-        # Format numbers
-        display_df['Impressions'] = display_df['Impressions'].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "N/A")
-        display_df['Intent Actions'] = display_df['Intent Actions'].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "N/A")
-        display_df['Conversions'] = display_df['Conversions'].apply(lambda x: f"{int(x):,}" if pd.notna(x) else "N/A")
-        display_df['CTR %'] = display_df['CTR %'].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
-        display_df['Conv Rate %'] = display_df['Conv Rate %'].apply(lambda x: f"{x:.1f}%" if pd.notna(x) else "N/A")
-        display_df['Engagement Score'] = display_df['Engagement Score'].apply(lambda x: f"{x:.1f}" if pd.notna(x) else "N/A")
+        # Sort by engagement score by default (descending)
+        display_df = display_df.sort_values('Engagement Score', ascending=False, na_position='last')
 
-        # Display table
+        # Display table with better styling
         st.dataframe(
             display_df,
             use_container_width=True,
-            hide_index=True
+            hide_index=True,
+            column_config={
+                "Supplier": st.column_config.TextColumn("Supplier", width="medium"),
+                "Impressions": st.column_config.NumberColumn("Impressions", format="%d"),
+                "Intent Actions": st.column_config.NumberColumn("Intent Actions", format="%d"),
+                "Conversions": st.column_config.NumberColumn("Conversions", format="%d"),
+                "CTR %": st.column_config.NumberColumn("CTR %", format="%.1f%%"),
+                "Conv Rate %": st.column_config.NumberColumn("Conv Rate %", format="%.1f%%"),
+                "Engagement Score": st.column_config.NumberColumn("Engagement Score", format="%.1f")
+            }
         )
 
-        # Download option
+        # Download option with feedback
         csv = supplier_data.to_csv(index=False)
-        st.download_button(
+        download_clicked = st.download_button(
             label="📥 Download Full Data (CSV)",
             data=csv,
-            file_name="supplier_performance.csv",
-            mime="text/csv"
+            file_name=f"supplier_performance_{pd.Timestamp.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv",
+            help="Download complete supplier performance data including all metrics"
         )
 
+        if download_clicked:
+            st.success("✅ Download started! Check your downloads folder.")
+
 except Exception as e:
-    st.error(f"❌ Error loading data: {str(e)}")
-    st.info("💡 Make sure your database connection is configured correctly")
+    st.error(f"❌ Error loading supplier data: {str(e)}")
+
+    with st.expander("🔧 Troubleshooting Steps"):
+        st.markdown("""
+        **Common Issues & Solutions:**
+
+        1. **Database Connection**
+           - Verify your database credentials in `.streamlit/secrets.toml`
+           - Check if supplier performance tables exist in your database
+
+        2. **Data Quality**
+           - Ensure supplier analytics are being tracked
+           - Verify that card impressions and actions are being logged
+
+        3. **Calculation Issues**
+           - High CTR (near 100%) usually indicates low impression counts
+           - Zero conversion rates may be expected for suppliers with few interactions
+        """)
+
     st.exception(e)
 
 # Footer
-st.divider()
-st.caption("📊 DECK Analytics Dashboard - Supplier Portal")
+add_deck_footer()

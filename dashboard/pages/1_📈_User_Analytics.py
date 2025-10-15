@@ -19,13 +19,18 @@ from utils.visualizations import (
     create_multi_line_chart,
     create_funnel_chart
 )
+from utils.styling import apply_deck_branding, add_deck_footer
 
 # Page configuration
 st.set_page_config(
     page_title="DECK Analytics - User Analytics",
     page_icon="📈",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# Apply DECK branding
+apply_deck_branding()
 
 # Title
 st.title("📈 User Analytics")
@@ -84,10 +89,10 @@ try:
                 dau_data.sort_values('activity_date'),
                 x='activity_date',
                 y='daily_active_users',
-                title=None,
+                title="Daily Active Users",
                 y_label="Active Users"
             )
-            st.plotly_chart(dau_chart, use_container_width=True)
+            st.plotly_chart(dau_chart, use_container_width=True, config={'displayModeBar': False})
 
             # Feature Breakdown Chart
             st.markdown("#### Feature Adoption Breakdown")
@@ -95,7 +100,7 @@ try:
                 dau_data.sort_values('activity_date'),
                 x='activity_date',
                 y_columns=['ai_active_users', 'curation_active_users', 'conversion_active_users', 'multiplayer_active_users'],
-                title=None,
+                title="",
                 y_label="Active Users"
             )
             st.plotly_chart(feature_chart, use_container_width=True)
@@ -244,7 +249,7 @@ try:
         funnel_chart = create_funnel_chart(
             stages=funnel_stages,
             values=funnel_values,
-            title=None
+            title=""
         )
         st.plotly_chart(funnel_chart, use_container_width=True)
 
@@ -336,10 +341,29 @@ try:
             st.metric("Multiplayer Active", f"{int(latest['multiplayer_active_users']):,}" if pd.notna(latest['multiplayer_active_users']) else "N/A")
 
 except Exception as e:
-    st.error(f"❌ Error loading data: {str(e)}")
-    st.info("💡 Make sure your database connection is configured correctly")
+    st.error(f"❌ Error loading user analytics data: {str(e)}")
+
+    with st.expander("🔧 How to fix this"):
+        st.markdown("""
+        **Troubleshooting Steps:**
+
+        1. **Database Connection**
+           - Check `.streamlit/secrets.toml` for correct database credentials
+           - Verify database server is running and accessible
+           - Test connection using a database client
+
+        2. **Analytics Tables**
+           - Ensure these tables exist: `daily_active_users`, `weekly_active_users`, `monthly_active_users`, `user_acquisition_funnel`
+           - Verify analytics models have been run and populated data
+           - Check that date ranges have sufficient data
+
+        3. **Data Issues**
+           - Verify user events are being tracked and logged
+           - Check if analytics aggregation jobs are running
+           - Ensure date columns are properly formatted
+        """)
+
     st.exception(e)
 
 # Footer
-st.divider()
-st.caption("📊 DECK Analytics Dashboard")
+add_deck_footer()

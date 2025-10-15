@@ -10,13 +10,18 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from utils.data_loader import load_dextr_performance
 from utils.visualizations import create_line_chart, create_multi_line_chart, create_gauge_chart
+from utils.styling import apply_deck_branding, add_deck_footer
 
 # Page configuration
 st.set_page_config(
     page_title="DECK Analytics - AI Performance",
     page_icon="🤖",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
+
+# Apply DECK branding
+apply_deck_branding()
 
 # Title
 st.title("🤖 AI Performance (Dextr)")
@@ -46,25 +51,29 @@ try:
     with col1:
         st.metric(
             label="Total Queries (Today)",
-            value=f"{int(latest['total_queries']):,}" if pd.notna(latest['total_queries']) else "N/A"
+            value=f"{int(latest['total_queries']):,}" if pd.notna(latest['total_queries']) else "N/A",
+            help="Total number of AI queries submitted today across all users"
         )
 
     with col2:
         st.metric(
             label="Unique AI Users (Today)",
-            value=f"{int(latest['unique_users']):,}" if pd.notna(latest['unique_users']) else "N/A"
+            value=f"{int(latest['unique_users']):,}" if pd.notna(latest['unique_users']) else "N/A",
+            help="Number of unique users who used AI features today"
         )
 
     with col3:
         st.metric(
             label="Queries per User",
-            value=f"{latest['queries_per_user']:.1f}" if pd.notna(latest['queries_per_user']) else "N/A"
+            value=f"{latest['queries_per_user']:.1f}" if pd.notna(latest['queries_per_user']) else "N/A",
+            help="Average number of AI queries per active user today"
         )
 
     with col4:
         st.metric(
             label="Unique Packs Generated",
-            value=f"{int(latest['unique_packs_generated']):,}" if pd.notna(latest['unique_packs_generated']) else "N/A"
+            value=f"{int(latest['unique_packs_generated']):,}" if pd.notna(latest['unique_packs_generated']) else "N/A",
+            help="Number of unique AI-generated experience packs created today"
         )
 
     st.divider()
@@ -109,7 +118,7 @@ try:
             st.metric(
                 label="Satisfaction Rate",
                 value=f"{latest['satisfaction_rate']:.1f}%" if pd.notna(latest['satisfaction_rate']) else "N/A",
-                help="Percentage of well-liked packs"
+                help="Percentage of AI-generated packs that received positive user feedback (likes, high engagement)"
             )
         with col2d:
             st.metric(
@@ -155,7 +164,7 @@ try:
         trend_data,
         x='query_date',
         y_columns=['queries_7day_avg', 'satisfaction_7day_avg'],
-        title=None,
+        title="",
         y_label="Value"
     )
     st.plotly_chart(rolling_chart, use_container_width=True)
@@ -260,34 +269,29 @@ try:
             help="Sessions with 2+ cards liked"
         )
 
-    st.divider()
-
-    # ============================================
-    # SECTION F: GEOGRAPHIC & VERSION INSIGHTS
-    # ============================================
-    st.subheader("🌍 Geographic & Version Insights")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.metric(
-            label="Unique Locations",
-            value=f"{int(latest['unique_locations']):,}" if pd.notna(latest['unique_locations']) else "N/A",
-            help="Number of unique locations using AI"
-        )
-
-    with col2:
-        st.metric(
-            label="App Versions Used",
-            value=f"{int(latest['app_versions_used']):,}" if pd.notna(latest['app_versions_used']) else "N/A",
-            help="Number of different app versions"
-        )
-
 except Exception as e:
-    st.error(f"❌ Error loading data: {str(e)}")
-    st.info("💡 Make sure your database connection is configured correctly")
+    st.error(f"❌ Error loading AI performance data: {str(e)}")
+
+    with st.expander("🔧 Troubleshooting Guide"):
+        st.markdown("""
+        **Common Issues & Solutions:**
+
+        1. **Database Connection**
+           - Verify database credentials in `.streamlit/secrets.toml`
+           - Check if AI analytics tables exist (e.g., `dextr_performance`)
+           - Ensure database server is accessible
+
+        2. **Missing AI Data**
+           - Verify AI queries are being logged to the database
+           - Check if Dextr (AI service) is running and tracking events
+           - Ensure analytics pipeline is processing AI interactions
+
+        3. **Chart Display Issues**
+           - If you see "got multiple values for keyword argument 'title'", this is a known bug
+           - Refresh the page to retry loading charts
+        """)
+
     st.exception(e)
 
 # Footer
-st.divider()
-st.caption("📊 DECK Analytics Dashboard")
+add_deck_footer()

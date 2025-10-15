@@ -4,16 +4,21 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from utils.data_loader import load_executive_summary, load_headline_metrics
+from utils.styling import apply_deck_branding, add_deck_footer
 
 # Page configuration
 st.set_page_config(
     page_title="DECK Analytics - Executive Overview",
-    page_icon="📊",
-    layout="wide"
+    page_icon="🎴",
+    layout="wide",
+    initial_sidebar_state="expanded"
 )
 
+# Apply DECK branding
+apply_deck_branding()
+
 # Title
-st.title("📊 DECK Analytics - Executive Overview")
+st.title("🎴 DECK Analytics - Executive Overview")
 
 # Refresh button
 if st.button("🔄 Refresh Data"):
@@ -112,22 +117,26 @@ try:
         st.metric(
             label="Avg Daily AI Queries",
             value=f"{int(summary['avg_daily_ai_queries']):,}" if pd.notna(summary['avg_daily_ai_queries']) else "N/A",
-            delta=None
+            delta=None,
+            help="Average number of AI queries per day across all users"
         )
         st.metric(
             label="AI Satisfaction Rate",
             value=f"{summary['ai_satisfaction_rate']:.1f}%" if pd.notna(summary['ai_satisfaction_rate']) else "N/A",
-            delta=None
+            delta=None,
+            help="Percentage of AI interactions that received positive feedback from users (likes, thumbs up, etc.)"
         )
         st.metric(
             label="AI Adoption Rate",
             value=f"{summary['ai_adoption_rate_percent']:.1f}%" if pd.notna(summary['ai_adoption_rate_percent']) else "N/A",
-            delta=None
+            delta=None,
+            help="Percentage of active users who have used AI features at least once"
         )
         st.metric(
             label="AI Power Users",
             value=f"{summary['ai_power_user_percentage']:.1f}%" if pd.notna(summary['ai_power_user_percentage']) else "N/A",
-            delta=None
+            delta=None,
+            help="Percentage of users who frequently use AI features (10+ queries in the period)"
         )
 
     # Column 3: Content & Features
@@ -225,9 +234,36 @@ try:
 
 except Exception as e:
     st.error(f"❌ Error loading data: {str(e)}")
-    st.info("💡 Make sure your database connection is configured correctly in .streamlit/secrets.toml")
+
+    with st.expander("🔧 How to fix this issue"):
+        st.markdown("""
+        **Common Solutions:**
+
+        1. **Check Database Connection**
+           - Verify your database credentials in `.streamlit/secrets.toml`
+           - Ensure your database server is running and accessible
+           - Check network connectivity and firewall settings
+
+        2. **Verify Configuration File**
+           ```toml
+           [database]
+           host = "your-host"
+           port = 5432
+           database = "your-database"
+           user = "your-username"
+           password = "your-password"
+           ```
+
+        3. **Test Connection**
+           - Try connecting to your database using a SQL client
+           - Verify table names and schemas match the expected format
+
+        4. **Check Data Models**
+           - Ensure all required analytics tables exist
+           - Verify data is being populated correctly
+        """)
+
     st.exception(e)
 
 # Footer
-st.divider()
-st.caption("📊 DECK Analytics Dashboard | Use the sidebar to navigate to other sections")
+add_deck_footer()
