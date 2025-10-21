@@ -86,24 +86,47 @@ with
         left join {{ ref("src_session_places") }} as sp on sp.id = sv.place_id
     ),
 
+    legacy as (
+        select 
+            'legacy' as event_source,
+            user_id,
+            place_id::text as card_id,
+            case 
+                when direction in ('right', 'up') then 'swipe_right'
+                when direction in ('left') then 'swipe_left'
+            end as event_name, 
+            null as source,
+            null as source_id,
+            created_at as event_timestamp
+        from {{ ref("src_user_swipes_v2")}}
+
+        union all 
+
+        select 
+            'legacy' as event_source,
+            user_id,
+            place_id::text as card_id,
+            'swipe_right' as event_name, 
+            null as source,
+            null as source_id,
+            created_at as event_timestamp
+        from {{ ref("src_user_liked_places")}}
+    ),
+
     combined as (
-        select *
-        from card_actions
+        select * from card_actions
         union all
-        select *
-        from featured_actions
+        select * from featured_actions
         union all
-        select *
-        from ai_queries
+        select * from ai_queries
         union all
-        select *
-        from carousel_impressions
+        select * from carousel_impressions
         union all
-        select *
-        from dextr_pack_swipes
+        select * from dextr_pack_swipes
         union all
-        select *
-        from multiplayer_sessions
+        select * from multiplayer_sessions
+        union all 
+        select * from legacy
     )
 
 select
