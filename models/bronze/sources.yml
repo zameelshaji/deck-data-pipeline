@@ -74,3 +74,5 @@ sources:
         description: "Legacy swipes"
       - name: user_liked_places
         description: "Legacy featured likes"
+      - name: learned_places
+        description: "legacy cards table"
