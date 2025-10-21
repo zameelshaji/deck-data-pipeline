@@ -64,3 +64,13 @@ sources:
         description: "User referral codes for inviting others"
       - name: referral_usages
         description: "Tracking of referral code usage during onboarding"
+
+  - name: legacy 
+    description: "Raw Supabase tables - legacy"
+    database: postgres
+    schema: legacy
+    tables:
+      - name: user_swipes_ver2
+        description: "Legacy swipes"
+      - name: user_liked_places
+        description: "Legacy featured likes"
