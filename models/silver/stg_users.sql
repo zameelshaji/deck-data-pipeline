@@ -3,9 +3,10 @@ select
     -- Core identity
     u.user_id,
     u.email,
+    u.created_at,
+
     up.username,
     up.full_name,
-    up.created_at,
     up.onboarding_completed,
     
     -- Preference data
@@ -29,3 +30,4 @@ left join
 left join 
     {{ ref ('src_user_preferences')}} as upr
     on u.user_id = upr.user_id
+where u.created_at is not null
