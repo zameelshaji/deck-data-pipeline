@@ -35,12 +35,19 @@ cumulative_prompts as (
     select 
         ds.metric_date,
         count(dq.query_id) as total_prompts,
-        count(lq.query) as legacy_prompts,
         count(distinct dq.user_id) as users_who_prompted
     from date_spine ds
     left join {{ ref('src_dextr_queries') }} dq 
         on dq.query_timestamp::date <= ds.metric_date
-    left join {{ ref('src_learned_places_queries')}} lq 
+    group by ds.metric_date
+),
+
+cumulative_legacy_prompts as (
+    select 
+        ds.metric_date,
+        count(lq.query) as legacy_prompts
+    from date_spine ds 
+    left join {{ ref('src_learned_places_queries')}} lq
         on lq.created_at::date <= ds.metric_date
     group by ds.metric_date
 ),
@@ -95,7 +102,7 @@ select
     -- Cumulative totals (the big 4)
     cu.total_users,
     cc.total_experience_cards,
-    cp.total_prompts,
+    cp.total_prompts + lp.legacy_prompts as total_prompts,
     cs.total_swipes,
     
     -- Cumulative breakdowns
@@ -108,6 +115,7 @@ from date_spine ds
 left join cumulative_users cu on ds.metric_date = cu.metric_date
 left join cumulative_cards cc on ds.metric_date = cc.metric_date
 left join cumulative_prompts cp on ds.metric_date = cp.metric_date
+left join cumulative_legacy_prompts lp on ds.metric_date = lp.metric_date
 left join cumulative_swipes cs on ds.metric_date = cs.metric_date
 left join daily_new_metrics dm on ds.metric_date = dm.metric_date
 
