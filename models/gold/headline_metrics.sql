@@ -34,7 +34,8 @@ cumulative_cards as (
 cumulative_prompts as (
     select 
         ds.metric_date,
-        count(dq.query_id) + count(lq.query) as total_prompts,
+        count(dq.query_id) as total_prompts,
+        count(lq.query) as legacy_prompts,
         count(distinct dq.user_id) as users_who_prompted
     from date_spine ds
     left join {{ ref('src_dextr_queries') }} dq 
