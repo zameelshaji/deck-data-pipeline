@@ -4,5 +4,5 @@ select
     email_confirmed_at,
     created_at
 from {{ source("auth", "users") }}
-where id::text not in (select id from {{ref('src_test_accounts')}})
+-- where id::text not in (select id from {{ref('src_test_accounts')}})
 
