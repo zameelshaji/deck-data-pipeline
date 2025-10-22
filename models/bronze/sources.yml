@@ -76,3 +76,11 @@ sources:
         description: "Legacy featured likes"
       - name: learned_places
         description: "legacy cards table"
+  
+  - name: auth
+    description: "Raw auth tables"
+    database: postgres
+    schema: auth
+    tables:
+      - name: users
+        description: "Auth users created by supabase when user creates"

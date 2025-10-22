@@ -1,11 +1,12 @@
 -- User master table with all attributes
 select 
     -- Core identity
-    up.user_id,
-    up.email,
+    u.user_id,
+    u.email,
+    u.created_at,
+
     up.username,
     up.full_name,
-    up.created_at,
     up.onboarding_completed,
     
     -- Preference data
@@ -22,7 +23,11 @@ select
     upr.prefers_family,
     upr.prefers_date
 from 
+    {{ref ('src_users')}} as u
+left join 
     {{ ref ('src_user_profiles')}} as up
+    on u.user_id = up.user_id
 left join 
     {{ ref ('src_user_preferences')}} as upr
-    on up.user_id = upr.user_id
+    on u.user_id = upr.user_id
+where u.created_at is not null
