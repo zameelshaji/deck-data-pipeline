@@ -28,5 +28,12 @@ select
     card_metadata,
     created_at,
     user_ratings_total,
-    types
+    types,
+    'Adventure' = ANY(categories)  as is_adventure,
+    'Culture' = ANY(categories) as is_culture,
+    'Dining' = ANY(categories) as is_dining,
+    'Entertainment' = ANY(categories) as is_entertainment,
+    'Health' = ANY(categories) as is_health,
+    'Drinks' = ANY(categories) as is_drinks
+
 from {{ source("public", "experience_cards") }}

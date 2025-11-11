@@ -26,7 +26,14 @@ with
             serves_brunch,
             serves_breakfast,
             user_ratings_total,
-            types
+            types,
+            is_adventure,
+            is_culture,
+            is_dining,
+            is_entertainment,
+            is_health,
+            is_drinks
+
         from {{ ref("src_experience_cards") }}
     ),
 
@@ -57,7 +64,14 @@ with
             serves_brunch,
             serves_breakfast,
             null::int as user_ratings_total,
-            types
+            types,
+            is_adventure,
+            is_culture,
+            is_dining,
+            is_entertainment,
+            is_health,
+            is_drinks
+
         from {{ ref("src_featured_cards") }}
     )
 
