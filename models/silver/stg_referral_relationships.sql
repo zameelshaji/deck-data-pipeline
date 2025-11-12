@@ -1,18 +1,23 @@
-with referral_codes as (
-    select * from {{ ref('src_referral_codes') }}
-),
 
-referral_usages as (
-    select * from {{ ref('src_referral_usages') }}
+with referred as (
+    select 
+        ru.user_id as referred_user_id,
+        rc.user_id as referrer_user_id,
+        ru.used_at
+    from {{ ref('src_referral_usages') }} ru
+    left join {{ ref('src_referral_codes') }} rc on rc.code_id = ru.code_id
 )
 
 select
-    rc.code_id,
-    rc.user_id as referrer_user_id,
-    ru.referred_user_id,
-    rc.code,
-    rc.created_at as code_created_at,
-    ru.used_at as referral_used_at
-from referral_codes rc
-inner join referral_usages ru
-    on rc.code_id = ru.code_id
+    r.referrer_user_id,
+    u1.username as referrer_username,
+    u1.email as referrer_email,
+    r.referred_user_id,
+    u2.username as referred_username,
+    u2.email as referred_email,
+    r.used_at,
+    date(r.used_at) as used_date
+from referred r
+left join {{ ref('stg_users')}} u1 on r.referrer_user_id = u1.user_id
+left join {{ ref('stg_users')}} u2 on r.referred_user_id = u2.user_id
+
