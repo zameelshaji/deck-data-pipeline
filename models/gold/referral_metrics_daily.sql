@@ -1,3 +1,4 @@
+{{ config(enabled=false) }}
 with referral_relationships as (
     select * from {{ ref('stg_referral_relationships') }}
 )
