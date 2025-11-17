@@ -1,454 +1,416 @@
-"""DECK Dashboard - Custom Styling and Branding"""
+"""DECK Dashboard - Minimal Notion-Inspired Styling"""
 
 import streamlit as st
 
 
-# DECK Brand Colors
+# Notion-Inspired Color Palette - Minimal and Clean
 BRAND_COLORS = {
-    # Primary Brand Colors
-    'primary': '#E91E8C',           # DECK Magenta/Pink
-    'primary_dark': '#C7177A',      # Darker Pink (hover states)
-    'primary_light': '#FF4FA3',     # Lighter Pink (accents)
+    # Primary Colors - Subtle and Neutral
+    'primary': '#37352F',           # Notion's main text color
+    'primary_hover': '#2F2F2F',     # Slightly darker for hover
+    'accent': '#2383E2',            # Notion's blue accent (used sparingly)
 
-    # Light Mode Colors
-    'light_bg': '#FFFFFF',
-    'light_secondary_bg': '#F5F5F5',
-    'light_text': '#1A1A1A',
-    'light_text_secondary': '#6B7280',
+    # Background Colors
+    'bg_main': '#FFFFFF',           # Pure white main background
+    'bg_secondary': '#F7F6F3',      # Notion's light gray background
+    'bg_hover': '#EFEFEF',          # Hover state background
 
-    # Dark Mode Colors
-    'dark_bg': '#0E1117',
-    'dark_secondary_bg': '#262730',
-    'dark_text': '#FAFAFA',
-    'dark_text_secondary': '#A3A3A3',
+    # Text Colors
+    'text_primary': '#37352F',      # Main text - warm dark gray
+    'text_secondary': '#787774',    # Secondary text - medium gray
+    'text_tertiary': '#9B9A97',     # Tertiary/placeholder text
 
-    # Status Colors
-    'success': '#10B981',
-    'warning': '#F59E0B',
-    'error': '#EF4444',
-    'info': '#3B82F6',
+    # Border Colors
+    'border': '#E9E9E7',            # Light border
+    'border_dark': '#DFDFDE',       # Slightly darker border
+
+    # Status Colors - Muted
+    'success': '#0F7B6C',           # Muted green
+    'warning': '#D9730D',           # Muted orange
+    'error': '#E03E3E',             # Muted red
+    'info': '#2383E2',              # Notion blue
 }
 
 
 def apply_deck_branding():
-    """Apply DECK custom CSS styling to the dashboard"""
+    """Apply minimal Notion-inspired CSS styling to the dashboard"""
 
     custom_css = f"""
     <style>
-    /* Import Google Fonts */
+    /* Import Google Fonts - Inter for clean typography */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-    /* Global Font */
+    /* Global Font - Clean and Minimal */
     html, body, [class*="css"] {{
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
     }}
 
-    /* Main Title Styling - BOLD PINK */
+    /* Main Title - Simple and Clean */
     h1 {{
-        color: {BRAND_COLORS['primary']} !important;
-        font-weight: 800 !important;
-        letter-spacing: -0.02em;
-        text-shadow: 2px 2px 4px rgba(233, 30, 140, 0.2);
-        font-size: 3rem !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        font-weight: 600 !important;
+        font-size: 2rem !important;
+        letter-spacing: -0.03em;
+        margin-bottom: 0.5rem !important;
     }}
 
-    /* Subheader Styling - BOLD PINK */
+    /* Subheaders - Minimal Styling */
     h2, h3 {{
-        color: {BRAND_COLORS['primary']} !important;
-        font-weight: 700 !important;
-        background: linear-gradient(90deg, {BRAND_COLORS['primary']}10 0%, transparent 100%);
-        padding: 0.5rem 1rem;
-        border-left: 5px solid {BRAND_COLORS['primary']};
-        border-radius: 4px;
-        margin: 1rem 0 !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        font-weight: 600 !important;
+        font-size: 1.25rem !important;
+        padding: 0;
+        border: none;
+        margin: 1.5rem 0 1rem 0 !important;
     }}
 
     h4 {{
-        color: {BRAND_COLORS['primary']} !important;
-        font-weight: 600 !important;
-        border-bottom: 2px solid {BRAND_COLORS['primary']};
-        padding-bottom: 0.3rem;
-    }}
-
-    /* Metric Value Styling - BOLD PINK NUMBERS */
-    [data-testid="stMetricValue"] {{
-        font-size: 2.5rem !important;
-        font-weight: 800 !important;
-        color: {BRAND_COLORS['primary']} !important;
-        text-shadow: 1px 1px 2px rgba(233, 30, 140, 0.15);
-    }}
-
-    /* Metric Label Styling */
-    [data-testid="stMetricLabel"] {{
-        font-weight: 700 !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        font-weight: 500 !important;
         font-size: 1rem !important;
-        color: {BRAND_COLORS['light_text']} !important;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+        border: none;
+        padding: 0;
+        margin: 1rem 0 0.5rem 0 !important;
     }}
 
-    /* Metric Delta Positive */
+    /* Metric Value - Clean Numbers */
+    [data-testid="stMetricValue"] {{
+        font-size: 1.75rem !important;
+        font-weight: 600 !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        letter-spacing: -0.02em;
+    }}
+
+    /* Metric Label - Subtle */
+    [data-testid="stMetricLabel"] {{
+        font-weight: 400 !important;
+        font-size: 0.875rem !important;
+        color: {BRAND_COLORS['text_secondary']} !important;
+        text-transform: none;
+    }}
+
+    /* Metric Delta */
     [data-testid="stMetricDelta"] svg {{
         fill: {BRAND_COLORS['success']} !important;
     }}
 
     [data-testid="stMetricDelta"] {{
         color: {BRAND_COLORS['success']} !important;
+        font-size: 0.8rem !important;
+        font-weight: 500 !important;
     }}
 
-    /* Button Styling - VIBRANT PINK */
+    /* Button - Minimal and Functional */
     .stButton > button {{
-        background: linear-gradient(135deg, {BRAND_COLORS['primary']} 0%, {BRAND_COLORS['primary_dark']} 100%) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 12px !important;
-        padding: 0.75rem 2rem !important;
-        font-weight: 700 !important;
-        font-size: 1.1rem !important;
-        text-transform: uppercase;
-        letter-spacing: 1px;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 15px rgba(233, 30, 140, 0.4) !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        border: 1px solid {BRAND_COLORS['border_dark']} !important;
+        border-radius: 4px !important;
+        padding: 0.4rem 1rem !important;
+        font-weight: 500 !important;
+        font-size: 0.875rem !important;
+        transition: background-color 0.1s ease !important;
+        box-shadow: none !important;
     }}
 
     .stButton > button:hover {{
-        background: linear-gradient(135deg, {BRAND_COLORS['primary_dark']} 0%, {BRAND_COLORS['primary']} 100%) !important;
-        transform: translateY(-3px) scale(1.02);
-        box-shadow: 0 8px 25px rgba(233, 30, 140, 0.6) !important;
+        background-color: {BRAND_COLORS['bg_hover']} !important;
+        transform: none;
+        box-shadow: none !important;
     }}
 
     .stButton > button:active {{
-        transform: translateY(-1px) scale(0.98);
+        background-color: {BRAND_COLORS['bg_secondary']} !important;
     }}
 
-    /* Tab Styling - BOLD PINK TABS */
+    /* Tab Styling - Clean Underline Style */
     .stTabs [data-baseweb="tab-list"] {{
-        gap: 12px;
-        border-bottom: 3px solid {BRAND_COLORS['primary']} !important;
-    }}
-
-    .stTabs [data-baseweb="tab"] {{
-        border-radius: 12px 12px 0 0;
-        padding: 0.75rem 2rem;
-        font-weight: 700;
-        font-size: 1.05rem;
-        border: 2px solid transparent;
-        transition: all 0.3s ease;
-    }}
-
-    .stTabs [data-baseweb="tab"]:hover {{
-        background-color: {BRAND_COLORS['primary']}15 !important;
-        border-color: {BRAND_COLORS['primary']}50 !important;
-    }}
-
-    .stTabs [aria-selected="true"] {{
-        background: linear-gradient(180deg, {BRAND_COLORS['primary']} 0%, {BRAND_COLORS['primary_dark']} 100%) !important;
-        color: white !important;
-        border-color: {BRAND_COLORS['primary']} !important;
-        box-shadow: 0 -3px 10px rgba(233, 30, 140, 0.3) !important;
-        transform: translateY(-2px);
-    }}
-
-    /* Divider Styling - BOLD PINK LINE */
-    hr {{
-        border: none !important;
-        height: 4px !important;
-        background: linear-gradient(90deg, {BRAND_COLORS['primary']} 0%, {BRAND_COLORS['primary_light']} 50%, {BRAND_COLORS['primary']} 100%) !important;
-        border-radius: 2px;
-        margin: 2rem 0 !important;
-        box-shadow: 0 2px 8px rgba(233, 30, 140, 0.3);
-    }}
-
-    /* Sidebar Styling - PINK ACCENT SIDEBAR */
-    [data-testid="stSidebar"] {{
-        background: linear-gradient(180deg, {BRAND_COLORS['primary']}08 0%, {BRAND_COLORS['light_secondary_bg']} 20%, {BRAND_COLORS['light_secondary_bg']} 80%, {BRAND_COLORS['primary']}08 100%) !important;
-        border-right: 4px solid {BRAND_COLORS['primary']} !important;
-    }}
-
-    section[data-testid="stSidebar"] {{
-        background: linear-gradient(180deg, {BRAND_COLORS['primary']}08 0%, {BRAND_COLORS['light_secondary_bg']} 20%, {BRAND_COLORS['light_secondary_bg']} 80%, {BRAND_COLORS['primary']}08 100%) !important;
-    }}
-
-    section[data-testid="stSidebar"] > div {{
+        gap: 0;
+        border-bottom: 1px solid {BRAND_COLORS['border']} !important;
         background-color: transparent !important;
     }}
 
-    /* Sidebar Navigation - PINK HIGHLIGHTS */
+    .stTabs [data-baseweb="tab"] {{
+        border-radius: 0;
+        padding: 0.75rem 1rem;
+        font-weight: 400;
+        font-size: 0.875rem;
+        border: none;
+        background-color: transparent !important;
+        color: {BRAND_COLORS['text_secondary']} !important;
+    }}
+
+    .stTabs [data-baseweb="tab"]:hover {{
+        background-color: transparent !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+    }}
+
+    .stTabs [aria-selected="true"] {{
+        background-color: transparent !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        font-weight: 500 !important;
+        border-bottom: 2px solid {BRAND_COLORS['text_primary']} !important;
+        margin-bottom: -1px;
+    }}
+
+    /* Divider - Subtle */
+    hr {{
+        border: none !important;
+        height: 1px !important;
+        background-color: {BRAND_COLORS['border']} !important;
+        margin: 1.5rem 0 !important;
+    }}
+
+    /* Sidebar - Clean Background */
+    [data-testid="stSidebar"] {{
+        background-color: {BRAND_COLORS['bg_secondary']} !important;
+        border-right: 1px solid {BRAND_COLORS['border']} !important;
+    }}
+
+    section[data-testid="stSidebar"] {{
+        background-color: {BRAND_COLORS['bg_secondary']} !important;
+    }}
+
+    /* Sidebar Navigation - Minimal */
     [data-testid="stSidebarNav"] li a {{
-        border-radius: 12px;
-        transition: all 0.3s ease;
-        padding: 0.75rem 1rem !important;
-        margin: 0.3rem 0;
-        font-weight: 600;
-        border-left: 4px solid transparent;
+        border-radius: 4px;
+        transition: background-color 0.1s ease;
+        padding: 0.4rem 0.75rem !important;
+        margin: 0.1rem 0;
+        font-weight: 400;
+        font-size: 0.875rem;
+        color: {BRAND_COLORS['text_secondary']} !important;
     }}
 
     [data-testid="stSidebarNav"] li a:hover {{
-        background: linear-gradient(90deg, {BRAND_COLORS['primary']}25 0%, {BRAND_COLORS['primary']}10 100%) !important;
-        border-left: 4px solid {BRAND_COLORS['primary']} !important;
-        transform: translateX(5px);
-        box-shadow: 0 2px 8px rgba(233, 30, 140, 0.2);
+        background-color: {BRAND_COLORS['bg_hover']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
     }}
 
-    /* Active Page in Sidebar - BOLD PINK */
+    /* Active Page in Sidebar - Subtle Highlight */
     [data-testid="stSidebarNav"] li [aria-current="page"] {{
-        background: linear-gradient(135deg, {BRAND_COLORS['primary']} 0%, {BRAND_COLORS['primary_dark']} 100%) !important;
-        color: white !important;
-        font-weight: 700;
-        border-left: 4px solid {BRAND_COLORS['primary_light']} !important;
-        box-shadow: 0 4px 12px rgba(233, 30, 140, 0.4) !important;
-        transform: translateX(8px);
+        background-color: {BRAND_COLORS['bg_hover']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        font-weight: 500;
     }}
 
-    /* Card Styling for Metrics - PINK BORDERS */
+    /* Metric Container - Minimal Card */
     [data-testid="metric-container"] {{
-        background: linear-gradient(135deg, white 0%, {BRAND_COLORS['light_secondary_bg']} 100%);
-        padding: 1.5rem;
-        border-radius: 16px;
-        border: 3px solid {BRAND_COLORS['primary']}30;
-        border-left: 6px solid {BRAND_COLORS['primary']};
-        transition: all 0.3s ease;
-        box-shadow: 0 2px 8px rgba(233, 30, 140, 0.1);
+        background-color: {BRAND_COLORS['bg_main']};
+        padding: 1rem;
+        border-radius: 4px;
+        border: 1px solid {BRAND_COLORS['border']};
+        transition: none;
+        box-shadow: none;
     }}
 
     [data-testid="metric-container"]:hover {{
-        border-color: {BRAND_COLORS['primary']};
-        border-left-color: {BRAND_COLORS['primary_light']};
-        box-shadow: 0 8px 24px rgba(233, 30, 140, 0.25);
-        transform: translateY(-4px) scale(1.02);
-        background: linear-gradient(135deg, {BRAND_COLORS['primary']}05 0%, white 100%);
+        border-color: {BRAND_COLORS['border_dark']};
+        box-shadow: none;
+        transform: none;
     }}
 
-    /* Chart Container Styling - PINK FRAME (minimal to not break charts) */
-    .js-plotly-plot {{
-        border-left: 5px solid {BRAND_COLORS['primary']};
-        padding: 1rem;
-    }}
-
-    /* Links - BOLD PINK */
+    /* Links - Subtle */
     a {{
-        color: {BRAND_COLORS['primary']} !important;
+        color: {BRAND_COLORS['accent']} !important;
         text-decoration: none !important;
-        font-weight: 700;
-        transition: all 0.2s ease;
-        border-bottom: 2px solid transparent;
+        font-weight: 400;
     }}
 
     a:hover {{
-        color: {BRAND_COLORS['primary_dark']} !important;
-        border-bottom: 2px solid {BRAND_COLORS['primary']} !important;
-        text-shadow: 0 0 8px rgba(233, 30, 140, 0.3);
+        color: {BRAND_COLORS['accent']} !important;
+        text-decoration: underline !important;
     }}
 
-    /* Warning/Info Boxes */
+    /* Alert Boxes - Minimal */
     .stAlert {{
-        border-radius: 8px;
-        border-left: 4px solid {BRAND_COLORS['primary']};
+        border-radius: 4px;
+        border-left: 3px solid {BRAND_COLORS['info']};
+        background-color: {BRAND_COLORS['bg_secondary']} !important;
     }}
 
     /* Success Message */
     .stSuccess {{
-        background-color: {BRAND_COLORS['success']}15;
+        background-color: #F0FDF4 !important;
         border-left-color: {BRAND_COLORS['success']} !important;
     }}
 
     /* Warning Message */
     .stWarning {{
-        background-color: {BRAND_COLORS['warning']}15;
+        background-color: #FFFBEB !important;
         border-left-color: {BRAND_COLORS['warning']} !important;
     }}
 
     /* Error Message */
     .stError {{
-        background-color: {BRAND_COLORS['error']}15;
+        background-color: #FEF2F2 !important;
         border-left-color: {BRAND_COLORS['error']} !important;
     }}
 
     /* Info Message */
     .stInfo {{
-        background-color: {BRAND_COLORS['info']}15;
+        background-color: #EFF6FF !important;
         border-left-color: {BRAND_COLORS['info']} !important;
-    }}
-
-    /* Footer Styling */
-    .footer {{
-        text-align: center;
-        padding: 2rem 0;
-        color: {BRAND_COLORS['light_text_secondary']};
-        font-size: 0.9rem;
     }}
 
     /* Loading Spinner */
     .stSpinner > div {{
-        border-top-color: {BRAND_COLORS['primary']} !important;
-    }}
-
-    /* Dataframe Styling */
-    .dataframe {{
-        border-radius: 8px !important;
+        border-top-color: {BRAND_COLORS['text_secondary']} !important;
     }}
 
     /* Code Blocks */
     code {{
-        background-color: {BRAND_COLORS['light_secondary_bg']} !important;
-        color: {BRAND_COLORS['primary']} !important;
-        padding: 0.2rem 0.4rem;
-        border-radius: 4px;
-        font-weight: 500;
-    }}
-
-    /* Header Enhancement - PINK GRADIENT */
-    header[data-testid="stHeader"] {{
-        background: linear-gradient(135deg, {BRAND_COLORS['primary']}15 0%, {BRAND_COLORS['primary']}05 50%, transparent 100%);
-        border-bottom: 3px solid {BRAND_COLORS['primary']}30;
-        box-shadow: 0 2px 12px rgba(233, 30, 140, 0.1);
+        background-color: {BRAND_COLORS['bg_secondary']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        padding: 0.125rem 0.25rem;
+        border-radius: 3px;
+        font-size: 0.875em;
+        font-weight: 400;
     }}
 
     /* Remove Streamlit Branding */
     #MainMenu {{visibility: hidden;}}
     footer {{visibility: hidden;}}
 
-    /* Custom Footer */
-    .custom-footer {{
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        width: 100%;
-        background: {BRAND_COLORS['light_secondary_bg']};
-        padding: 0.5rem;
-        text-align: center;
-        font-size: 0.85rem;
-        color: {BRAND_COLORS['light_text_secondary']};
-        border-top: 2px solid {BRAND_COLORS['primary']};
-        z-index: 999;
-    }}
-
-    /* Force Light Mode - Override Dark Mode with SUBTLE PINK ACCENTS */
+    /* Main App Background */
     .stApp {{
-        background: linear-gradient(180deg, {BRAND_COLORS['primary']}02 0%, {BRAND_COLORS['light_bg']} 5%, {BRAND_COLORS['light_bg']} 95%, {BRAND_COLORS['primary']}02 100%) !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
     }}
 
-    [data-testid="stAppViewContainer"] {{
-        background-color: transparent !important;
-    }}
-
-    /* Force all text to light mode colors - but keep headings pink */
-    p, span, label, [data-testid="stMarkdownContainer"] p {{
-        color: {BRAND_COLORS['light_text']} !important;
-    }}
-
-    /* Ensure white backgrounds on all containers */
-    .element-container, .stBlock, [data-testid="block-container"] {{
-        background-color: transparent !important;
-    }}
-
-    /* Fix Selectbox (Dropdown) Styling */
+    /* Selectbox Styling */
     [data-baseweb="select"] {{
-        background-color: {BRAND_COLORS['light_bg']} !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
+    }}
+
+    [data-baseweb="select"] > div {{
+        background-color: {BRAND_COLORS['bg_main']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        border-color: {BRAND_COLORS['border']} !important;
+        border-radius: 4px !important;
+        font-size: 0.875rem !important;
+    }}
+
+    [data-baseweb="select"]:hover > div {{
+        border-color: {BRAND_COLORS['border_dark']} !important;
     }}
 
     [data-baseweb="popover"] {{
-        background-color: {BRAND_COLORS['light_bg']} !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
+        border: 1px solid {BRAND_COLORS['border']} !important;
+        border-radius: 4px !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
     }}
 
     [data-baseweb="menu"] {{
-        background-color: {BRAND_COLORS['light_bg']} !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
     }}
 
     [data-baseweb="menu"] li {{
-        background-color: {BRAND_COLORS['light_bg']} !important;
-        color: {BRAND_COLORS['light_text']} !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        font-size: 0.875rem !important;
     }}
 
     [data-baseweb="menu"] li:hover {{
-        background-color: {BRAND_COLORS['primary']}15 !important;
+        background-color: {BRAND_COLORS['bg_secondary']} !important;
     }}
 
-    /* Fix Input Fields */
+    /* Input Fields */
     input, textarea, [data-baseweb="input"] {{
-        background-color: {BRAND_COLORS['light_bg']} !important;
-        color: {BRAND_COLORS['light_text']} !important;
-    }}
-
-    /* MINIMAL Plotly styling - only backgrounds, no trace interference */
-
-    /* Fix chart container height */
-    .stPlotlyChart {{
-        width: 100% !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        border-color: {BRAND_COLORS['border']} !important;
+        border-radius: 4px !important;
+        font-size: 0.875rem !important;
     }}
 
     /* Caption styling */
     .stCaption {{
-        color: {BRAND_COLORS['light_text_secondary']} !important;
+        color: {BRAND_COLORS['text_tertiary']} !important;
+        font-size: 0.75rem !important;
     }}
 
-    /* Fix dataframe backgrounds */
+    /* Dataframe Styling - Clean Table */
     .stDataFrame {{
-        background-color: {BRAND_COLORS['light_bg']} !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
     }}
 
     [data-testid="stDataFrame"] {{
-        background-color: {BRAND_COLORS['light_bg']} !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
+        border: 1px solid {BRAND_COLORS['border']} !important;
+        border-radius: 4px !important;
     }}
 
-    /* Fix dataframe table headers - PINK */
     .stDataFrame thead tr th {{
-        background-color: {BRAND_COLORS['primary']} !important;
-        color: white !important;
-        font-weight: 700 !important;
-        border-bottom: 3px solid {BRAND_COLORS['primary_dark']} !important;
+        background-color: {BRAND_COLORS['bg_secondary']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        font-weight: 500 !important;
+        font-size: 0.8125rem !important;
+        border-bottom: 1px solid {BRAND_COLORS['border']} !important;
+        padding: 0.5rem 0.75rem !important;
     }}
 
-    /* Fix dataframe rows */
     .stDataFrame tbody tr {{
-        background-color: white !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
     }}
 
     .stDataFrame tbody tr:nth-child(even) {{
-        background-color: {BRAND_COLORS['light_secondary_bg']} !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
     }}
 
     .stDataFrame tbody tr:hover {{
-        background-color: {BRAND_COLORS['primary']}10 !important;
+        background-color: {BRAND_COLORS['bg_secondary']} !important;
     }}
 
     .stDataFrame tbody tr td {{
-        color: {BRAND_COLORS['light_text']} !important;
-        border-bottom: 1px solid {BRAND_COLORS['light_secondary_bg']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        border-bottom: 1px solid {BRAND_COLORS['border']} !important;
+        font-size: 0.8125rem !important;
+        padding: 0.5rem 0.75rem !important;
     }}
 
-    /* Fix selectbox dropdown options */
-    [data-baseweb="select"] > div {{
-        background-color: {BRAND_COLORS['light_bg']} !important;
-        color: {BRAND_COLORS['light_text']} !important;
-        border-color: {BRAND_COLORS['primary']}40 !important;
-    }}
-
-    [data-baseweb="select"]:hover > div {{
-        border-color: {BRAND_COLORS['primary']} !important;
-    }}
-
-    /* Fix all text inputs and selects */
-    .stSelectbox > div > div {{
-        background-color: {BRAND_COLORS['light_bg']} !important;
-        color: {BRAND_COLORS['light_text']} !important;
-    }}
-
-    /* Fix download button */
+    /* Download Button - Minimal */
     .stDownloadButton > button {{
-        background: linear-gradient(135deg, {BRAND_COLORS['success']} 0%, #059669 100%) !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 12px !important;
-        padding: 0.75rem 2rem !important;
-        font-weight: 700 !important;
-        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4) !important;
+        background-color: {BRAND_COLORS['bg_main']} !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        border: 1px solid {BRAND_COLORS['border_dark']} !important;
+        border-radius: 4px !important;
+        padding: 0.4rem 1rem !important;
+        font-weight: 500 !important;
+        font-size: 0.875rem !important;
     }}
 
     .stDownloadButton > button:hover {{
-        background: linear-gradient(135deg, #059669 0%, {BRAND_COLORS['success']} 100%) !important;
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.5) !important;
+        background-color: {BRAND_COLORS['bg_hover']} !important;
+        transform: none;
+    }}
+
+    /* Expander - Clean */
+    .streamlit-expanderHeader {{
+        font-weight: 500 !important;
+        font-size: 0.875rem !important;
+        color: {BRAND_COLORS['text_primary']} !important;
+        background-color: {BRAND_COLORS['bg_secondary']} !important;
+        border-radius: 4px !important;
+    }}
+
+    /* Plotly Charts - Remove heavy styling */
+    .js-plotly-plot {{
+        border: none !important;
+        padding: 0 !important;
+    }}
+
+    /* Column gap adjustments */
+    [data-testid="column"] {{
+        padding: 0 0.5rem !important;
+    }}
+
+    /* Remove extra padding */
+    .block-container {{
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
     }}
     </style>
     """
@@ -457,63 +419,62 @@ def apply_deck_branding():
 
 
 def add_deck_header():
-    """Add DECK branded header to the page"""
+    """Add minimal DECK header to the page"""
     st.markdown(f"""
         <div style="
-            padding: 1rem 0;
-            margin-bottom: 1rem;
-            border-bottom: 3px solid {BRAND_COLORS['primary']};
+            padding: 0 0 1rem 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid {BRAND_COLORS['border']};
         ">
             <h1 style="
                 margin: 0;
-                color: {BRAND_COLORS['primary']};
-                font-size: 2.5rem;
-                font-weight: 700;
+                color: {BRAND_COLORS['text_primary']};
+                font-size: 1.5rem;
+                font-weight: 600;
+                letter-spacing: -0.02em;
             ">
-                🎴 DECK Analytics
+                DECK Analytics
             </h1>
             <p style="
-                margin: 0.5rem 0 0 0;
-                color: {BRAND_COLORS['light_text_secondary']};
-                font-size: 1rem;
+                margin: 0.25rem 0 0 0;
+                color: {BRAND_COLORS['text_tertiary']};
+                font-size: 0.875rem;
+                font-weight: 400;
             ">
-                Insights & Performance Dashboard
+                Performance Dashboard
             </p>
         </div>
     """, unsafe_allow_html=True)
 
 
 def add_deck_footer():
-    """Add DECK branded footer to the page"""
+    """Add minimal DECK footer to the page"""
     st.markdown(f"""
         <div style="
             margin-top: 3rem;
-            padding-top: 2rem;
-            border-top: 2px solid {BRAND_COLORS['primary']}40;
+            padding-top: 1.5rem;
+            border-top: 1px solid {BRAND_COLORS['border']};
             text-align: center;
-            color: {BRAND_COLORS['light_text_secondary']};
+            color: {BRAND_COLORS['text_tertiary']};
         ">
-            <p style="margin: 0.5rem 0; font-weight: 600; color: {BRAND_COLORS['primary']};">
-                🎴 DECK Analytics Dashboard
-            </p>
-            <p style="margin: 0.5rem 0; font-size: 0.9rem;">
-                Powered by Streamlit | &copy; 2025 DECK
+            <p style="margin: 0; font-size: 0.75rem; font-weight: 400;">
+                DECK Analytics &middot; {chr(169)} 2025
             </p>
         </div>
     """, unsafe_allow_html=True)
 
 
 def create_metric_card(label, value, delta=None, help_text=None):
-    """Create a styled metric card with DECK branding"""
+    """Create a minimal styled metric card"""
     delta_html = ""
     if delta is not None:
         delta_color = BRAND_COLORS['success'] if isinstance(delta, (int, float)) and delta >= 0 else BRAND_COLORS['error']
         delta_html = f"""
             <div style="
                 color: {delta_color};
-                font-size: 0.9rem;
-                font-weight: 600;
-                margin-top: 0.5rem;
+                font-size: 0.8rem;
+                font-weight: 500;
+                margin-top: 0.25rem;
             ">
                 {delta}
             </div>
@@ -523,10 +484,9 @@ def create_metric_card(label, value, delta=None, help_text=None):
     if help_text:
         help_html = f"""
             <div style="
-                color: {BRAND_COLORS['light_text_secondary']};
-                font-size: 0.85rem;
+                color: {BRAND_COLORS['text_tertiary']};
+                font-size: 0.75rem;
                 margin-top: 0.5rem;
-                font-style: italic;
             ">
                 {help_text}
             </div>
@@ -534,25 +494,25 @@ def create_metric_card(label, value, delta=None, help_text=None):
 
     return f"""
         <div style="
-            background: {BRAND_COLORS['light_secondary_bg']};
-            padding: 1.5rem;
-            border-radius: 12px;
-            border: 2px solid {BRAND_COLORS['primary']}20;
-            transition: all 0.2s ease;
+            background: {BRAND_COLORS['bg_main']};
+            padding: 1rem;
+            border-radius: 4px;
+            border: 1px solid {BRAND_COLORS['border']};
             height: 100%;
         ">
             <div style="
-                color: {BRAND_COLORS['light_text']};
-                font-size: 0.95rem;
-                font-weight: 600;
-                margin-bottom: 0.5rem;
+                color: {BRAND_COLORS['text_secondary']};
+                font-size: 0.8125rem;
+                font-weight: 400;
+                margin-bottom: 0.25rem;
             ">
                 {label}
             </div>
             <div style="
-                color: {BRAND_COLORS['primary']};
-                font-size: 2rem;
-                font-weight: 700;
+                color: {BRAND_COLORS['text_primary']};
+                font-size: 1.5rem;
+                font-weight: 600;
+                letter-spacing: -0.02em;
             ">
                 {value}
             </div>
