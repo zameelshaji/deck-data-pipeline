@@ -173,3 +173,89 @@ def load_content_performance():
         df = pd.read_sql(text(query), conn)
 
     return df
+
+
+@st.cache_data(ttl=300)
+def load_latest_mau():
+    """Load the latest Monthly Active Users (MAU) metric"""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        monthly_active_users,
+        mom_growth_percent
+    FROM analytics_prod_gold.monthly_active_users
+    ORDER BY activity_month DESC
+    LIMIT 1
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading MAU data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_latest_wau():
+    """Load the latest Weekly Active Users (WAU) metric with growth data"""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        weekly_active_users,
+        wow_growth_percent,
+        growth_vs_4_weeks_ago_percent
+    FROM analytics_prod_gold.weekly_active_users
+    ORDER BY activity_week DESC
+    LIMIT 1
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading WAU data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_total_multiplayer_sessions():
+    """Load total multiplayer sessions to date"""
+    engine = get_database_connection()
+
+    query = """
+    SELECT COUNT(*) as total_multiplayer_sessions
+    FROM analytics_prod_silver.stg_multiplayer 
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading multiplayer sessions data: {str(e)}")
+        return pd.DataFrame({'total_multiplayer_sessions': [0]})
+
+
+@st.cache_data(ttl=300)
+def load_total_decks_created():
+    """Load total number of decks (boards) created that are not default"""
+    engine = get_database_connection()
+
+    query = """
+    SELECT COUNT(*) as total_decks_created
+    FROM analytics_prod_bronze.src_boards
+    WHERE is_default = false OR is_default IS NULL
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading decks created data: {str(e)}")
+        return pd.DataFrame({'total_decks_created': [0]})

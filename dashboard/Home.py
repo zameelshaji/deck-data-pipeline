@@ -3,7 +3,14 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from utils.data_loader import load_executive_summary, load_headline_metrics
+from utils.data_loader import (
+    load_executive_summary,
+    load_headline_metrics,
+    load_latest_mau,
+    load_latest_wau,
+    load_total_multiplayer_sessions,
+    load_total_decks_created
+)
 from utils.styling import apply_deck_branding, add_deck_footer
 
 # Page configuration
@@ -29,6 +36,10 @@ try:
     # Load data
     exec_summary = load_executive_summary()
     headline_metrics = load_headline_metrics(days=1)  # Get latest
+    mau_data = load_latest_mau()
+    wau_data = load_latest_wau()
+    multiplayer_sessions_data = load_total_multiplayer_sessions()
+    decks_created_data = load_total_decks_created()
 
     if exec_summary.empty or headline_metrics.empty:
         st.warning("⚠️ No data available")
@@ -37,6 +48,10 @@ try:
     # Extract values
     summary = exec_summary.iloc[0]
     latest = headline_metrics.iloc[0]
+    mau = mau_data.iloc[0] if not mau_data.empty else None
+    wau = wau_data.iloc[0] if not wau_data.empty else None
+    multiplayer_total = multiplayer_sessions_data.iloc[0]['total_multiplayer_sessions'] if not multiplayer_sessions_data.empty else 0
+    decks_total = decks_created_data.iloc[0]['total_decks_created'] if not decks_created_data.empty else 0
 
     # Display last updated
     st.caption(f"📅 Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -48,7 +63,7 @@ try:
     # ============================================
     st.subheader("📈 Key Metrics")
 
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
 
     with col1:
         st.metric(
@@ -59,9 +74,9 @@ try:
 
     with col2:
         st.metric(
-            label="📊 Daily Active Users (30d avg)",
-            value=f"{int(summary['daily_active_users']):,}",
-            delta=f"{summary['dau_growth_percent']:.1f}%" if pd.notna(summary['dau_growth_percent']) else None
+            label="📊 Monthly Active Users (MAU)",
+            value=f"{int(mau['monthly_active_users']):,}" if mau is not None else "N/A",
+            delta=f"{mau['mom_growth_percent']:.1f}%" if mau is not None and pd.notna(mau['mom_growth_percent']) else None
         )
 
     with col3:
@@ -75,6 +90,20 @@ try:
         st.metric(
             label="👆 Total Swipes",
             value=f"{int(latest['total_swipes']):,}",
+            delta=None
+        )
+
+    with col5:
+        st.metric(
+            label="🎮 Multiplayer Sessions",
+            value=f"{int(multiplayer_total):,}",
+            delta=None
+        )
+
+    with col6:
+        st.metric(
+            label="🎨 Decks Created",
+            value=f"{int(decks_total):,}",
             delta=None
         )
 
@@ -96,8 +125,8 @@ try:
             delta=None
         )
         st.metric(
-            label="DAU Growth",
-            value=f"{summary['dau_growth_percent']:.1f}%" if pd.notna(summary['dau_growth_percent']) else "N/A",
+            label="WAU Growth",
+            value=f"{wau['wow_growth_percent']:.1f}%" if wau is not None and pd.notna(wau['wow_growth_percent']) else "N/A",
             delta=None
         )
         st.metric(
@@ -211,15 +240,15 @@ try:
     col1, col2 = st.columns(2)
 
     with col1:
-        dau_growth = summary['dau_growth_vs_previous_30d']
-        if pd.notna(dau_growth):
+        if wau is not None and pd.notna(wau['growth_vs_4_weeks_ago_percent']):
+            wau_growth = wau['growth_vs_4_weeks_ago_percent']
             st.metric(
-                label="DAU Growth (vs Previous 30d)",
-                value=f"{dau_growth:+.1f}%",
-                delta=f"{dau_growth:+.1f}%"
+                label="WAU Growth (vs 4 Weeks Ago)",
+                value=f"{wau_growth:+.1f}%",
+                delta=f"{wau_growth:+.1f}%"
             )
         else:
-            st.metric(label="DAU Growth (vs Previous 30d)", value="N/A")
+            st.metric(label="WAU Growth (vs 4 Weeks Ago)", value="N/A")
 
     with col2:
         ai_growth = summary['ai_adoption_growth_vs_previous_30d']
