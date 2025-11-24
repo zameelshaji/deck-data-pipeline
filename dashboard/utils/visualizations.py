@@ -8,20 +8,20 @@ import plotly.io as pio
 # Set default template to ensure charts are visible
 pio.templates.default = "plotly_white"
 
-# Notion-Inspired Muted Chart Colors
+# DECK Pink Theme Chart Colors
 CHART_COLORS = {
-    'primary': '#37352F',         # Warm dark gray (main)
-    'secondary': '#787774',       # Medium gray
-    'accent': '#2383E2',          # Notion blue (sparingly)
-    'success': '#0F7B6C',         # Muted green
-    'warning': '#D9730D',         # Muted orange
-    'error': '#E03E3E',           # Muted red
-    'purple': '#9065B0',          # Muted purple
-    'blue': '#2383E2',            # Notion blue
+    'primary': '#E91E8C',         # DECK Hot Pink (main)
+    'secondary': '#FF6BB5',       # Light Pink
+    'accent': '#D4157A',          # Dark Pink
+    'success': '#10B981',         # Green
+    'warning': '#F59E0B',         # Orange
+    'error': '#EF4444',           # Red
+    'purple': '#C7177A',          # Deep Pink
+    'blue': '#FF2E9C',            # Bright Pink
 }
 
-# Muted color sequence for multi-line charts
-CHART_COLOR_SEQUENCE = ['#37352F', '#787774', '#2383E2', '#9065B0', '#0F7B6C', '#D9730D']
+# Pink color sequence for multi-line charts
+CHART_COLOR_SEQUENCE = ['#E91E8C', '#FF6BB5', '#D4157A', '#FF2E9C', '#C7177A', '#FFB3D9']
 
 # Default layout template - Clean and Minimal
 DEFAULT_LAYOUT = {
@@ -139,9 +139,9 @@ def create_multi_line_chart(df, x, y_columns, title, y_label=None):
 
 
 def create_funnel_chart(stages, values, title):
-    """Create a funnel chart with muted gradient"""
-    # Grayscale gradient
-    gradient_colors = ['#37352F', '#555550', '#787774', '#9B9A97']
+    """Create a funnel chart with pink gradient"""
+    # Pink gradient from dark to light
+    gradient_colors = ['#E91E8C', '#FF2E9C', '#FF6BB5', '#FFB3D9']
 
     fig = go.Figure(go.Funnel(
         y=stages,
@@ -151,7 +151,7 @@ def create_funnel_chart(stages, values, title):
         textfont=dict(size=12, color='white', family='Inter, -apple-system, sans-serif'),
         marker=dict(
             color=gradient_colors[:len(stages)],
-            line=dict(width=1, color='white')
+            line=dict(width=2, color='white')
         )
     ))
 
@@ -242,7 +242,7 @@ def create_area_chart(df, x, y, title, y_label=None):
     fig = px.area(df, x=x, y=y, title=title)
 
     fig.update_traces(
-        fillcolor='rgba(55, 53, 47, 0.1)',
+        fillcolor='rgba(233, 30, 140, 0.1)',  # Light pink fill
         line=dict(color=CHART_COLORS['primary'], width=2)
     )
 

@@ -81,7 +81,6 @@ try:
                 )
 
             # WAU Trend Chart
-            st.markdown("#### Weekly Active Users Trend (Last 12 Weeks)")
             wau_chart = create_line_chart(
                 wau_data.sort_values('activity_week'),
                 x='activity_week',
@@ -128,7 +127,6 @@ try:
                 )
 
             # MAU Trend Chart
-            st.markdown("#### Monthly Active Users Trend (Last 12 Months)")
             mau_chart = create_line_chart(
                 mau_data.sort_values('activity_month'),
                 x='activity_month',

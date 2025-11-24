@@ -202,7 +202,7 @@ try:
     st.plotly_chart(mau_chart, use_container_width=True, config={'displayModeBar': False})
 
     # Growth Rate Trend
-    st.markdown("#### Month-over-Month Growth Rate")
+    st.markdown("#### Month-over-Month MAU Growth Rate")
     growth_chart = create_bar_chart(
         mau_sorted,
         x='activity_month',
