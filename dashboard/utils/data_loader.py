@@ -268,10 +268,9 @@ def load_referral_metrics():
 
     query = """
     SELECT
-        COALESCE(SUM(referrals_used), 0) as total_referrals_given,
-        COALESCE((SELECT COUNT(DISTINCT referred_user_id)
-                  FROM analytics_prod_silver.stg_referral_relationships), 0) as total_referrals_claimed
-    FROM analytics_prod_gold.referral_analytics
+        COALESCE(COUNT(DISTINCT referrer_used_id), 0) as total_referrals_given,
+        COALESCE(COUNT(DISTINCT referred_user_id), 0) as total_referrals_claimed
+    FROM analytics_prod_silver.stg_referral_relationships
     """
 
     try:

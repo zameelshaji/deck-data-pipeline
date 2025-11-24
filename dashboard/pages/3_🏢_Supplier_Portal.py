@@ -130,17 +130,20 @@ try:
         with col1:
             st.metric(
                 "Impression → Intent Rate",
-                f"{supplier_detail['impression_to_intent_rate']:.1f}%" if pd.notna(supplier_detail['impression_to_intent_rate']) else "N/A"
+                f"{supplier_detail['impression_to_intent_rate']:.1f}%" if pd.notna(supplier_detail['impression_to_intent_rate']) else "N/A",
+                help="Percentage of impressions that led to user engagement actions"
             )
         with col2:
             st.metric(
                 "Intent → Conversion Rate",
-                f"{supplier_detail['intent_to_conversion_rate']:.1f}%" if pd.notna(supplier_detail['intent_to_conversion_rate']) else "N/A"
+                f"{supplier_detail['intent_to_conversion_rate']:.1f}%" if pd.notna(supplier_detail['intent_to_conversion_rate']) else "N/A",
+                help="Percentage of engagement actions that led to conversions"
             )
         with col3:
             st.metric(
                 "Overall Conversion Rate",
-                f"{supplier_detail['overall_conversion_rate']:.1f}%" if pd.notna(supplier_detail['overall_conversion_rate']) else "N/A"
+                f"{supplier_detail['overall_conversion_rate']:.1f}%" if pd.notna(supplier_detail['overall_conversion_rate']) else "N/A",
+                help="Percentage of impressions that led directly to conversions"
             )
 
         st.divider()
@@ -157,17 +160,20 @@ try:
             with col1:
                 st.metric(
                     "Viewers",
-                    f"{int(supplier_detail['viewers_last_7d']):,}" if pd.notna(supplier_detail['viewers_last_7d']) else "N/A"
+                    f"{int(supplier_detail['viewers_last_7d']):,}" if pd.notna(supplier_detail['viewers_last_7d']) else "N/A",
+                    help="Number of unique users who viewed this supplier's card in the last 7 days"
                 )
             with col2:
                 st.metric(
                     "Intent Actions",
-                    f"{int(supplier_detail['intent_actions_last_7d']):,}" if pd.notna(supplier_detail['intent_actions_last_7d']) else "N/A"
+                    f"{int(supplier_detail['intent_actions_last_7d']):,}" if pd.notna(supplier_detail['intent_actions_last_7d']) else "N/A",
+                    help="Total engagement actions on this card in the last 7 days"
                 )
             with col3:
                 st.metric(
                     "Conversions",
-                    f"{int(supplier_detail['conversions_last_7d']):,}" if pd.notna(supplier_detail['conversions_last_7d']) else "N/A"
+                    f"{int(supplier_detail['conversions_last_7d']):,}" if pd.notna(supplier_detail['conversions_last_7d']) else "N/A",
+                    help="Total conversion actions on this card in the last 7 days"
                 )
 
         with tab_30d:
@@ -175,17 +181,20 @@ try:
             with col1:
                 st.metric(
                     "Viewers",
-                    f"{int(supplier_detail['viewers_last_30d']):,}" if pd.notna(supplier_detail['viewers_last_30d']) else "N/A"
+                    f"{int(supplier_detail['viewers_last_30d']):,}" if pd.notna(supplier_detail['viewers_last_30d']) else "N/A",
+                    help="Number of unique users who viewed this supplier's card in the last 30 days"
                 )
             with col2:
                 st.metric(
                     "Intent Actions",
-                    f"{int(supplier_detail['intent_actions_last_30d']):,}" if pd.notna(supplier_detail['intent_actions_last_30d']) else "N/A"
+                    f"{int(supplier_detail['intent_actions_last_30d']):,}" if pd.notna(supplier_detail['intent_actions_last_30d']) else "N/A",
+                    help="Total engagement actions on this card in the last 30 days"
                 )
             with col3:
                 st.metric(
                     "Conversions",
-                    f"{int(supplier_detail['conversions_last_30d']):,}" if pd.notna(supplier_detail['conversions_last_30d']) else "N/A"
+                    f"{int(supplier_detail['conversions_last_30d']):,}" if pd.notna(supplier_detail['conversions_last_30d']) else "N/A",
+                    help="Total conversion actions on this card in the last 30 days"
                 )
 
         with tab_90d:
@@ -193,17 +202,20 @@ try:
             with col1:
                 st.metric(
                     "Viewers",
-                    f"{int(supplier_detail['viewers_last_90d']):,}" if pd.notna(supplier_detail['viewers_last_90d']) else "N/A"
+                    f"{int(supplier_detail['viewers_last_90d']):,}" if pd.notna(supplier_detail['viewers_last_90d']) else "N/A",
+                    help="Number of unique users who viewed this supplier's card in the last 90 days"
                 )
             with col2:
                 st.metric(
                     "Intent Actions",
-                    f"{int(supplier_detail['intent_actions_last_90d']):,}" if pd.notna(supplier_detail['intent_actions_last_90d']) else "N/A"
+                    f"{int(supplier_detail['intent_actions_last_90d']):,}" if pd.notna(supplier_detail['intent_actions_last_90d']) else "N/A",
+                    help="Total engagement actions on this card in the last 90 days"
                 )
             with col3:
                 st.metric(
                     "Conversions",
-                    f"{int(supplier_detail['conversions_last_90d']):,}" if pd.notna(supplier_detail['conversions_last_90d']) else "N/A"
+                    f"{int(supplier_detail['conversions_last_90d']):,}" if pd.notna(supplier_detail['conversions_last_90d']) else "N/A",
+                    help="Total conversion actions on this card in the last 90 days"
                 )
 
         st.divider()
@@ -218,52 +230,52 @@ try:
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.metric("Card Opens", f"{int(supplier_detail['card_opens']):,}" if pd.notna(supplier_detail['card_opens']) else "N/A")
-                st.metric("Positive Swipes", f"{int(supplier_detail['positive_swipes']):,}" if pd.notna(supplier_detail['positive_swipes']) else "N/A")
+                st.metric("Card Opens", f"{int(supplier_detail['card_opens']):,}" if pd.notna(supplier_detail['card_opens']) else "N/A", help="Number of times users opened/expanded this card")
+                st.metric("Positive Swipes", f"{int(supplier_detail['positive_swipes']):,}" if pd.notna(supplier_detail['positive_swipes']) else "N/A", help="Number of right swipes (positive reactions)")
 
             with col2:
-                st.metric("Negative Swipes", f"{int(supplier_detail['negative_swipes']):,}" if pd.notna(supplier_detail['negative_swipes']) else "N/A")
-                st.metric("Saves", f"{int(supplier_detail['saves']):,}" if pd.notna(supplier_detail['saves']) else "N/A")
+                st.metric("Negative Swipes", f"{int(supplier_detail['negative_swipes']):,}" if pd.notna(supplier_detail['negative_swipes']) else "N/A", help="Number of left swipes (negative reactions)")
+                st.metric("Saves", f"{int(supplier_detail['saves']):,}" if pd.notna(supplier_detail['saves']) else "N/A", help="Number of times users saved this card")
 
             with col3:
-                st.metric("Shares", f"{int(supplier_detail['shares']):,}" if pd.notna(supplier_detail['shares']) else "N/A")
-                st.metric("Click-Through Rate", f"{supplier_detail['click_through_rate']:.1f}%" if pd.notna(supplier_detail['click_through_rate']) else "N/A")
+                st.metric("Shares", f"{int(supplier_detail['shares']):,}" if pd.notna(supplier_detail['shares']) else "N/A", help="Number of times users shared this card")
+                st.metric("Click-Through Rate", f"{supplier_detail['click_through_rate']:.1f}%" if pd.notna(supplier_detail['click_through_rate']) else "N/A", help="Percentage of impressions that led to card opens")
 
             # Intent rates
             st.markdown("#### Intent Quality Metrics")
             col1, col2, col3 = st.columns(3)
             with col1:
-                st.metric("Positive Swipe Rate", f"{supplier_detail['positive_swipe_rate']:.1f}%" if pd.notna(supplier_detail['positive_swipe_rate']) else "N/A")
+                st.metric("Positive Swipe Rate", f"{supplier_detail['positive_swipe_rate']:.1f}%" if pd.notna(supplier_detail['positive_swipe_rate']) else "N/A", help="Percentage of impressions that resulted in positive swipes")
             with col2:
-                st.metric("Save Rate", f"{supplier_detail['save_rate']:.1f}%" if pd.notna(supplier_detail['save_rate']) else "N/A")
+                st.metric("Save Rate", f"{supplier_detail['save_rate']:.1f}%" if pd.notna(supplier_detail['save_rate']) else "N/A", help="Percentage of impressions that resulted in saves")
             with col3:
-                st.metric("Share Rate", f"{supplier_detail['share_rate']:.1f}%" if pd.notna(supplier_detail['share_rate']) else "N/A")
+                st.metric("Share Rate", f"{supplier_detail['share_rate']:.1f}%" if pd.notna(supplier_detail['share_rate']) else "N/A", help="Percentage of impressions that resulted in shares")
 
         # Conversion Actions Detail
         with st.expander("💰 Conversion Actions Breakdown", expanded=True):
             col1, col2, col3, col4 = st.columns(4)
 
             with col1:
-                st.metric("Website Visits", f"{int(supplier_detail['website_visits']):,}" if pd.notna(supplier_detail['website_visits']) else "N/A")
+                st.metric("Website Visits", f"{int(supplier_detail['website_visits']):,}" if pd.notna(supplier_detail['website_visits']) else "N/A", help="Number of clicks to supplier's website")
 
             with col2:
-                st.metric("Book Clicks", f"{int(supplier_detail['book_clicks']):,}" if pd.notna(supplier_detail['book_clicks']) else "N/A")
+                st.metric("Book Clicks", f"{int(supplier_detail['book_clicks']):,}" if pd.notna(supplier_detail['book_clicks']) else "N/A", help="Number of clicks on booking/reservation buttons")
 
             with col3:
-                st.metric("Direction Clicks", f"{int(supplier_detail['direction_clicks']):,}" if pd.notna(supplier_detail['direction_clicks']) else "N/A")
+                st.metric("Direction Clicks", f"{int(supplier_detail['direction_clicks']):,}" if pd.notna(supplier_detail['direction_clicks']) else "N/A", help="Number of clicks to get directions")
 
             with col4:
-                st.metric("Phone Clicks", f"{int(supplier_detail['phone_clicks']):,}" if pd.notna(supplier_detail['phone_clicks']) else "N/A")
+                st.metric("Phone Clicks", f"{int(supplier_detail['phone_clicks']):,}" if pd.notna(supplier_detail['phone_clicks']) else "N/A", help="Number of clicks to call the supplier")
 
         # Performance Classification
         with st.expander("🏆 Performance Metrics", expanded=True):
             col1, col2 = st.columns(2)
 
             with col1:
-                st.metric("Impression → Intent Rate", f"{supplier_detail['impression_to_intent_rate']:.1f}%" if pd.notna(supplier_detail['impression_to_intent_rate']) else "N/A")
+                st.metric("Impression → Intent Rate", f"{supplier_detail['impression_to_intent_rate']:.1f}%" if pd.notna(supplier_detail['impression_to_intent_rate']) else "N/A", help="Percentage of viewers who took an engagement action")
 
             with col2:
-                st.metric("User Conversion Rate", f"{supplier_detail['user_conversion_rate']:.1f}%" if pd.notna(supplier_detail['user_conversion_rate']) else "N/A")
+                st.metric("User Conversion Rate", f"{supplier_detail['user_conversion_rate']:.1f}%" if pd.notna(supplier_detail['user_conversion_rate']) else "N/A", help="Percentage of unique viewers who took a conversion action")
 
     else:
         # ============================================

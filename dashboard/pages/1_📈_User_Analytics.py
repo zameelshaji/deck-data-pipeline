@@ -86,10 +86,10 @@ try:
                 wau_data.sort_values('activity_week'),
                 x='activity_week',
                 y='weekly_active_users',
-                title=None,
+                title="",
                 y_label="Active Users"
             )
-            st.plotly_chart(wau_chart, use_container_width=True)
+            st.plotly_chart(wau_chart, use_container_width=True, config={'displayModeBar': False})
 
         else:
             st.warning("No weekly active users data available")
@@ -133,10 +133,10 @@ try:
                 mau_data.sort_values('activity_month'),
                 x='activity_month',
                 y='monthly_active_users',
-                title=None,
+                title="",
                 y_label="Active Users"
             )
-            st.plotly_chart(mau_chart, use_container_width=True)
+            st.plotly_chart(mau_chart, use_container_width=True, config={'displayModeBar': False})
 
         else:
             st.warning("No monthly active users data available")
@@ -201,28 +201,32 @@ try:
         with col1:
             st.metric(
                 label="Total Signups",
-                value=f"{total_signups:,}"
+                value=f"{total_signups:,}",
+                help="Total number of new user registrations in the selected timeframe"
             )
 
         with col2:
             onboarding_rate = (total_onboarded / total_signups * 100) if total_signups > 0 else 0
             st.metric(
                 label="Onboarding Rate",
-                value=f"{onboarding_rate:.1f}%"
+                value=f"{onboarding_rate:.1f}%",
+                help="Percentage of signups who completed the onboarding process"
             )
 
         with col3:
             ai_adoption = (total_ai_users / total_signups * 100) if total_signups > 0 else 0
             st.metric(
                 label="AI Adoption",
-                value=f"{ai_adoption:.1f}%"
+                value=f"{ai_adoption:.1f}%",
+                help="Percentage of new signups who used AI features (Dextr) at least once"
             )
 
         with col4:
             activation_rate = (total_activated / total_signups * 100) if total_signups > 0 else 0
             st.metric(
                 label="Week 1 Activation",
-                value=f"{activation_rate:.1f}%"
+                value=f"{activation_rate:.1f}%",
+                help="Percentage of signups who were active during their first week"
             )
 
         # Show average metrics
@@ -236,19 +240,22 @@ try:
         with col1:
             st.metric(
                 label="Avg Onboarding Completion",
-                value=f"{avg_onboarding:.1f}%" if pd.notna(avg_onboarding) else "N/A"
+                value=f"{avg_onboarding:.1f}%" if pd.notna(avg_onboarding) else "N/A",
+                help="Average daily onboarding completion rate across the timeframe"
             )
 
         with col2:
             st.metric(
                 label="Avg AI Adoption",
-                value=f"{avg_ai_adoption:.1f}%" if pd.notna(avg_ai_adoption) else "N/A"
+                value=f"{avg_ai_adoption:.1f}%" if pd.notna(avg_ai_adoption) else "N/A",
+                help="Average daily AI feature adoption rate across the timeframe"
             )
 
         with col3:
             st.metric(
                 label="Avg Week 1 Activation",
-                value=f"{avg_activation:.1f}%" if pd.notna(avg_activation) else "N/A"
+                value=f"{avg_activation:.1f}%" if pd.notna(avg_activation) else "N/A",
+                help="Average daily first-week activation rate across the timeframe"
             )
 
     else:

@@ -196,10 +196,10 @@ try:
         mau_sorted,
         x='activity_month',
         y='monthly_active_users',
-        title="Monthly Active Users Trend",
+        title="",
         y_label="Active Users"
     )
-    st.plotly_chart(mau_chart, use_container_width=True)
+    st.plotly_chart(mau_chart, use_container_width=True, config={'displayModeBar': False})
 
     # Growth Rate Trend
     st.markdown("#### Month-over-Month Growth Rate")
@@ -207,10 +207,10 @@ try:
         mau_sorted,
         x='activity_month',
         y='mom_growth_percent',
-        title="MoM Growth %",
+        title="",
         orientation='v'
     )
-    st.plotly_chart(growth_chart, use_container_width=True)
+    st.plotly_chart(growth_chart, use_container_width=True, config={'displayModeBar': False})
 
 except Exception as e:
     st.error(f"❌ Error loading monthly summary data: {str(e)}")
