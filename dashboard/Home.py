@@ -9,7 +9,8 @@ from utils.data_loader import (
     load_latest_mau,
     load_latest_wau,
     load_total_multiplayer_sessions,
-    load_total_decks_created
+    load_total_decks_created,
+    load_referral_metrics
 )
 from utils.styling import apply_deck_branding, add_deck_footer
 
@@ -40,6 +41,7 @@ try:
     wau_data = load_latest_wau()
     multiplayer_sessions_data = load_total_multiplayer_sessions()
     decks_created_data = load_total_decks_created()
+    referral_data = load_referral_metrics()
 
     if exec_summary.empty or headline_metrics.empty:
         st.warning("⚠️ No data available")
@@ -52,6 +54,12 @@ try:
     wau = wau_data.iloc[0] if not wau_data.empty else None
     multiplayer_total = multiplayer_sessions_data.iloc[0]['total_multiplayer_sessions'] if not multiplayer_sessions_data.empty else 0
     decks_total = decks_created_data.iloc[0]['total_decks_created'] if not decks_created_data.empty else 0
+    referral_metrics = referral_data.iloc[0] if not referral_data.empty else None
+
+    # Calculate MAU % of Total Users
+    mau_percentage = 0
+    if mau is not None and latest['total_users'] > 0:
+        mau_percentage = (mau['monthly_active_users'] / latest['total_users']) * 100
 
     # Display last updated
     st.caption(f"📅 Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -59,207 +67,112 @@ try:
     st.divider()
 
     # ============================================
-    # SECTION A: HERO METRICS
+    # KEY METRICS - 3 rows x 3 columns
     # ============================================
     st.subheader("📈 Key Metrics")
 
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    # Add custom CSS for enhanced metrics
+    st.markdown("""
+        <style>
+        .home-metric [data-testid="stMetricValue"] {
+            font-size: 2.5rem !important;
+            font-weight: 600 !important;
+        }
+        .home-metric [data-testid="stMetricLabel"] {
+            font-size: 1rem !important;
+            font-weight: 500 !important;
+        }
+        .home-metric [data-testid="metric-container"] {
+            padding: 1.5rem !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    # Wrap metrics in div with home-metric class
+    st.markdown('<div class="home-metric">', unsafe_allow_html=True)
+
+    # Row 1
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         st.metric(
             label="👥 Total Users",
             value=f"{int(latest['total_users']):,}",
-            delta=None
+            delta=None,
+            help="Total number of registered users on the platform"
         )
 
     with col2:
         st.metric(
             label="📊 Monthly Active Users (MAU)",
             value=f"{int(mau['monthly_active_users']):,}" if mau is not None else "N/A",
-            delta=f"{mau['mom_growth_percent']:.1f}%" if mau is not None and pd.notna(mau['mom_growth_percent']) else None
+            delta=f"{mau['mom_growth_percent']:.1f}%" if mau is not None and pd.notna(mau['mom_growth_percent']) else None,
+            help="Unique users who performed at least one action in the last 30 days"
         )
 
     with col3:
+        st.metric(
+            label="📈 MAU % of Total Users",
+            value=f"{mau_percentage:.1f}%",
+            delta=None,
+            help="Percentage of total registered users who were active in the last 30 days"
+        )
+
+    # Row 2
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
         st.metric(
             label="💬 Total Prompts",
             value=f"{int(latest['total_prompts']):,}",
-            delta=None
+            delta=None,
+            help="Cumulative number of AI queries submitted by all users"
         )
 
-    with col4:
+    with col2:
         st.metric(
             label="👆 Total Swipes",
             value=f"{int(latest['total_swipes']):,}",
-            delta=None
+            delta=None,
+            help="Cumulative number of card swipes (left or right) by all users"
         )
 
-    with col5:
+    with col3:
         st.metric(
             label="🎮 Multiplayer Sessions",
             value=f"{int(multiplayer_total):,}",
-            delta=None
+            delta=None,
+            help="Total number of collaborative planning sessions created"
         )
 
-    with col6:
+    # Row 3
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
         st.metric(
             label="🎨 Decks Created",
             value=f"{int(decks_total):,}",
-            delta=None
+            delta=None,
+            help="Total number of custom boards/wishlists created by users"
         )
 
-    st.divider()
-
-    # ============================================
-    # SECTION B: KEY METRICS GRID
-    # ============================================
-    st.subheader("🎯 Performance Metrics (Last 30 Days)")
-
-    col1, col2, col3 = st.columns(3)
-
-    # Column 1: Growth Metrics
-    with col1:
-        st.markdown("### 📈 Growth")
-        st.metric(
-            label="New Signups",
-            value=f"{int(summary['new_signups_30d']):,}",
-            delta=None
-        )
-        st.metric(
-            label="WAU Growth",
-            value=f"{wau['wow_growth_percent']:.1f}%" if wau is not None and pd.notna(wau['wow_growth_percent']) else "N/A",
-            delta=None
-        )
-        st.metric(
-            label="Activation Rate",
-            value=f"{summary['activation_rate']:.1f}%" if pd.notna(summary['activation_rate']) else "N/A",
-            delta=None
-        )
-        st.metric(
-            label="Avg Events/User",
-            value=f"{summary['avg_events_per_user']:.1f}" if pd.notna(summary['avg_events_per_user']) else "N/A",
-            delta=None
-        )
-
-    # Column 2: AI Performance
     with col2:
-        st.markdown("### 🤖 AI Performance")
         st.metric(
-            label="Avg Daily AI Queries",
-            value=f"{int(summary['avg_daily_ai_queries']):,}" if pd.notna(summary['avg_daily_ai_queries']) else "N/A",
+            label="🎁 Referrals Given",
+            value=f"{int(referral_metrics['total_referrals_given']):,}" if referral_metrics is not None else "0",
             delta=None,
-            help="Average number of AI queries per day across all users"
-        )
-        st.metric(
-            label="AI Satisfaction Rate",
-            value=f"{summary['ai_satisfaction_rate']:.1f}%" if pd.notna(summary['ai_satisfaction_rate']) else "N/A",
-            delta=None,
-            help="Percentage of AI interactions that received positive feedback from users (likes, thumbs up, etc.)"
-        )
-        st.metric(
-            label="AI Adoption Rate",
-            value=f"{summary['ai_adoption_rate_percent']:.1f}%" if pd.notna(summary['ai_adoption_rate_percent']) else "N/A",
-            delta=None,
-            help="Percentage of active users who have used AI features at least once"
-        )
-        st.metric(
-            label="AI Power Users",
-            value=f"{summary['ai_power_user_percentage']:.1f}%" if pd.notna(summary['ai_power_user_percentage']) else "N/A",
-            delta=None,
-            help="Percentage of users who frequently use AI features (10+ queries in the period)"
+            help="Number of referral codes successfully used by new users"
         )
 
-    # Column 3: Content & Features
     with col3:
-        st.markdown("### 🎨 Content & Features")
         st.metric(
-            label="Active Experience Cards",
-            value=f"{int(summary['active_cards_count']):,}" if pd.notna(summary['active_cards_count']) else "N/A",
-            delta=None
-        )
-        st.metric(
-            label="Content Like Rate",
-            value=f"{summary['content_like_rate']:.1f}%" if pd.notna(summary['content_like_rate']) else "N/A",
-            delta=None
-        )
-        st.metric(
-            label="High Performing Cards",
-            value=f"{int(summary['high_performing_cards']):,}" if pd.notna(summary['high_performing_cards']) else "N/A",
-            delta=None
-        )
-        st.metric(
-            label="Multiplayer Sessions",
-            value=f"{int(summary['total_multiplayer_sessions_last_30']):,}" if pd.notna(summary['total_multiplayer_sessions_last_30']) else "N/A",
-            delta=None
-        )
-
-    st.divider()
-
-    # ============================================
-    # SECTION C: ADDITIONAL INSIGHTS
-    # ============================================
-    st.subheader("💡 Additional Insights")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("### 🎯 Engagement Quality")
-        st.metric(
-            label="Conversion User Rate",
-            value=f"{summary['conversion_user_rate_percent']:.1f}%" if pd.notna(summary['conversion_user_rate_percent']) else "N/A",
+            label="✅ Referrals Claimed",
+            value=f"{int(referral_metrics['total_referrals_claimed']):,}" if referral_metrics is not None else "0",
             delta=None,
-            help="Percentage of users performing conversion actions"
-        )
-        st.metric(
-            label="Content Conversion Rate",
-            value=f"{summary['content_conversion_rate']:.1f}%" if pd.notna(summary['content_conversion_rate']) else "N/A",
-            delta=None,
-            help="Percentage of impressions leading to conversions"
+            help="Number of users who signed up using a referral code"
         )
 
-    with col2:
-        st.markdown("### 🤝 Multiplayer")
-        st.metric(
-            label="Avg Participants/Session",
-            value=f"{summary['avg_multiplayer_participants']:.1f}" if pd.notna(summary['avg_multiplayer_participants']) else "N/A",
-            delta=None
-        )
-        st.metric(
-            label="Consensus Rate",
-            value=f"{summary['multiplayer_consensus_rate']:.1f}%" if pd.notna(summary['multiplayer_consensus_rate']) else "N/A",
-            delta=None,
-            help="Average agreement rate in multiplayer sessions"
-        )
-
-    st.divider()
-
-    # ============================================
-    # SECTION D: GROWTH COMPARISON
-    # ============================================
-    st.subheader("📊 Growth vs Previous Period")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if wau is not None and pd.notna(wau['growth_vs_4_weeks_ago_percent']):
-            wau_growth = wau['growth_vs_4_weeks_ago_percent']
-            st.metric(
-                label="WAU Growth (vs 4 Weeks Ago)",
-                value=f"{wau_growth:+.1f}%",
-                delta=f"{wau_growth:+.1f}%"
-            )
-        else:
-            st.metric(label="WAU Growth (vs 4 Weeks Ago)", value="N/A")
-
-    with col2:
-        ai_growth = summary['ai_adoption_growth_vs_previous_30d']
-        if pd.notna(ai_growth):
-            st.metric(
-                label="AI Adoption Growth (vs Previous 30d)",
-                value=f"{ai_growth:+.1f}%",
-                delta=f"{ai_growth:+.1f}%"
-            )
-        else:
-            st.metric(label="AI Adoption Growth (vs Previous 30d)", value="N/A")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 except Exception as e:
     st.error(f"❌ Error loading data: {str(e)}")

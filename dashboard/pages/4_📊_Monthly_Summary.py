@@ -15,8 +15,7 @@ from utils.data_loader import (
 )
 from utils.visualizations import (
     create_line_chart,
-    create_bar_chart,
-    create_multi_line_chart
+    create_bar_chart
 )
 from utils.styling import apply_deck_branding, add_deck_footer
 
@@ -53,23 +52,18 @@ try:
     mau_data['activity_month'] = pd.to_datetime(mau_data['activity_month'])
 
     # Aggregate headline metrics by month
-    # Note: headline_data contains cumulative totals, so we need to calculate the difference
-    # between the last day and first day of each month
     if not headline_data.empty:
         headline_data['metric_date'] = pd.to_datetime(headline_data['metric_date'])
         headline_data['month'] = headline_data['metric_date'].dt.to_period('M')
 
         # For each month, get the max value (end of month) minus min value (start of month)
-        # This gives us the actual activity for that month
         monthly_headline_list = []
         for month in headline_data['month'].unique():
             month_data = headline_data[headline_data['month'] == month].sort_values('metric_date')
             if len(month_data) > 1:
-                # Difference between last and first day of the month
                 prompts_in_month = month_data['total_prompts'].iloc[-1] - month_data['total_prompts'].iloc[0]
                 swipes_in_month = month_data['total_swipes'].iloc[-1] - month_data['total_swipes'].iloc[0]
             else:
-                # Only one day of data, use that value (edge case)
                 prompts_in_month = month_data['total_prompts'].iloc[0]
                 swipes_in_month = month_data['total_swipes'].iloc[0]
 
@@ -145,105 +139,52 @@ try:
         month_swipes = headline_row['total_swipes']
 
     # ============================================
-    # SECTION A: KEY METRICS FOR SELECTED MONTH
+    # SECTION A: KEY METRICS FOR SELECTED MONTH (Simplified)
     # ============================================
-    st.subheader(f"📈 Key Metrics for {format_month(selected_month)}")
+    # Build heading with MoM growth if available
+    mom_growth = month_metrics['mom_growth_percent']
+    if pd.notna(mom_growth):
+        heading = f"📈 Key Metrics for {format_month(selected_month)} | MoM Growth: {mom_growth:.1f}%"
+    else:
+        heading = f"📈 Key Metrics for {format_month(selected_month)}"
+
+    st.subheader(heading)
 
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.metric(
-            label="Monthly Active Users",
+            label="MAU",
             value=f"{int(month_metrics['monthly_active_users']):,}",
-            delta=f"{month_metrics['mom_growth_percent']:.1f}% MoM" if pd.notna(month_metrics['mom_growth_percent']) else None
+            delta=f"{month_metrics['mom_growth_percent']:.1f}% MoM" if pd.notna(month_metrics['mom_growth_percent']) else None,
+            help="Unique users who performed at least one action during this month"
         )
 
     with col2:
         st.metric(
             label="New Signups",
-            value=f"{int(month_signups):,}"
+            value=f"{int(month_signups):,}",
+            help="Number of new user registrations during this month"
         )
 
     with col3:
         st.metric(
             label="Total Prompts",
-            value=f"{int(month_prompts):,}"
+            value=f"{int(month_prompts):,}",
+            help="Number of AI queries submitted during this month"
         )
 
     with col4:
         st.metric(
             label="Total Swipes",
-            value=f"{int(month_swipes):,}"
-        )
-
-    # Second row of metrics
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        st.metric(
-            label="3-Month Rolling Avg",
-            value=f"{int(month_metrics['rolling_3month_avg']):,}" if pd.notna(month_metrics['rolling_3month_avg']) else "N/A"
-        )
-
-    with col2:
-        st.metric(
-            label="AI Adoption Rate",
-            value=f"{month_metrics['ai_adoption_rate']:.1f}%" if pd.notna(month_metrics['ai_adoption_rate']) else "N/A"
-        )
-
-    with col3:
-        st.metric(
-            label="Avg Events/User",
-            value=f"{month_metrics['avg_events_per_user']:.1f}" if pd.notna(month_metrics['avg_events_per_user']) else "N/A"
-        )
-
-    with col4:
-        st.metric(
-            label="MoM Growth",
-            value=f"{month_metrics['mom_growth_percent']:.1f}%" if pd.notna(month_metrics['mom_growth_percent']) else "N/A"
+            value=f"{int(month_swipes):,}",
+            help="Number of card swipes performed during this month"
         )
 
     st.divider()
 
     # ============================================
-    # SECTION B: FEATURE ADOPTION FOR SELECTED MONTH
-    # ============================================
-    st.subheader(f"🎯 Feature Adoption - {format_month(selected_month)}")
-
-    col1, col2, col3, col4 = st.columns(4)
-
-    with col1:
-        ai_users = month_metrics.get('ai_active_users', 0)
-        st.metric(
-            label="AI Active Users",
-            value=f"{int(ai_users):,}" if pd.notna(ai_users) else "N/A"
-        )
-
-    with col2:
-        conversion_rate = month_metrics.get('conversion_user_rate', 0)
-        st.metric(
-            label="Conversion User Rate",
-            value=f"{conversion_rate:.1f}%" if pd.notna(conversion_rate) else "N/A"
-        )
-
-    with col3:
-        multiplayer_rate = month_metrics.get('multiplayer_adoption_rate', 0)
-        st.metric(
-            label="Multiplayer Adoption",
-            value=f"{multiplayer_rate:.1f}%" if pd.notna(multiplayer_rate) else "N/A"
-        )
-
-    with col4:
-        featured_rate = month_metrics.get('featured_adoption_rate', 0)
-        st.metric(
-            label="Featured Adoption",
-            value=f"{featured_rate:.1f}%" if pd.notna(featured_rate) else "N/A"
-        )
-
-    st.divider()
-
-    # ============================================
-    # SECTION C: MONTHLY TREND COMPARISON
+    # SECTION B: MONTHLY TREND COMPARISON
     # ============================================
     st.subheader("📉 Monthly Trends (Last 12 Months)")
 
@@ -270,81 +211,6 @@ try:
         orientation='v'
     )
     st.plotly_chart(growth_chart, use_container_width=True)
-
-    st.divider()
-
-    # ============================================
-    # SECTION D: DETAILED METRICS TABLE
-    # ============================================
-    st.subheader(f"📋 Detailed Metrics - {format_month(selected_month)}")
-
-    # Create a summary table of all available metrics
-    metrics_data = {
-        'Metric': [
-            'Monthly Active Users',
-            'New Signups',
-            'Total Prompts',
-            'Total Swipes',
-            'MoM Growth %',
-            '3-Month Rolling Average',
-            'AI Adoption Rate',
-            'Avg Events/User',
-            'AI Active Users',
-            'Conversion User Rate',
-            'Multiplayer Adoption Rate',
-            'Featured Adoption Rate'
-        ],
-        'Value': [
-            f"{int(month_metrics['monthly_active_users']):,}",
-            f"{int(month_signups):,}",
-            f"{int(month_prompts):,}",
-            f"{int(month_swipes):,}",
-            f"{month_metrics['mom_growth_percent']:.2f}%" if pd.notna(month_metrics['mom_growth_percent']) else "N/A",
-            f"{int(month_metrics['rolling_3month_avg']):,}" if pd.notna(month_metrics['rolling_3month_avg']) else "N/A",
-            f"{month_metrics['ai_adoption_rate']:.2f}%" if pd.notna(month_metrics['ai_adoption_rate']) else "N/A",
-            f"{month_metrics['avg_events_per_user']:.2f}" if pd.notna(month_metrics['avg_events_per_user']) else "N/A",
-            f"{int(month_metrics.get('ai_active_users', 0)):,}" if pd.notna(month_metrics.get('ai_active_users', 0)) else "N/A",
-            f"{month_metrics.get('conversion_user_rate', 0):.2f}%" if pd.notna(month_metrics.get('conversion_user_rate', 0)) else "N/A",
-            f"{month_metrics.get('multiplayer_adoption_rate', 0):.2f}%" if pd.notna(month_metrics.get('multiplayer_adoption_rate', 0)) else "N/A",
-            f"{month_metrics.get('featured_adoption_rate', 0):.2f}%" if pd.notna(month_metrics.get('featured_adoption_rate', 0)) else "N/A"
-        ]
-    }
-
-    metrics_df = pd.DataFrame(metrics_data)
-    st.dataframe(metrics_df, use_container_width=True, hide_index=True)
-
-    st.divider()
-
-    # ============================================
-    # SECTION E: MONTH COMPARISON
-    # ============================================
-    st.subheader("🔄 Compare with Previous Month")
-
-    # Get previous month data if available
-    current_idx = mau_sorted[mau_sorted['activity_month'] == selected_month].index
-    if len(current_idx) > 0:
-        current_pos = mau_sorted.index.get_loc(current_idx[0])
-        if current_pos > 0:
-            prev_month_metrics = mau_sorted.iloc[current_pos - 1]
-            prev_month_date = prev_month_metrics['activity_month']
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.markdown(f"**{format_month(selected_month)}**")
-                st.metric("MAU", f"{int(month_metrics['monthly_active_users']):,}")
-                st.metric("AI Adoption", f"{month_metrics['ai_adoption_rate']:.1f}%")
-                st.metric("Avg Events/User", f"{month_metrics['avg_events_per_user']:.1f}")
-
-            with col2:
-                st.markdown(f"**{format_month(prev_month_date)}**")
-                st.metric("MAU", f"{int(prev_month_metrics['monthly_active_users']):,}")
-                st.metric("AI Adoption", f"{prev_month_metrics['ai_adoption_rate']:.1f}%")
-                st.metric("Avg Events/User", f"{prev_month_metrics['avg_events_per_user']:.1f}")
-        else:
-            st.info("No previous month data available for comparison")
-    else:
-        st.info("Unable to find comparison data")
 
 except Exception as e:
     st.error(f"❌ Error loading monthly summary data: {str(e)}")

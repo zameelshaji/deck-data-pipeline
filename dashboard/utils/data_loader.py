@@ -259,3 +259,25 @@ def load_total_decks_created():
     except Exception as e:
         st.error(f"Error loading decks created data: {str(e)}")
         return pd.DataFrame({'total_decks_created': [0]})
+
+
+@st.cache_data(ttl=300)
+def load_referral_metrics():
+    """Load referral metrics for Home page"""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        COALESCE(SUM(referrals_used), 0) as total_referrals_given,
+        COALESCE((SELECT COUNT(DISTINCT referred_user_id)
+                  FROM analytics_prod_silver.stg_referral_relationships), 0) as total_referrals_claimed
+    FROM analytics_prod_gold.referral_analytics
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading referral metrics: {str(e)}")
+        return pd.DataFrame({'total_referrals_given': [0], 'total_referrals_claimed': [0]})

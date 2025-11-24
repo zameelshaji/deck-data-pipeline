@@ -59,17 +59,17 @@ try:
         supplier_detail = supplier_data[supplier_data['card_name'] == selected_supplier].iloc[0]
 
         # ============================================
-        # SECTION B: PERFORMANCE OVERVIEW CARDS
+        # SECTION B: PERFORMANCE OVERVIEW CARDS (Simplified - 3 columns)
         # ============================================
         st.subheader(f"📊 Performance Overview: {selected_supplier}")
 
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3 = st.columns(3)
 
         with col1:
             st.metric(
                 label="Total Impressions",
                 value=f"{int(supplier_detail['total_impressions']):,}",
-                help=f"Unique viewers: {int(supplier_detail['unique_viewers']):,}"
+                help="Number of times this supplier's card was viewed"
             )
 
         with col2:
@@ -77,7 +77,7 @@ try:
                 label="Total Intent Actions",
                 value=f"{int(supplier_detail['total_intent_actions']):,}",
                 delta=f"{supplier_detail['impression_to_intent_rate']:.1f}%" if pd.notna(supplier_detail['impression_to_intent_rate']) else None,
-                help="Swipes, saves, shares"
+                help="User engagement actions on this card (opens, swipes, saves, shares)"
             )
 
         with col3:
@@ -85,15 +85,7 @@ try:
                 label="Total Conversions",
                 value=f"{int(supplier_detail['total_conversions']):,}",
                 delta=f"{supplier_detail['overall_conversion_rate']:.1f}%" if pd.notna(supplier_detail['overall_conversion_rate']) else None,
-                help="Website visits, bookings, etc."
-            )
-
-        with col4:
-            engagement_score = supplier_detail['engagement_score']
-            st.metric(
-                label="Engagement Score",
-                value=f"{engagement_score:.1f}/10" if pd.notna(engagement_score) else "N/A",
-                help="Weighted score (0-10 scale) based on all user interactions: impressions, swipes, saves, shares, and conversions. Higher is better."
+                help="Conversion actions taken on this card (website visits, bookings, directions, calls)"
             )
 
         st.divider()
@@ -268,64 +260,63 @@ try:
             col1, col2 = st.columns(2)
 
             with col1:
-                st.metric("Engagement Score", f"{supplier_detail['engagement_score']:.1f}/10" if pd.notna(supplier_detail['engagement_score']) else "N/A")
+                st.metric("Impression → Intent Rate", f"{supplier_detail['impression_to_intent_rate']:.1f}%" if pd.notna(supplier_detail['impression_to_intent_rate']) else "N/A")
 
             with col2:
                 st.metric("User Conversion Rate", f"{supplier_detail['user_conversion_rate']:.1f}%" if pd.notna(supplier_detail['user_conversion_rate']) else "N/A")
 
     else:
         # ============================================
-        # ALL SUPPLIERS LEADERBOARD
+        # ALL SUPPLIERS LEADERBOARD (Simplified)
         # ============================================
         st.subheader("🏆 All Suppliers Leaderboard")
 
-        # Display summary statistics
+        # Display summary statistics (4 columns - simplified)
         col1, col2, col3, col4 = st.columns(4)
 
         with col1:
-            st.metric("Total Suppliers", f"{len(supplier_data):,}")
+            st.metric(
+                "Total Suppliers",
+                f"{len(supplier_data):,}",
+                help="Number of featured supplier partners tracked in the system"
+            )
 
         with col2:
-            avg_engagement = supplier_data['engagement_score'].mean()
+            total_impressions = supplier_data['total_impressions'].sum()
             st.metric(
-                "Avg Engagement Score",
-                f"{avg_engagement:.1f}/10" if pd.notna(avg_engagement) else "N/A",
-                help="Average engagement score across all suppliers (0-10 scale)"
+                "Total Impressions",
+                f"{int(total_impressions):,}",
+                help="Total number of times supplier cards were viewed by users"
             )
 
         with col3:
-            total_impressions = supplier_data['total_impressions'].sum()
-            st.metric("Total Impressions", f"{int(total_impressions):,}")
+            total_intent = supplier_data['total_intent_actions'].sum()
+            st.metric(
+                "Total Intent Signals",
+                f"{int(total_intent):,}",
+                help="Total user engagement actions (card opens, swipes, saves, shares) on supplier cards"
+            )
 
         with col4:
             total_conversions = supplier_data['total_conversions'].sum()
-            st.metric("Total Conversions", f"{int(total_conversions):,}")
+            st.metric(
+                "Total Conversions",
+                f"{int(total_conversions):,}",
+                help="Total conversion actions (website visits, booking clicks, directions, phone clicks) on supplier cards"
+            )
 
         st.divider()
 
-        # Leaderboard table
+        # Leaderboard table (Simplified - removed CTR, Conv Rate, Engagement Score)
         st.markdown("#### 📊 Supplier Performance Table")
         st.caption("💡 Click column headers to sort. Hover over rows to highlight.")
 
-        # Add metric explanations
-        with st.expander("ℹ️ Metric Definitions"):
-            st.markdown("""
-            - **CTR (Click-Through Rate)**: Percentage of impressions that led to intent actions (swipes, saves, shares)
-            - **Conv Rate (Conversion Rate)**: Percentage of impressions that led to conversions (website visits, bookings, etc.)
-            - **Engagement Score**: Weighted score (0-10) based on all user interactions
-
-            ⚠️ **Note**: High CTR (near 100%) for suppliers with very few impressions may indicate data quality issues or outliers.
-            """)
-
-        # Prepare display dataframe with raw values for sorting
+        # Prepare display dataframe with only essential columns
         display_df = supplier_data[[
             'card_name',
             'total_impressions',
             'total_intent_actions',
-            'total_conversions',
-            'click_through_rate',
-            'overall_conversion_rate',
-            'engagement_score'
+            'total_conversions'
         ]].copy()
 
         # Rename columns for better display
@@ -333,14 +324,11 @@ try:
             'Supplier',
             'Impressions',
             'Intent Actions',
-            'Conversions',
-            'CTR %',
-            'Conv Rate %',
-            'Engagement Score'
+            'Conversions'
         ]
 
-        # Sort by engagement score by default (descending)
-        display_df = display_df.sort_values('Engagement Score', ascending=False, na_position='last')
+        # Sort by impressions by default (descending)
+        display_df = display_df.sort_values('Impressions', ascending=False, na_position='last')
 
         # Display table with better styling
         st.dataframe(
@@ -351,10 +339,7 @@ try:
                 "Supplier": st.column_config.TextColumn("Supplier", width="medium"),
                 "Impressions": st.column_config.NumberColumn("Impressions", format="%d"),
                 "Intent Actions": st.column_config.NumberColumn("Intent Actions", format="%d"),
-                "Conversions": st.column_config.NumberColumn("Conversions", format="%d"),
-                "CTR %": st.column_config.NumberColumn("CTR %", format="%.1f%%"),
-                "Conv Rate %": st.column_config.NumberColumn("Conv Rate %", format="%.1f%%"),
-                "Engagement Score": st.column_config.NumberColumn("Engagement Score", format="%.1f")
+                "Conversions": st.column_config.NumberColumn("Conversions", format="%d")
             }
         )
 
