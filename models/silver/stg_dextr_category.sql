@@ -113,6 +113,7 @@ select
     query_id, 
     user_id, 
     pack_id,
+    query_timestamp,  
     array_agg(distinct card_id order by card_id) as card_ids,
 
     -- Category presence 
@@ -133,5 +134,5 @@ select
     
     
 from user_pack_cards
-group by query_id, user_id, pack_id
+group by query_id, user_id, pack_id, query_timestamp 
 order by query_id, pack_id
