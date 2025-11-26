@@ -65,6 +65,9 @@ sources:
       - name: referral_usages
         description: "Tracking of referral code usage during onboarding"
 
+      - name: giveaway_claims
+        description: "Tracking the claims made on places"
+
   - name: legacy 
     description: "Raw Supabase tables - legacy"
     database: postgres

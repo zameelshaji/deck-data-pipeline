@@ -268,8 +268,7 @@ def load_referral_metrics():
 
     query = """
     SELECT
-        COALESCE(COUNT(DISTINCT referrer_user_id), 0) as total_referrals_given,
-        COALESCE(COUNT(DISTINCT referred_user_id), 0) as total_referrals_claimed
+        COALESCE(COUNT(DISTINCT referred_user_id), 0) as total_referrals_made
     FROM analytics_prod_silver.stg_referral_relationships
     """
 
@@ -280,6 +279,25 @@ def load_referral_metrics():
     except Exception as e:
         st.error(f"Error loading referral metrics: {str(e)}")
         return pd.DataFrame({'total_referrals_given': [0], 'total_referrals_claimed': [0]})
+
+@st.cache_data(ttl=300)
+def load_giveaway_metrics():
+    """Load giveaway metrics for Home page"""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        count(*) as giveaways_claimed
+    FROM analytics_prod_bronze.src_giveaway_claims
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading giveaway metrics: {str(e)}")
+        return pd.DataFrame({'giveaways_claimed': [0]})
 
 
 @st.cache_data(ttl=300)
