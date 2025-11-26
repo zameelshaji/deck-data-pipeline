@@ -11,11 +11,15 @@ sys.path.append(str(Path(__file__).parent.parent))
 from utils.data_loader import (
     load_weekly_active_users,
     load_monthly_active_users,
-    load_user_acquisition_funnel
+    load_user_acquisition_funnel,
+    load_cohort_retention_monthly,
+    load_monthly_retention_summary_metrics
 )
 from utils.visualizations import (
     create_line_chart,
-    create_funnel_chart
+    create_funnel_chart,
+    create_monthly_cohort_heatmap,
+    create_monthly_retention_curve
 )
 from utils.styling import apply_deck_branding, add_deck_footer
 
@@ -258,6 +262,125 @@ try:
 
     else:
         st.warning("No user acquisition funnel data available")
+
+    st.divider()
+
+    # ============================================
+    # SECTION C: MONTHLY USER COHORT RETENTION ANALYSIS
+    # ============================================
+    st.subheader("🔁 Monthly Cohort Retention Analysis")
+
+    st.markdown("""
+    Track how well we retain users over months to understand long-term engagement patterns.
+    """)
+
+    try:
+        # Load monthly retention data
+        monthly_retention_data = load_cohort_retention_monthly(months=12)
+        monthly_retention_summary = load_monthly_retention_summary_metrics()
+
+        if not monthly_retention_data.empty and not monthly_retention_summary.empty:
+            summary = monthly_retention_summary.iloc[0]
+
+            # Key monthly retention metrics
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                st.metric(
+                    label="Avg Month 1 Retention",
+                    value=f"{summary['avg_month1_retention']:.1f}%" if pd.notna(summary['avg_month1_retention']) else "N/A",
+                    help="Average percentage of users who return in their first month after signup"
+                )
+
+            with col2:
+                st.metric(
+                    label="Avg Month 3 Retention",
+                    value=f"{summary['avg_month3_retention']:.1f}%" if pd.notna(summary['avg_month3_retention']) else "N/A",
+                    help="Average percentage of users who return in their third month after signup"
+                )
+
+            with col3:
+                st.metric(
+                    label="Avg Month 6 Retention",
+                    value=f"{summary['avg_month6_retention']:.1f}%" if pd.notna(summary['avg_month6_retention']) else "N/A",
+                    help="Average percentage of users who return in their sixth month after signup"
+                )
+
+            with col4:
+                # Calculate retention trend
+                if pd.notna(summary['recent_month1_retention']) and pd.notna(summary['older_month1_retention']):
+                    trend = summary['recent_month1_retention'] - summary['older_month1_retention']
+                    st.metric(
+                        label="Month 1 Trend",
+                        value=f"{summary['recent_month1_retention']:.1f}%",
+                        delta=f"{trend:+.1f}%",
+                        help="Month 1 retention trend: recent cohorts vs older cohorts"
+                    )
+                else:
+                    st.metric(
+                        label="Best Month 1",
+                        value=f"{summary['best_month1_retention']:.1f}%" if pd.notna(summary['best_month1_retention']) else "N/A",
+                        help="Best performing cohort's Month 1 retention rate"
+                    )
+
+            st.markdown("---")
+
+            # Monthly cohort retention heatmap
+            st.markdown("#### 📊 Monthly Cohort Retention Heatmap")
+            st.caption("💡 Darker pink = higher retention. Each row is a signup month cohort.")
+
+            monthly_heatmap_fig = create_monthly_cohort_heatmap(monthly_retention_data)
+            st.plotly_chart(monthly_heatmap_fig, use_container_width=True, config={'displayModeBar': False})
+
+            st.markdown("---")
+
+            # Monthly retention curve
+            st.markdown("#### 📈 Monthly Retention Curve")
+            st.caption("💡 Shows average long-term retention trend across all cohorts")
+
+            monthly_curve_fig = create_monthly_retention_curve(monthly_retention_data)
+            st.plotly_chart(monthly_curve_fig, use_container_width=True, config={'displayModeBar': False})
+
+            # Additional insights
+            with st.expander("📊 Retention Insights & Benchmarks"):
+                st.markdown("""
+                **Understanding Monthly Retention Rates:**
+
+                - **Month 1 (30-50%)**: Good early retention shows product-market fit
+                - **Month 3 (20-40%)**: Indicates users finding lasting value
+                - **Month 6 (10-30%)**: Strong long-term engagement benchmark
+
+                **Retention Improvement Strategies:**
+                - Focus on Week 1 activation to improve Month 1 retention
+                - Identify drop-off points and address user pain points
+                - Implement re-engagement campaigns for dormant users
+                - Analyze high-retention cohorts to replicate success factors
+                """)
+
+        else:
+            st.warning("⚠️ No monthly retention data available. Run `dbt run --select user_cohort_retention_monthly` to build the model.")
+
+    except Exception as e:
+        st.error(f"❌ Error loading cohort retention data: {str(e)}")
+
+        with st.expander("🔧 Troubleshooting"):
+            st.markdown("""
+            **Common Issues:**
+
+            1. **Missing Data**
+               - Ensure `user_cohort_retention_monthly` table exists in `analytics_prod_gold` schema
+               - Run dbt to generate the retention models: `dbt run --select user_cohort_retention_monthly`
+
+            2. **Empty Results**
+               - Verify there is sufficient user event data spanning multiple months
+               - Check that users have activity tracked in `stg_events` table
+
+            3. **Query Errors**
+               - Confirm database connection is working
+               - Verify column names match in the data loader functions
+            """)
+
+        st.exception(e)
 
 except Exception as e:
     st.error(f"❌ Error loading user analytics data: {str(e)}")
