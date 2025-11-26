@@ -18,8 +18,7 @@ from utils.data_loader import (
 from utils.visualizations import (
     create_line_chart,
     create_funnel_chart,
-    create_monthly_cohort_heatmap,
-    create_monthly_retention_curve
+    create_monthly_cohort_heatmap
 )
 from utils.styling import apply_deck_branding, add_deck_footer
 
@@ -331,31 +330,6 @@ try:
 
             monthly_heatmap_fig = create_monthly_cohort_heatmap(monthly_retention_data)
             st.plotly_chart(monthly_heatmap_fig, use_container_width=True, config={'displayModeBar': False})
-
-            st.markdown("---")
-
-            # Monthly retention curve
-            st.markdown("#### 📈 Monthly Retention Curve")
-            st.caption("💡 Shows average long-term retention trend across all cohorts")
-
-            monthly_curve_fig = create_monthly_retention_curve(monthly_retention_data)
-            st.plotly_chart(monthly_curve_fig, use_container_width=True, config={'displayModeBar': False})
-
-            # Additional insights
-            with st.expander("📊 Retention Insights & Benchmarks"):
-                st.markdown("""
-                **Understanding Monthly Retention Rates:**
-
-                - **Month 1 (30-50%)**: Good early retention shows product-market fit
-                - **Month 3 (20-40%)**: Indicates users finding lasting value
-                - **Month 6 (10-30%)**: Strong long-term engagement benchmark
-
-                **Retention Improvement Strategies:**
-                - Focus on Week 1 activation to improve Month 1 retention
-                - Identify drop-off points and address user pain points
-                - Implement re-engagement campaigns for dormant users
-                - Analyze high-retention cohorts to replicate success factors
-                """)
 
         else:
             st.warning("⚠️ No monthly retention data available. Run `dbt run --select user_cohort_retention_monthly` to build the model.")

@@ -16,6 +16,7 @@ cumulative_users as (
     from date_spine ds
     left join {{ ref('stg_users') }} u 
         on u.created_at::date <= ds.metric_date
+    where is_test_user = 0
     group by ds.metric_date
 ),
 
