@@ -50,7 +50,7 @@ cohort_retention_counts as (
         ca.months_since_signup,
         count(distinct ca.user_id) as users_active
     from cohort_activity ca
-    where ca.months_since_signup >= 0  -- Only count from signup month onwards
+    where ca.months_since_signup > 0  -- Only count from signup month onwards
     group by ca.cohort_month, ca.months_since_signup
 ),
 
@@ -65,7 +65,6 @@ cohort_retention_rates as (
 
         -- Add labels for easier reading
         case
-            when crc.months_since_signup = 0 then 'Month 0 (Signup)'
             when crc.months_since_signup = 1 then 'Month 1'
             when crc.months_since_signup = 2 then 'Month 2'
             when crc.months_since_signup = 3 then 'Month 3'
