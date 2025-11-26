@@ -171,7 +171,7 @@ try:
     with col3:
         st.metric(
             label="✅ Giveaways Claimed",
-            value=f"{int(giveaway_metrics['giveaway_claims']):,}" if giveaway_metrics is not None else "0",
+            value=f"{int(giveaway_metrics['giveaways_claimed']):,}" if giveaway_metrics is not None else "0",
             delta=None,
             help="Number of giveaway claims made"
         )
