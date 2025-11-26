@@ -161,7 +161,7 @@ try:
             label="🎁 Referrals Given",
             value=f"{int(referral_metrics['total_referrals_given']):,}" if referral_metrics is not None else "0",
             delta=None,
-            help="Number of referral codes successfully used by new users"
+            help="Number of users who provided their referral codes to new users"
         )
 
     with col3:
