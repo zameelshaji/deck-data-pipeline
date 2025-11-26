@@ -95,3 +95,27 @@ models:
         description: "Qualitative growth assessment"
       - name: ai_health
         description: "Qualitative AI feature health assessment"
+
+  - name: user_cohort_retention_monthly
+    description: "Monthly cohort retention analysis showing how users return over months"
+    columns:
+      - name: cohort_month
+        description: "Month when the cohort of users signed up"
+        tests:
+          - not_null
+      - name: cohort_size
+        description: "Total number of users who signed up in this cohort month"
+        tests:
+          - not_null
+      - name: months_since_signup
+        description: "Number of months since the cohort signed up (0 = signup month)"
+      - name: month_label
+        description: "Human-readable label for the month (e.g., 'Month 1', 'Month 3')"
+      - name: users_active
+        description: "Number of users from this cohort who were active in this month"
+      - name: retention_rate
+        description: "Percentage of cohort users who were active (0-100)"
+      - name: cohort_quarter
+        description: "Quarter of cohort signup for grouping"
+      - name: cohort_year
+        description: "Year of cohort signup for grouping"
