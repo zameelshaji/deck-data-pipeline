@@ -10,7 +10,8 @@ from utils.data_loader import (
     load_latest_wau,
     load_total_multiplayer_sessions,
     load_total_decks_created,
-    load_referral_metrics
+    load_referral_metrics, 
+    load_giveaway_metrics
 )
 from utils.styling import apply_deck_branding, add_deck_footer
 
@@ -42,6 +43,7 @@ try:
     multiplayer_sessions_data = load_total_multiplayer_sessions()
     decks_created_data = load_total_decks_created()
     referral_data = load_referral_metrics()
+    giveaway_data = load_giveaway_metrics()
 
     if exec_summary.empty or headline_metrics.empty:
         st.warning("⚠️ No data available")
@@ -55,6 +57,8 @@ try:
     multiplayer_total = multiplayer_sessions_data.iloc[0]['total_multiplayer_sessions'] if not multiplayer_sessions_data.empty else 0
     decks_total = decks_created_data.iloc[0]['total_decks_created'] if not decks_created_data.empty else 0
     referral_metrics = referral_data.iloc[0] if not referral_data.empty else None
+    giveaway_metrics = giveaway_data.iloc[0] if not giveaway_data.empty else None
+
 
     # Calculate MAU % of Total Users
     mau_percentage = 0
@@ -158,18 +162,18 @@ try:
 
     with col2:
         st.metric(
-            label="🎁 Referrals Given",
-            value=f"{int(referral_metrics['total_referrals_given']):,}" if referral_metrics is not None else "0",
+            label="🎁 Referrals Made",
+            value=f"{int(referral_metrics['total_referrals_made']):,}" if referral_metrics is not None else "0",
             delta=None,
             help="Number of users who provided their referral codes to new users"
         )
 
     with col3:
         st.metric(
-            label="✅ Referrals Claimed",
-            value=f"{int(referral_metrics['total_referrals_claimed']):,}" if referral_metrics is not None else "0",
+            label="✅ Giveaways Claimed",
+            value=f"{int(giveaway_metrics['giveaway_claims']):,}" if giveaway_metrics is not None else "0",
             delta=None,
-            help="Number of users who signed up using a referral code"
+            help="Number of giveaway claims made"
         )
 
     st.markdown('</div>', unsafe_allow_html=True)

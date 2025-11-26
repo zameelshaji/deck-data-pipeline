@@ -230,48 +230,12 @@ try:
                 help="Percentage of signups who were active during their first week"
             )
 
-        # Show average metrics
-        st.markdown("#### Average Funnel Performance")
-        col1, col2, col3 = st.columns(3)
-
-        avg_onboarding = funnel_data['onboarding_completion_rate'].mean()
-        avg_ai_adoption = funnel_data['ai_adoption_rate'].mean()
-        avg_activation = funnel_data['week_1_activation_rate'].mean()
-
-        with col1:
-            st.metric(
-                label="Avg Onboarding Completion",
-                value=f"{avg_onboarding:.1f}%" if pd.notna(avg_onboarding) else "N/A",
-                help="Average daily onboarding completion rate across the timeframe"
-            )
-
-        with col2:
-            st.metric(
-                label="Avg AI Adoption",
-                value=f"{avg_ai_adoption:.1f}%" if pd.notna(avg_ai_adoption) else "N/A",
-                help="Average daily AI feature adoption rate across the timeframe"
-            )
-
-        with col3:
-            st.metric(
-                label="Avg Week 1 Activation",
-                value=f"{avg_activation:.1f}%" if pd.notna(avg_activation) else "N/A",
-                help="Average daily first-week activation rate across the timeframe"
-            )
-
-    else:
-        st.warning("No user acquisition funnel data available")
-
     st.divider()
 
     # ============================================
     # SECTION C: MONTHLY USER COHORT RETENTION ANALYSIS
     # ============================================
     st.subheader("🔁 Monthly Cohort Retention Analysis")
-
-    st.markdown("""
-    Track how well we retain users over months to understand long-term engagement patterns.
-    """)
 
     try:
         # Load monthly retention data
@@ -282,7 +246,7 @@ try:
             summary = monthly_retention_summary.iloc[0]
 
             # Key monthly retention metrics
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2 = st.columns(2)
 
             with col1:
                 st.metric(
@@ -297,30 +261,6 @@ try:
                     value=f"{summary['avg_month3_retention']:.1f}%" if pd.notna(summary['avg_month3_retention']) else "N/A",
                     help="Average percentage of users who return in their third month after signup"
                 )
-
-            with col3:
-                st.metric(
-                    label="Avg Month 6 Retention",
-                    value=f"{summary['avg_month6_retention']:.1f}%" if pd.notna(summary['avg_month6_retention']) else "N/A",
-                    help="Average percentage of users who return in their sixth month after signup"
-                )
-
-            with col4:
-                # Calculate retention trend
-                if pd.notna(summary['recent_month1_retention']) and pd.notna(summary['older_month1_retention']):
-                    trend = summary['recent_month1_retention'] - summary['older_month1_retention']
-                    st.metric(
-                        label="Month 1 Trend",
-                        value=f"{summary['recent_month1_retention']:.1f}%",
-                        delta=f"{trend:+.1f}%",
-                        help="Month 1 retention trend: recent cohorts vs older cohorts"
-                    )
-                else:
-                    st.metric(
-                        label="Best Month 1",
-                        value=f"{summary['best_month1_retention']:.1f}%" if pd.notna(summary['best_month1_retention']) else "N/A",
-                        help="Best performing cohort's Month 1 retention rate"
-                    )
 
             st.markdown("---")
 
