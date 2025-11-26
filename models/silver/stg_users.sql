@@ -40,5 +40,5 @@ left join
     on u.user_id = upr.user_id
 left join 
     test_users as t 
-    on u.user_id = t.id
+    on u.user_id::text = t.id
 where u.created_at is not null
