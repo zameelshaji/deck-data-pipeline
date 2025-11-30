@@ -1,4 +1,6 @@
-with events as (
+{{ config(materialized='table') }}
+
+with events as ( 
     select
         date(event_timestamp) as day,
         card_id,
@@ -46,43 +48,30 @@ daily as (
 select
     day,
 
-    -- Adventure: [interest, conversion]
-    array[
-        coalesce(max(case when category = 'Adventure' then interest_count   end), 0)::int,
-        coalesce(max(case when category = 'Adventure' then conversion_count end), 0)::int
-    ] as adventure,
+    -- Adventure
+    coalesce(max(case when category = 'Adventure' then interest_count   end), 0)::int as adventure_interest,
+    coalesce(max(case when category = 'Adventure' then conversion_count end), 0)::int as adventure_conversion,
 
     -- Culture
-    array[
-        coalesce(max(case when category = 'Culture' then interest_count   end), 0)::int,
-        coalesce(max(case when category = 'Culture' then conversion_count end), 0)::int
-    ] as culture,
+    coalesce(max(case when category = 'Culture' then interest_count   end), 0)::int as culture_interest,
+    coalesce(max(case when category = 'Culture' then conversion_count end), 0)::int as culture_conversion,
 
     -- Dining
-    array[
-        coalesce(max(case when category = 'Dining' then interest_count   end), 0)::int,
-        coalesce(max(case when category = 'Dining' then conversion_count end), 0)::int
-    ] as dining,
+    coalesce(max(case when category = 'Dining' then interest_count   end), 0)::int as dining_interest,
+    coalesce(max(case when category = 'Dining' then conversion_count end), 0)::int as dining_conversion,
 
     -- Drinks
-    array[
-        coalesce(max(case when category = 'Drinks' then interest_count   end), 0)::int,
-        coalesce(max(case when category = 'Drinks' then conversion_count end), 0)::int
-    ] as drinks,
+    coalesce(max(case when category = 'Drinks' then interest_count   end), 0)::int as drinks_interest,
+    coalesce(max(case when category = 'Drinks' then conversion_count end), 0)::int as drinks_conversion,
 
     -- Entertainment
-    array[
-        coalesce(max(case when category = 'Entertainment' then interest_count   end), 0)::int,
-        coalesce(max(case when category = 'Entertainment' then conversion_count end), 0)::int
-    ] as entertainment,
+    coalesce(max(case when category = 'Entertainment' then interest_count   end), 0)::int as entertainment_interest,
+    coalesce(max(case when category = 'Entertainment' then conversion_count end), 0)::int as entertainment_conversion,
 
     -- Health
-    array[
-        coalesce(max(case when category = 'Health' then interest_count   end), 0)::int,
-        coalesce(max(case when category = 'Health' then conversion_count end), 0)::int
-    ] as health
+    coalesce(max(case when category = 'Health' then interest_count   end), 0)::int as health_interest,
+    coalesce(max(case when category = 'Health' then conversion_count end), 0)::int as health_conversion
 
 from daily
 group by day
 order by day desc
-
