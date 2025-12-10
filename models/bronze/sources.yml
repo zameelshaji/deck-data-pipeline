@@ -53,11 +53,18 @@ sources:
       - name: session_votes
         description: "User votes on places in multiplayer sessions"
 
+      - name: places 
+        description: 'Post Gemini cards/places revamp'
+      - name: dextr_places
+        description: 'post gemini dextr_pack_cards'
+
       # Personal Organization
       - name: boards
         description: "User-created boards/wishlists"
       - name: board_places
         description: "Places saved to user boards"
+      - name: board_places_v2
+        description: "Places saved to user boards v2"
 
       # Referrals
       - name: referral_codes

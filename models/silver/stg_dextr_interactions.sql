@@ -31,7 +31,22 @@ with
             count(case when user_action is not null then 1 end) as cards_acted_upon
         from {{ ref("src_dextr_pack_cards") }}
         group by pack_id
+
+        union all 
+    
+        -- post gemini
+        select 
+            pack_id, 
+            count(*) as total_cards_in_pack,
+            null as cards_shown, 
+            count(case when user_action = 'like' then 1 end) as cards_liked, 
+            count(case when user_action = 'dislike' then 1 end) as cards_disliked, 
+            count(case when user_action is not null then 1 end) as cards_acted_upon
+        from {{ref('src_dextr_places')}}
+        group by pack_id
     )
+
+
 
 select
     qpp.*,
