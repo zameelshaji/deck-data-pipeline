@@ -119,3 +119,96 @@ models:
         description: "Quarter of cohort signup for grouping"
       - name: cohort_year
         description: "Year of cohort signup for grouping"
+
+  - name: user_segmentation
+    description: "Customer segmentation model identifying 'Planners' (users who actively initiate planning) vs 'Passengers' (passive engagers). Critical for retention strategies."
+    columns:
+      - name: user_id
+        description: "Unique user identifier"
+        tests:
+          - not_null
+          - unique
+      - name: email
+        description: "User email address"
+      - name: username
+        description: "User's display username"
+      - name: full_name
+        description: "User's full name"
+      - name: created_at
+        description: "Timestamp when user account was created"
+        tests:
+          - not_null
+      - name: user_type
+        description: "Segmentation classification: 'Planner' (actively initiates planning) or 'Passenger' (passive engager)"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Planner', 'Passenger']
+      - name: planner_criteria_met
+        description: "Array of criteria that qualified user as Planner: ['prompt_and_swipe', 'created_deck', 'shared_content', 'created_multiplayer']"
+      - name: total_prompts
+        description: "Total number of Dextr AI prompts submitted by user"
+      - name: total_swipes
+        description: "Total number of card swipes (both left and right) across all sources"
+      - name: total_saves
+        description: "Total number of cards saved to boards"
+      - name: total_shares
+        description: "Total number of shares (decks or cards) across all sources"
+      - name: total_decks_created
+        description: "Total number of non-default boards/decks created by user"
+      - name: total_multiplayer_sessions_created
+        description: "Total number of multiplayer planning sessions initiated by user"
+      - name: total_multiplayer_sessions_participated
+        description: "Total number of multiplayer sessions user participated in (including as creator)"
+      - name: total_referrals_given
+        description: "Total number of referrals given by user (number of users who used this user's referral code)"
+      - name: total_conversions
+        description: "Total conversion actions: opened_website, book_with_deck, click_directions, click_phone"
+      - name: days_active
+        description: "Number of distinct days user had any activity"
+      - name: last_activity_date
+        description: "Date of user's most recent activity"
+      - name: days_since_signup
+        description: "Number of days since user account was created"
+      - name: days_since_last_activity
+        description: "Number of days since user's last activity (NULL if never active)"
+      - name: is_test_user
+        description: "Boolean flag indicating if user is a test account (should be 0, as test users are excluded)"
+      - name: prompts_per_active_day
+        description: "Average number of AI prompts per active day (total_prompts / days_active)"
+      - name: swipes_per_prompt
+        description: "Average number of swipes per AI prompt (total_swipes / total_prompts)"
+      - name: conversion_rate
+        description: "Percentage of swipes that led to conversion actions (total_conversions / total_swipes * 100)"
+
+  - name: user_segmentation_summary
+    description: "High-level summary of Planners vs Passengers segmentation with key metrics and comparisons"
+    columns:
+      - name: total_users
+        description: "Total number of users in the system (excluding test users)"
+      - name: total_planners
+        description: "Total number of users classified as Planners"
+      - name: total_passengers
+        description: "Total number of users classified as Passengers"
+      - name: planner_percentage
+        description: "Percentage of total users who are Planners"
+      - name: planner_activation_rate
+        description: "Percentage of Planners with at least 1 day of activity"
+      - name: passenger_activation_rate
+        description: "Percentage of Passengers with at least 1 day of activity"
+      - name: planner_avg_prompts_per_active_day
+        description: "Average AI prompts per active day for Planners"
+      - name: planner_avg_conversion_rate
+        description: "Average conversion rate for Planners"
+      - name: planners_via_prompt_swipe
+        description: "Number of Planners who qualified via prompt + swipe criteria"
+      - name: planners_via_deck
+        description: "Number of Planners who created at least one deck"
+      - name: planners_via_share
+        description: "Number of Planners who shared content"
+      - name: planners_via_multiplayer
+        description: "Number of Planners who created multiplayer sessions"
+      - name: planner_vs_passenger_prompt_ratio
+        description: "Ratio of Planner to Passenger average prompts per active day"
+      - name: report_generated_at
+        description: "Timestamp when this summary was generated"
