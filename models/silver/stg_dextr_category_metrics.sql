@@ -1,3 +1,8 @@
+
+
+{{ config(
+  enabled=true | false
+) }}
 with daily_totals as (
     select
         date_trunc('day', query_timestamp)::date as day,
