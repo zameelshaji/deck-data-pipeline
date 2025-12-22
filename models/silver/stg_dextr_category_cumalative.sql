@@ -1,6 +1,6 @@
 
 {{ config(
-  enabled=true | false
+  enabled=false
 ) }}
 with daily_totals as (
     select
