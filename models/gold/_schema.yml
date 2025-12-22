@@ -212,3 +212,64 @@ models:
         description: "Ratio of Planner to Passenger average prompts per active day"
       - name: report_generated_at
         description: "Timestamp when this summary was generated"
+
+  - name: dextr_query_user_performance
+    description: "Dextr query performance analysis by user. One row per query showing all card-level interactions and performance metrics."
+    columns:
+      - name: date
+        description: "Date when the query was made"
+        tests:
+          - not_null
+      - name: user_id
+        description: "ID of the user who made the query"
+        tests:
+          - not_null
+      - name: user_name
+        description: "Username of the person who made the query"
+      - name: user_email
+        description: "Email of the user who made the query"
+      - name: user_type
+        description: "User segment: Planner or Passenger"
+      - name: query_id
+        description: "Unique identifier for the Dextr query"
+        tests:
+          - not_null
+          - unique
+      - name: query_text
+        description: "The actual query text submitted by the user"
+      - name: query_timestamp
+        description: "Timestamp when the query was submitted"
+      - name: processing_time
+        description: "Time taken to process the query (in seconds)"
+      - name: query_context
+        description: "Full query context as JSONB (location, session_id, app_version)"
+      - name: location
+        description: "Location from query context (typically 'London')"
+      - name: app_version
+        description: "App version from query context"
+      - name: session_id
+        description: "Session ID from query context"
+      - name: pack_id
+        description: "ID of the pack/recommendations generated for this query"
+      - name: total_cards_in_pack
+        description: "Total number of cards in the generated pack"
+      - name: cards_viewed
+        description: "Number of cards shown to the user (shown_to_user = true)"
+      - name: cards_liked
+        description: "Number of cards the user swiped right on"
+      - name: cards_disliked
+        description: "Number of cards the user swiped left on"
+      - name: cards_saved
+        description: "Number of cards the user saved from this pack"
+      - name: like_rate
+        description: "Percentage of viewed cards that were liked (cards_liked / cards_viewed * 100)"
+      - name: save_rate
+        description: "Percentage of viewed cards that were saved (cards_saved / cards_viewed * 100)"
+      - name: view_completion_rate
+        description: "Percentage of pack cards that were viewed (cards_viewed / total_cards_in_pack * 100)"
+      - name: query_engaged
+        description: "Binary flag: 1 if user viewed any cards, 0 otherwise"
+      - name: query_had_likes
+        description: "Binary flag: 1 if user liked any cards, 0 otherwise"
+      - name: query_had_saves
+        description: "Binary flag: 1 if user saved any cards, 0 otherwise"
