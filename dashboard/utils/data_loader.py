@@ -394,3 +394,196 @@ def load_monthly_retention_summary_metrics():
     except Exception as e:
         st.error(f"Error loading monthly retention summary: {str(e)}")
         return pd.DataFrame()
+
+
+# ============================================
+# NORTH STAR METRICS DATA LOADERS
+# ============================================
+
+@st.cache_data(ttl=300)
+def load_north_star_weekly(weeks=12):
+    """Load weekly North Star metrics (SSR, SCR3, WAP, TTFS)"""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT *
+    FROM analytics_prod_gold.north_star_weekly
+    WHERE session_week >= current_date - interval '{weeks} weeks'
+    ORDER BY session_week DESC
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading North Star weekly data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_north_star_latest():
+    """Load latest week's North Star metrics with WoW comparison"""
+    engine = get_database_connection()
+
+    query = """
+    SELECT *
+    FROM analytics_prod_gold.north_star_weekly
+    ORDER BY session_week DESC
+    LIMIT 2
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading latest North Star data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_north_star_by_surface(weeks=12):
+    """Load North Star metrics broken down by surface"""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT *
+    FROM analytics_prod_gold.north_star_by_surface
+    WHERE session_week >= current_date - interval '{weeks} weeks'
+    ORDER BY session_week DESC, total_sessions DESC
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading North Star by surface data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_north_star_save_analysis(weeks=12):
+    """Load save source breakdown and analysis"""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT *
+    FROM analytics_prod_gold.north_star_save_analysis
+    WHERE save_week >= current_date - interval '{weeks} weeks'
+    ORDER BY save_week DESC, save_count DESC
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading save analysis data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_north_star_multiplayer(weeks=12):
+    """Load multiplayer engagement metrics"""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT *
+    FROM analytics_prod_gold.north_star_multiplayer_analysis
+    WHERE metric_week >= current_date - interval '{weeks} weeks'
+    ORDER BY metric_week DESC
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading multiplayer analysis data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_north_star_funnel(weeks=12):
+    """Load session funnel data"""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT *
+    FROM analytics_prod_gold.north_star_session_funnel
+    WHERE session_week >= current_date - interval '{weeks} weeks'
+    ORDER BY session_week DESC
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading session funnel data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_north_star_funnel_latest():
+    """Load the most recent week's funnel data"""
+    engine = get_database_connection()
+
+    query = """
+    SELECT *
+    FROM analytics_prod_gold.north_star_session_funnel
+    ORDER BY session_week DESC
+    LIMIT 1
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading latest funnel data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_north_star_activation(weeks=12):
+    """Load activation cohort data"""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT *
+    FROM analytics_prod_gold.north_star_activation
+    WHERE cohort_week >= current_date - interval '{weeks} weeks'
+    ORDER BY cohort_week DESC
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading activation data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_north_star_session_metrics(weeks=4):
+    """Load session-level metrics for detailed analysis"""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT *
+    FROM analytics_prod_gold.north_star_session_metrics
+    WHERE session_week >= current_date - interval '{weeks} weeks'
+    ORDER BY session_start DESC
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading session metrics data: {str(e)}")
+        return pd.DataFrame()
