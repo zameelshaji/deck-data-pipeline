@@ -10,14 +10,14 @@ with app_event_saves as (
 
 board_saves as (
     select
-        coalesce(bp.session_id, b.source_session_id) as session_id,
+        b.source_session_id as session_id,
         bp.added_by as user_id,
         bp.place_id::text as card_id,
         bp.added_at as saved_at
     from {{ ref('src_board_places') }} bp
     left join {{ ref('src_boards') }} b on bp.board_id = b.id
     where bp.added_by is not null
-      and coalesce(bp.session_id, b.source_session_id) is not null
+      and b.source_session_id is not null
 ),
 
 all_saves as (
