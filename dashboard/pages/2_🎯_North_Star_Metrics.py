@@ -260,35 +260,11 @@ else:
 
 st.divider()
 
-# --- Section D: Diagnostic Metrics ---
-st.subheader("🔬 Diagnostic Metrics")
-
-col1, col2, col3, col4 = st.columns(4)
-
-with col1:
-    scr3 = latest.get('scr3_rate', 0) or 0
-    st.metric("SCR3 (≥3 saves)", f"{float(scr3)*100:.1f}%", help="Shortlist completion rate")
-
-with col2:
-    sd = latest.get('avg_saves_per_saving_session', 0) or 0
-    st.metric("Save Density", f"{float(sd):.1f}", help="Avg saves per saving session")
-
-with col3:
-    ttfs = latest.get('median_ttfs', None)
-    ttfs_str = f"{int(ttfs)}s" if ttfs is not None and pd.notna(ttfs) else "N/A"
-    st.metric("Time to First Save", ttfs_str, help="Median seconds to first save")
-
-with col4:
-    ar = latest.get('attribution_rate', 0) or 0
-    st.metric("Attribution Rate", f"{float(ar)*100:.1f}%", help="% events with valid session_id")
-
-st.divider()
-
-# --- Section E: Activation Funnel ---
+# --- Section D: Activation Funnel ---
 st.subheader("🚀 Activation Funnel (7-day window)")
 
 try:
-    funnel_df = load_activation_funnel_data()
+    funnel_df = load_activation_funnel_data(data_source=data_source, session_type=session_type)
 
     if not funnel_df.empty:
         row = funnel_df.iloc[0]
@@ -341,7 +317,7 @@ except Exception as e:
 
 st.divider()
 
-# --- Section F: Retention (Activated Users) ---
+# --- Section E: Retention (Activated Users) ---
 st.subheader("🔁 Retention (Activated Users)")
 
 try:

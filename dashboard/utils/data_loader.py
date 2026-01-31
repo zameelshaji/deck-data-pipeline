@@ -429,22 +429,82 @@ def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_
 
 
 @st.cache_data(ttl=300)
-def load_activation_funnel_data():
-    """Load activation funnel data aggregated."""
+def load_activation_funnel_data(data_source='all', session_type='all'):
+    """Load activation funnel data aggregated, optionally filtered by data_source/session_type.
+
+    When filters are applied, session-level criteria are re-evaluated against
+    fct_session_outcomes with those filters, then joined back to user-level funnel data.
+    """
     engine = get_database_connection()
 
-    query = """
-    SELECT
-        COUNT(*) as total_users,
-        COUNT(*) FILTER (WHERE has_planning_initiation_7d) as f1_planning_initiation,
-        COUNT(*) FILTER (WHERE has_activation_7d) as f2_activated,
-        COUNT(*) FILTER (WHERE has_first_share_7d) as f3_first_share,
-        COUNT(*) FILTER (WHERE has_first_validation_7d) as f4_first_validation,
-        COUNT(*) FILTER (WHERE has_activation_30d) as activated_30d,
-        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY days_to_activation)
-            FILTER (WHERE days_to_activation IS NOT NULL) as median_tta
-    FROM analytics_prod_gold.fct_activation_funnel
-    """
+    session_conditions = []
+    if data_source != 'all':
+        session_conditions.append(f"s.data_source = '{data_source}'")
+    if session_type == 'prompt':
+        session_conditions.append("s.is_prompt_session = true")
+    elif session_type == 'non_prompt':
+        session_conditions.append("s.is_prompt_session = false")
+
+    if session_conditions:
+        session_where = "WHERE " + " AND ".join(session_conditions)
+        query = f"""
+        WITH filtered_sessions AS (
+            SELECT user_id, session_date, has_save, has_share, has_post_share_interaction
+            FROM analytics_prod_gold.fct_session_outcomes s
+            {session_where}
+        ),
+        users AS (
+            SELECT user_id, signup_date, signup_week
+            FROM analytics_prod_gold.fct_activation_funnel
+        ),
+        user_activity AS (
+            SELECT
+                u.user_id,
+                u.signup_date,
+                BOOL_OR(s.session_date BETWEEN u.signup_date AND u.signup_date + 7) as has_planning_initiation_7d,
+                BOOL_OR(
+                    (s.has_save OR s.has_share)
+                    AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
+                ) as has_activation_7d,
+                BOOL_OR(
+                    (s.has_save OR s.has_share)
+                    AND s.session_date BETWEEN u.signup_date AND u.signup_date + 30
+                ) as has_activation_30d,
+                BOOL_OR(
+                    s.has_share AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
+                ) as has_first_share_7d,
+                BOOL_OR(
+                    s.has_post_share_interaction AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
+                ) as has_first_validation_7d,
+                MIN(s.session_date) FILTER (WHERE s.has_save OR s.has_share) as first_activation_date
+            FROM users u
+            LEFT JOIN filtered_sessions s ON u.user_id = s.user_id
+            GROUP BY u.user_id, u.signup_date
+        )
+        SELECT
+            COUNT(*) as total_users,
+            COUNT(*) FILTER (WHERE COALESCE(has_planning_initiation_7d, false)) as f1_planning_initiation,
+            COUNT(*) FILTER (WHERE COALESCE(has_activation_7d, false)) as f2_activated,
+            COUNT(*) FILTER (WHERE COALESCE(has_first_share_7d, false)) as f3_first_share,
+            COUNT(*) FILTER (WHERE COALESCE(has_first_validation_7d, false)) as f4_first_validation,
+            COUNT(*) FILTER (WHERE COALESCE(has_activation_30d, false)) as activated_30d,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY first_activation_date - signup_date)
+                FILTER (WHERE first_activation_date IS NOT NULL) as median_tta
+        FROM user_activity
+        """
+    else:
+        query = """
+        SELECT
+            COUNT(*) as total_users,
+            COUNT(*) FILTER (WHERE has_planning_initiation_7d) as f1_planning_initiation,
+            COUNT(*) FILTER (WHERE has_activation_7d) as f2_activated,
+            COUNT(*) FILTER (WHERE has_first_share_7d) as f3_first_share,
+            COUNT(*) FILTER (WHERE has_first_validation_7d) as f4_first_validation,
+            COUNT(*) FILTER (WHERE has_activation_30d) as activated_30d,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY days_to_activation)
+                FILTER (WHERE days_to_activation IS NOT NULL) as median_tta
+        FROM analytics_prod_gold.fct_activation_funnel
+        """
 
     try:
         with engine.connect() as conn:
