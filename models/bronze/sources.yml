@@ -75,6 +75,40 @@ sources:
       - name: giveaway_claims
         description: "Tracking the claims made on places"
 
+      # North Star Metrics - Planning & Sharing
+      - name: planning_sessions
+        description: "User planning sessions tracking lifecycle from start to completion"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+      - name: app_events
+        description: "Application events tied to planning sessions"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+      - name: share_links
+        description: "Share links created by users for decks, cards, and multiplayer sessions"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+      - name: share_interactions
+        description: "Interactions on shared links by viewers"
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+
   - name: legacy 
     description: "Raw Supabase tables - legacy"
     database: postgres

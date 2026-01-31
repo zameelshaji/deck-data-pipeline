@@ -273,3 +273,151 @@ models:
         description: "Binary flag: 1 if user liked any cards, 0 otherwise"
       - name: query_had_saves
         description: "Binary flag: 1 if user saved any cards, 0 otherwise"
+
+  - name: fct_session_outcomes
+    description: "Core fact table for session-level North Star metric analysis. Each row is a planning session with outcome flags for PSR ladder."
+    columns:
+      - name: session_id
+        description: "Unique session identifier (native or inferred)"
+        tests:
+          - not_null
+          - unique
+      - name: user_id
+        description: "User who owned this session"
+        tests:
+          - not_null
+      - name: session_date
+        description: "Date the session started"
+      - name: session_week
+        description: "Week the session started (for weekly cohorts)"
+      - name: data_source
+        description: "Whether session is 'native' (from planning_sessions) or 'inferred' (from event timestamps)"
+        tests:
+          - accepted_values:
+              values: ['native', 'inferred']
+      - name: has_save
+        description: "TRUE if session had at least 1 save"
+      - name: has_share
+        description: "TRUE if session had at least 1 share"
+      - name: has_post_share_interaction
+        description: "TRUE if shared session received non-sharer interaction within 24h"
+      - name: meets_psr_broad
+        description: "TRUE if session has both save AND share (North Star)"
+      - name: meets_psr_strict
+        description: "TRUE if session has save AND share AND post-share interaction"
+      - name: is_no_value_session
+        description: "TRUE if session had neither saves nor shares"
+      - name: time_to_first_save_seconds
+        description: "Seconds from session start to first save"
+      - name: time_to_first_share_seconds
+        description: "Seconds from session start to first share"
+      - name: intent_strength
+        description: "Intent classification: 'strong' (dextr/search) or 'weak'"
+        tests:
+          - accepted_values:
+              values: ['strong', 'weak']
+
+  - name: fct_north_star_daily
+    description: "Daily aggregate North Star metrics with rates, rolling averages, and WoW changes"
+    columns:
+      - name: metric_date
+        description: "Date of metrics"
+        tests:
+          - not_null
+      - name: data_source
+        description: "Filter: 'all', 'native', or 'inferred'"
+      - name: session_type
+        description: "Filter: 'all', 'prompt', or 'non_prompt'"
+      - name: ssr
+        description: "Session Save Rate: % sessions with at least 1 save"
+      - name: shr
+        description: "Session Share Rate: % sessions with at least 1 share"
+      - name: psr_broad
+        description: "Plan Survival Rate (Broad): % sessions with save AND share"
+      - name: psr_strict
+        description: "Plan Survival Rate (Strict): includes post-share interaction"
+      - name: nvr
+        description: "No Value Rate: % sessions with 0 saves and 0 shares"
+      - name: attribution_rate
+        description: "Data quality: % sessions with native session_id"
+      - name: psr_broad_7d_avg
+        description: "7-day rolling average of PSR Broad"
+      - name: ssr_wow_change
+        description: "Week-over-week change in SSR"
+      - name: psr_broad_wow_change
+        description: "Week-over-week change in PSR Broad"
+
+  - name: fct_north_star_weekly
+    description: "Weekly aggregate North Star metrics with WAP calculations"
+    columns:
+      - name: metric_week
+        description: "Week start date"
+        tests:
+          - not_null
+      - name: weekly_active_planners
+        description: "Unique users with at least 1 save or share this week"
+      - name: psr_broad
+        description: "Plan Survival Rate (Broad) for the week"
+
+  - name: fct_activation_funnel
+    description: "User-level activation tracking within 7/30 day windows of signup"
+    columns:
+      - name: user_id
+        description: "Unique user identifier"
+        tests:
+          - not_null
+          - unique
+      - name: signup_date
+        description: "User signup date"
+        tests:
+          - not_null
+      - name: has_planning_initiation_7d
+        description: "F1: Had planning initiation within 7 days"
+      - name: has_activation_7d
+        description: "F2: Activated (save or share) within 7 days"
+      - name: has_first_share_7d
+        description: "F3: Shared at least once within 7 days"
+      - name: has_first_validation_7d
+        description: "F4: Share received interaction within 7 days"
+      - name: activation_type
+        description: "Type of activation: save_only, share_only, or save_and_share"
+        tests:
+          - accepted_values:
+              values: ['save_only', 'share_only', 'save_and_share']
+
+  - name: fct_retention_activated
+    description: "Retention analysis on activated users with D7/D30/D60 retention flags"
+    columns:
+      - name: user_id
+        description: "Unique user identifier"
+        tests:
+          - not_null
+          - unique
+      - name: activation_date
+        description: "Date user first activated"
+      - name: had_activity_d7
+        description: "Had activity within 7 days of activation"
+      - name: had_activity_d30
+        description: "Had activity within 30 days of activation"
+      - name: had_activity_d60
+        description: "Had activity within 60 days of activation"
+      - name: is_mature_d7
+        description: "TRUE if enough time has passed to measure D7 retention"
+
+  - name: fct_active_planners
+    description: "Weekly and monthly active planner counts with stickiness ratio"
+    columns:
+      - name: period_type
+        description: "Period granularity: week or month"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['week', 'month']
+      - name: period_start
+        description: "Start date of the period"
+        tests:
+          - not_null
+      - name: active_planners
+        description: "Unique users with at least 1 save or share in period"
+      - name: planner_stickiness
+        description: "avg(WAP) / MAP ratio (monthly only)"

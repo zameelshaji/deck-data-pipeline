@@ -337,6 +337,161 @@ def load_cohort_retention_monthly(months=12):
 
 
 @st.cache_data(ttl=300)
+def load_north_star_daily(data_source='all', session_type='all', start_date=None, end_date=None):
+    """Load daily North Star metrics."""
+    engine = get_database_connection()
+
+    conditions = ["1=1"]
+    if data_source != 'all':
+        conditions.append(f"data_source = '{data_source}'")
+    else:
+        conditions.append("data_source = 'all'")
+    if session_type != 'all':
+        conditions.append(f"session_type = '{session_type}'")
+    else:
+        conditions.append("session_type = 'all'")
+    if start_date:
+        conditions.append(f"metric_date >= '{start_date}'")
+    if end_date:
+        conditions.append(f"metric_date <= '{end_date}'")
+
+    where_clause = " AND ".join(conditions)
+    query = f"""
+    SELECT * FROM analytics_prod_gold.fct_north_star_daily
+    WHERE {where_clause}
+    ORDER BY metric_date DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading North Star daily data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_north_star_weekly(data_source='all', session_type='all'):
+    """Load weekly North Star metrics."""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT * FROM analytics_prod_gold.fct_north_star_weekly
+    WHERE data_source = '{data_source}'
+      AND session_type = '{session_type}'
+    ORDER BY metric_week DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading North Star weekly data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_psr_ladder_current(data_source='all', session_type='all', days=30):
+    """Load current PSR ladder metrics for funnel visualization."""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT
+        COALESCE(SUM(total_sessions), 0) as total_sessions,
+        COALESCE(SUM(sessions_with_save), 0) as sessions_with_save,
+        COALESCE(SUM(sessions_with_share), 0) as sessions_with_share,
+        COALESCE(SUM(sessions_with_psr_broad), 0) as sessions_with_psr_broad,
+        COALESCE(SUM(sessions_with_psr_strict), 0) as sessions_with_psr_strict,
+        COALESCE(SUM(no_value_sessions), 0) as no_value_sessions
+    FROM analytics_prod_gold.fct_north_star_daily
+    WHERE data_source = '{data_source}'
+      AND session_type = '{session_type}'
+      AND metric_date >= current_date - interval '{days} days'
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading PSR ladder: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_activation_funnel_data():
+    """Load activation funnel data aggregated."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        COUNT(*) as total_users,
+        COUNT(*) FILTER (WHERE has_planning_initiation_7d) as f1_planning_initiation,
+        COUNT(*) FILTER (WHERE has_activation_7d) as f2_activated,
+        COUNT(*) FILTER (WHERE has_first_share_7d) as f3_first_share,
+        COUNT(*) FILTER (WHERE has_first_validation_7d) as f4_first_validation,
+        COUNT(*) FILTER (WHERE has_activation_30d) as activated_30d,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY days_to_activation)
+            FILTER (WHERE days_to_activation IS NOT NULL) as median_tta
+    FROM analytics_prod_gold.fct_activation_funnel
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading activation funnel: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_retention_activated_summary():
+    """Load retention summary for activated users."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        COUNT(*) FILTER (WHERE is_mature_d7) as mature_d7_count,
+        COUNT(*) FILTER (WHERE is_mature_d7 AND had_activity_d7) as retained_d7,
+        COUNT(*) FILTER (WHERE is_mature_d30) as mature_d30_count,
+        COUNT(*) FILTER (WHERE is_mature_d30 AND had_activity_d30) as retained_d30,
+        COUNT(*) FILTER (WHERE is_mature_d60) as mature_d60_count,
+        COUNT(*) FILTER (WHERE is_mature_d60 AND had_activity_d60) as retained_d60
+    FROM analytics_prod_gold.fct_retention_activated
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading retention data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_active_planners_trend():
+    """Load WAP/MAP trend data."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT * FROM analytics_prod_gold.fct_active_planners
+    ORDER BY period_start DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading active planners: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
 def load_monthly_retention_summary_metrics():
     """Load summary metrics for monthly retention performance"""
     engine = get_database_connection()
