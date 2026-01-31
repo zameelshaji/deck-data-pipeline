@@ -449,7 +449,7 @@ def load_activation_funnel_data(data_source='all', session_type='all'):
         session_where = "WHERE " + " AND ".join(session_conditions)
         query = f"""
         WITH filtered_sessions AS (
-            SELECT user_id, session_date, has_save, has_share, has_post_share_interaction
+            SELECT user_id, session_date, has_save, has_share, has_post_share_interaction, is_prompt_session
             FROM analytics_prod_gold.fct_session_outcomes s
             {session_where}
         ),
@@ -463,20 +463,23 @@ def load_activation_funnel_data(data_source='all', session_type='all'):
                 u.signup_date,
                 BOOL_OR(s.session_date BETWEEN u.signup_date AND u.signup_date + 7) as has_planning_initiation_7d,
                 BOOL_OR(
-                    (s.has_save OR s.has_share)
+                    (s.has_save OR s.has_share OR s.is_prompt_session)
                     AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
                 ) as has_activation_7d,
                 BOOL_OR(
-                    (s.has_save OR s.has_share)
+                    (s.has_save OR s.has_share OR s.is_prompt_session)
                     AND s.session_date BETWEEN u.signup_date AND u.signup_date + 30
                 ) as has_activation_30d,
+                BOOL_OR(
+                    s.is_prompt_session AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
+                ) as has_prompt_7d,
                 BOOL_OR(
                     s.has_share AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
                 ) as has_first_share_7d,
                 BOOL_OR(
                     s.has_post_share_interaction AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
                 ) as has_first_validation_7d,
-                MIN(s.session_date) FILTER (WHERE s.has_save OR s.has_share) as first_activation_date
+                MIN(s.session_date) FILTER (WHERE s.has_save OR s.has_share OR s.is_prompt_session) as first_activation_date
             FROM users u
             LEFT JOIN filtered_sessions s ON u.user_id = s.user_id
             GROUP BY u.user_id, u.signup_date
@@ -485,6 +488,7 @@ def load_activation_funnel_data(data_source='all', session_type='all'):
             COUNT(*) as total_users,
             COUNT(*) FILTER (WHERE COALESCE(has_planning_initiation_7d, false)) as f1_planning_initiation,
             COUNT(*) FILTER (WHERE COALESCE(has_activation_7d, false)) as f2_activated,
+            COUNT(*) FILTER (WHERE COALESCE(has_prompt_7d, false)) as f2b_prompted,
             COUNT(*) FILTER (WHERE COALESCE(has_first_share_7d, false)) as f3_first_share,
             COUNT(*) FILTER (WHERE COALESCE(has_first_validation_7d, false)) as f4_first_validation,
             COUNT(*) FILTER (WHERE COALESCE(has_activation_30d, false)) as activated_30d,
@@ -498,6 +502,7 @@ def load_activation_funnel_data(data_source='all', session_type='all'):
             COUNT(*) as total_users,
             COUNT(*) FILTER (WHERE has_planning_initiation_7d) as f1_planning_initiation,
             COUNT(*) FILTER (WHERE has_activation_7d) as f2_activated,
+            COUNT(*) FILTER (WHERE has_prompt_7d) as f2b_prompted,
             COUNT(*) FILTER (WHERE has_first_share_7d) as f3_first_share,
             COUNT(*) FILTER (WHERE has_first_validation_7d) as f4_first_validation,
             COUNT(*) FILTER (WHERE has_activation_30d) as activated_30d,

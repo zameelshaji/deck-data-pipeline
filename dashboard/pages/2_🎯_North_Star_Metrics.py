@@ -271,17 +271,19 @@ try:
         total_users = int(row.get('total_users', 0))
         f1 = int(row.get('f1_planning_initiation', 0))
         f2 = int(row.get('f2_activated', 0))
+        f2b = int(row.get('f2b_prompted', 0))
         f3 = int(row.get('f3_first_share', 0))
         f4 = int(row.get('f4_first_validation', 0))
 
         if total_users > 0:
             fig = go.Figure(go.Funnel(
-                y=['F1: Planning Initiation', 'F2: Activated (Save/Share)',
-                   'F3: First Share', 'F4: First Validation'],
-                x=[f1, f2, f3, f4],
+                y=['F1: Planning Initiation', 'F2: Activated (Prompt/Save/Share)',
+                   'F2b: Used Dextr Prompt', 'F3: First Share', 'F4: First Validation'],
+                x=[f1, f2, f2b, f3, f4],
                 textinfo="value+percent initial",
                 marker=dict(color=[
                     BRAND_COLORS['info'],
+                    BRAND_COLORS['text_tertiary'],
                     BRAND_COLORS['accent'],
                     BRAND_COLORS['success'],
                     '#0D5F56',

@@ -84,6 +84,8 @@ outcomes as (
     select
         s.session_id,
         s.user_id,
+        u.username,
+        u.email,
         s.session_date,
         s.session_week,
         s.started_at,
@@ -135,6 +137,7 @@ outcomes as (
         coalesce(sh.share_attribution_confidence, 'high') as share_attribution_confidence
 
     from sessions_deduped s
+    left join {{ ref('stg_users') }} u on s.user_id = u.user_id
     left join all_saves sv on s.session_id = sv.session_id
     left join all_shares sh on s.session_id = sh.session_id
     left join post_share_interactions psi on s.session_id = psi.session_id

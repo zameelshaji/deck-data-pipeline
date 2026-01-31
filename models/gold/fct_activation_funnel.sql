@@ -16,6 +16,7 @@ user_sessions as (
         has_save,
         has_share,
         has_post_share_interaction,
+        is_prompt_session,
         initiation_surface
     from {{ ref('fct_session_outcomes') }}
 ),
@@ -31,17 +32,23 @@ user_activity as (
             s.session_date between u.signup_date and u.signup_date + 7
         ) as has_planning_initiation_7d,
 
-        -- F2: Activation (save or share) within 7 days
+        -- F2: Activation (save, share, or prompt) within 7 days
         bool_or(
-            (s.has_save or s.has_share)
+            (s.has_save or s.has_share or s.is_prompt_session)
             and s.session_date between u.signup_date and u.signup_date + 7
         ) as has_activation_7d,
 
         -- F2b: Activation within 30 days
         bool_or(
-            (s.has_save or s.has_share)
+            (s.has_save or s.has_share or s.is_prompt_session)
             and s.session_date between u.signup_date and u.signup_date + 30
         ) as has_activation_30d,
+
+        -- Prompt within 7 days
+        bool_or(
+            s.is_prompt_session
+            and s.session_date between u.signup_date and u.signup_date + 7
+        ) as has_prompt_7d,
 
         -- F3: First share within 7 days
         bool_or(
@@ -56,12 +63,13 @@ user_activity as (
         ) as has_first_validation_7d,
 
         -- Timing
-        min(s.session_date) filter (where s.has_save or s.has_share) as first_activation_date,
+        min(s.session_date) filter (where s.has_save or s.has_share or s.is_prompt_session) as first_activation_date,
         min(s.session_date) filter (where s.has_share) as first_share_date,
 
         -- Activation type
         bool_or(s.has_save and s.session_date between u.signup_date and u.signup_date + 7) as had_save_7d,
-        bool_or(s.has_share and s.session_date between u.signup_date and u.signup_date + 7) as had_share_7d
+        bool_or(s.has_share and s.session_date between u.signup_date and u.signup_date + 7) as had_share_7d,
+        bool_or(s.is_prompt_session and s.session_date between u.signup_date and u.signup_date + 7) as had_prompt_7d
 
     from users u
     left join user_sessions s on u.user_id = s.user_id
@@ -75,6 +83,7 @@ select
     coalesce(has_planning_initiation_7d, false) as has_planning_initiation_7d,
     coalesce(has_activation_7d, false) as has_activation_7d,
     coalesce(has_activation_30d, false) as has_activation_30d,
+    coalesce(has_prompt_7d, false) as has_prompt_7d,
     coalesce(has_first_share_7d, false) as has_first_share_7d,
     coalesce(has_first_validation_7d, false) as has_first_validation_7d,
 
@@ -92,9 +101,13 @@ select
     end as days_to_first_share,
 
     case
+        when coalesce(had_save_7d, false) and coalesce(had_share_7d, false) and coalesce(had_prompt_7d, false) then 'prompt_save_share'
         when coalesce(had_save_7d, false) and coalesce(had_share_7d, false) then 'save_and_share'
+        when coalesce(had_prompt_7d, false) and coalesce(had_save_7d, false) then 'prompt_and_save'
+        when coalesce(had_prompt_7d, false) and coalesce(had_share_7d, false) then 'prompt_and_share'
         when coalesce(had_share_7d, false) then 'share_only'
         when coalesce(had_save_7d, false) then 'save_only'
+        when coalesce(had_prompt_7d, false) then 'prompt_only'
         else null
     end as activation_type
 
