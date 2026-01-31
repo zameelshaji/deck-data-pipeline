@@ -4,6 +4,5 @@ select
     added_by,
     added_at,
     updated_at,
-    created_at,
     session_id
 from {{ source("public", "board_places_v2") }}
