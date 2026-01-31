@@ -78,6 +78,8 @@ select
     coalesce(has_first_share_7d, false) as has_first_share_7d,
     coalesce(has_first_validation_7d, false) as has_first_validation_7d,
 
+    first_activation_date,
+
     case
         when first_activation_date is not null
             then (first_activation_date - signup_date)

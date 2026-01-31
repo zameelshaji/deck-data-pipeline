@@ -16,11 +16,11 @@ with daily_metrics as (
 
         -- Density
         avg(save_count) filter (where has_save) as avg_saves_per_saving_session,
-        percentile_cont(0.5) within group (order by save_count) filter (where has_save) as median_saves_per_saving_session,
+        percentile_cont(0.5) within group (order by save_count) as median_saves_per_saving_session,
 
-        -- Timing
-        percentile_cont(0.5) within group (order by time_to_first_save_seconds) filter (where time_to_first_save_seconds is not null) as median_ttfs,
-        percentile_cont(0.5) within group (order by time_to_first_share_seconds) filter (where time_to_first_share_seconds is not null) as median_tts
+        -- Timing (median across all sessions; NULLs are excluded by percentile_cont)
+        percentile_cont(0.5) within group (order by time_to_first_save_seconds) as median_ttfs,
+        percentile_cont(0.5) within group (order by time_to_first_share_seconds) as median_tts
 
     from {{ ref('fct_session_outcomes') }}
     where session_date is not null

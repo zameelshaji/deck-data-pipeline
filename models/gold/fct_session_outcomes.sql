@@ -110,7 +110,7 @@ outcomes as (
             when s.initiation_surface in ('dextr', 'search') then 'strong'
             else 'weak'
         end as intent_strength,
-        coalesce(ps.session_id is not null, s.initiation_surface = 'dextr') as is_prompt_session
+        (ps.session_id is not null or s.initiation_surface = 'dextr') as is_prompt_session
 
     from sessions_deduped s
     left join {{ ref('stg_session_saves') }} sv on s.session_id = sv.session_id

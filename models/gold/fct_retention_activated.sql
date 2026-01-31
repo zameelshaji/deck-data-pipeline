@@ -1,8 +1,8 @@
 with activated_users as (
     select
         user_id,
-        signup_date as activation_date,
-        signup_week as activation_week,
+        coalesce(first_activation_date, signup_date) as activation_date,
+        date_trunc('week', coalesce(first_activation_date, signup_date))::date as activation_week,
         activation_type
     from {{ ref('fct_activation_funnel') }}
     where has_activation_7d = true
