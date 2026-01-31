@@ -44,11 +44,19 @@ models:
 
     silver:
       +materialized: table
-      +schema: silver 
+      +schema: silver
+      stg_dextr_category:
+        +enabled: false
+      stg_dextr_category_cumalative:
+        +enabled: false
+      stg_dextr_category_metrics:
+        +enabled: false
 
     gold:
       +materialized: table
-      +schema: gold 
+      +schema: gold
+      supplier_performance:
+        +enabled: false
 
 vars:
   timezone: 'UTC'
