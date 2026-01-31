@@ -13,6 +13,7 @@ from utils.data_loader import (
     load_activation_funnel_data,
     load_retention_activated_summary,
     load_active_planners_trend,
+    load_available_app_versions,
 )
 
 st.set_page_config(
@@ -56,6 +57,15 @@ with st.sidebar:
     }
     session_type = session_type_map[session_type_label]
 
+    app_version_options = load_available_app_versions()
+    app_version_label = st.selectbox(
+        "App Version",
+        options=["All Versions"] + app_version_options,
+        index=0,
+        help="Filter by app version"
+    )
+    app_version = None if app_version_label == "All Versions" else app_version_label
+
     date_range = st.date_input(
         "Date Range",
         value=(date.today() - timedelta(days=90), date.today()),
@@ -73,9 +83,10 @@ try:
         session_type=session_type,
         start_date=str(start_date),
         end_date=str(end_date),
+        app_version=app_version,
     )
-    weekly_df = load_north_star_weekly(data_source=data_source, session_type=session_type)
-    ladder_df = load_psr_ladder_current(data_source=data_source, session_type=session_type)
+    weekly_df = load_north_star_weekly(data_source=data_source, session_type=session_type, app_version=app_version)
+    ladder_df = load_psr_ladder_current(data_source=data_source, session_type=session_type, app_version=app_version)
 except Exception as e:
     st.error(f"Error loading data: {str(e)}")
     st.info("The North Star tables may not be populated yet. Run `dbt run --select +fct_north_star_daily` first.")

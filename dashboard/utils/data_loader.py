@@ -337,7 +337,7 @@ def load_cohort_retention_monthly(months=12):
 
 
 @st.cache_data(ttl=300)
-def load_north_star_daily(data_source='all', session_type='all', start_date=None, end_date=None):
+def load_north_star_daily(data_source='all', session_type='all', start_date=None, end_date=None, app_version=None):
     """Load daily North Star metrics."""
     engine = get_database_connection()
 
@@ -350,6 +350,10 @@ def load_north_star_daily(data_source='all', session_type='all', start_date=None
         conditions.append(f"session_type = '{session_type}'")
     else:
         conditions.append("session_type = 'all'")
+    if app_version:
+        conditions.append(f"app_version = '{app_version}'")
+    else:
+        conditions.append("app_version = 'all'")
     if start_date:
         conditions.append(f"metric_date >= '{start_date}'")
     if end_date:
@@ -372,14 +376,16 @@ def load_north_star_daily(data_source='all', session_type='all', start_date=None
 
 
 @st.cache_data(ttl=300)
-def load_north_star_weekly(data_source='all', session_type='all'):
+def load_north_star_weekly(data_source='all', session_type='all', app_version=None):
     """Load weekly North Star metrics."""
     engine = get_database_connection()
 
+    av_filter = f"'{app_version}'" if app_version else "'all'"
     query = f"""
     SELECT * FROM analytics_prod_gold.fct_north_star_weekly
     WHERE data_source = '{data_source}'
       AND session_type = '{session_type}'
+      AND app_version = {av_filter}
     ORDER BY metric_week DESC
     """
 
@@ -393,10 +399,11 @@ def load_north_star_weekly(data_source='all', session_type='all'):
 
 
 @st.cache_data(ttl=300)
-def load_psr_ladder_current(data_source='all', session_type='all', days=30):
+def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_version=None):
     """Load current PSR ladder metrics for funnel visualization."""
     engine = get_database_connection()
 
+    av_filter = f"'{app_version}'" if app_version else "'all'"
     query = f"""
     SELECT
         COALESCE(SUM(total_sessions), 0) as total_sessions,
@@ -408,6 +415,7 @@ def load_psr_ladder_current(data_source='all', session_type='all', days=30):
     FROM analytics_prod_gold.fct_north_star_daily
     WHERE data_source = '{data_source}'
       AND session_type = '{session_type}'
+      AND app_version = {av_filter}
       AND metric_date >= current_date - interval '{days} days'
     """
 
@@ -489,6 +497,27 @@ def load_active_planners_trend():
     except Exception as e:
         st.error(f"Error loading active planners: {str(e)}")
         return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_available_app_versions():
+    """Get list of distinct app versions from session data."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT DISTINCT app_version
+    FROM analytics_prod_gold.fct_session_outcomes
+    WHERE app_version IS NOT NULL
+    ORDER BY app_version DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df['app_version'].tolist()
+    except Exception as e:
+        st.error(f"Error loading app versions: {str(e)}")
+        return []
 
 
 @st.cache_data(ttl=300)

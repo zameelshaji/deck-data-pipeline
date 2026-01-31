@@ -10,6 +10,7 @@ with sessions_base as (
         session_duration_seconds,
         initiation_surface,
         device_type,
+        null::text as app_version,
         true as has_native_session_id,
         false as is_inferred_session,
         'native' as data_source
@@ -17,23 +18,22 @@ with sessions_base as (
 
     union all
 
-    -- Inferred sessions from app_events (only those without native session)
+    -- Inferred sessions from historical data
     select
-        effective_session_id as session_id,
+        session_id,
         user_id,
-        date(min(event_timestamp)) as session_date,
-        date_trunc('week', min(event_timestamp))::date as session_week,
-        min(event_timestamp) as started_at,
-        max(event_timestamp) as ended_at,
-        extract(epoch from (max(event_timestamp) - min(event_timestamp)))::integer as session_duration_seconds,
-        max(initiation_surface) as initiation_surface,
-        max(device_type) as device_type,
+        session_date,
+        session_week,
+        started_at,
+        ended_at,
+        session_duration_seconds,
+        initiation_surface,
+        null::text as device_type,
+        app_version,
         false as has_native_session_id,
         true as is_inferred_session,
         'inferred' as data_source
-    from {{ ref('stg_app_events_enriched') }}
-    where is_inferred_session = true
-    group by effective_session_id, user_id
+    from {{ ref('int_inferred_sessions') }}
 ),
 
 -- Deduplicate: prefer native sessions
@@ -44,13 +44,31 @@ sessions_deduped as (
     order by session_id, has_native_session_id desc
 ),
 
+-- Combine saves from both paths
+all_saves as (
+    select session_id, user_id, save_count, unique_cards_saved, first_save_at, last_save_at
+    from {{ ref('stg_session_saves') }}
+    union all
+    select session_id, user_id, save_count, unique_cards_saved, first_save_at, last_save_at
+    from {{ ref('int_inferred_session_saves') }}
+),
+
+-- Combine shares from both paths
+all_shares as (
+    select session_id, user_id, share_count, first_share_at, 'high' as share_attribution_confidence
+    from {{ ref('stg_session_shares') }}
+    union all
+    select session_id, user_id, share_count, first_share_at, share_attribution_confidence
+    from {{ ref('int_inferred_session_shares') }}
+),
+
 -- Post-share interactions per session (within 24h, non-sharer)
 post_share_interactions as (
     select
         si.session_id,
         count(*) as interaction_count
     from {{ ref('stg_share_interactions_clean') }} si
-    where si.time_since_share_minutes <= 1440  -- 24 hours
+    where si.time_since_share_minutes <= 1440
     group by si.session_id
 ),
 
@@ -73,6 +91,7 @@ outcomes as (
         s.session_duration_seconds,
         s.initiation_surface,
         s.device_type,
+        s.app_version,
         s.has_native_session_id,
         s.is_inferred_session,
         s.data_source,
@@ -110,11 +129,14 @@ outcomes as (
             when s.initiation_surface in ('dextr', 'search') then 'strong'
             else 'weak'
         end as intent_strength,
-        (ps.session_id is not null or s.initiation_surface = 'dextr') as is_prompt_session
+        (ps.session_id is not null or s.initiation_surface = 'dextr') as is_prompt_session,
+
+        -- Attribution confidence
+        coalesce(sh.share_attribution_confidence, 'high') as share_attribution_confidence
 
     from sessions_deduped s
-    left join {{ ref('stg_session_saves') }} sv on s.session_id = sv.session_id
-    left join {{ ref('stg_session_shares') }} sh on s.session_id = sh.session_id
+    left join all_saves sv on s.session_id = sv.session_id
+    left join all_shares sh on s.session_id = sh.session_id
     left join post_share_interactions psi on s.session_id = psi.session_id
     left join prompt_sessions ps on s.session_id = ps.session_id
 )

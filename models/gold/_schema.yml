@@ -316,6 +316,13 @@ models:
         tests:
           - accepted_values:
               values: ['strong', 'weak']
+      - name: app_version
+        description: "App version from dextr query context (inferred sessions) or null (native)"
+      - name: share_attribution_confidence
+        description: "Confidence in share attribution: 'high' (native), 'medium' (card share with pack_id), 'low' (share_link time-window match)"
+        tests:
+          - accepted_values:
+              values: ['high', 'medium', 'low']
 
   - name: fct_north_star_daily
     description: "Daily aggregate North Star metrics with rates, rolling averages, and WoW changes"
@@ -328,6 +335,8 @@ models:
         description: "Filter: 'all', 'native', or 'inferred'"
       - name: session_type
         description: "Filter: 'all', 'prompt', or 'non_prompt'"
+      - name: app_version
+        description: "Filter: 'all', specific version, or 'unknown'"
       - name: ssr
         description: "Session Save Rate: % sessions with at least 1 save"
       - name: shr
@@ -354,6 +363,8 @@ models:
         description: "Week start date"
         tests:
           - not_null
+      - name: app_version
+        description: "Filter: 'all', specific version, or 'unknown'"
       - name: weekly_active_planners
         description: "Unique users with at least 1 save or share this week"
       - name: psr_broad
