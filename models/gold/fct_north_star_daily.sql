@@ -26,7 +26,7 @@ with daily_metrics as (
 
     from {{ ref('fct_session_outcomes') }}
     where session_date is not null
-    group by session_date, data_source, case when is_prompt_session then 'prompt' else 'non_prompt' end, coalesce(app_version, 'unknown')
+    group by session_date, data_source, case when is_prompt_session then 'prompt' else 'non_prompt' end, coalesce(effective_app_version, 'unknown')
 ),
 
 -- Generate all aggregation combinations
