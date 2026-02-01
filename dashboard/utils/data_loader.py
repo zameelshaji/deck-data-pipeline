@@ -399,11 +399,15 @@ def load_north_star_weekly(data_source='all', session_type='all', app_version=No
 
 
 @st.cache_data(ttl=300)
-def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_version=None):
+def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_version=None, start_date=None, end_date=None):
     """Load current PSR ladder metrics for funnel visualization."""
     engine = get_database_connection()
 
     av_filter = f"'{app_version}'" if app_version else "'all'"
+    if start_date and end_date:
+        date_filter = f"metric_date >= '{start_date}' AND metric_date <= '{end_date}'"
+    else:
+        date_filter = f"metric_date >= current_date - interval '{days} days'"
     query = f"""
     SELECT
         COALESCE(SUM(total_sessions), 0) as total_sessions,
@@ -417,7 +421,7 @@ def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_
     WHERE data_source = '{data_source}'
       AND session_type = '{session_type}'
       AND app_version = {av_filter}
-      AND metric_date >= current_date - interval '{days} days'
+      AND {date_filter}
     """
 
     try:

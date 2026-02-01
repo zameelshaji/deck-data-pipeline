@@ -86,7 +86,7 @@ try:
         app_version=app_version,
     )
     weekly_df = load_north_star_weekly(data_source=data_source, session_type=session_type, app_version=app_version)
-    ladder_df = load_psr_ladder_current(data_source=data_source, session_type=session_type, app_version=app_version)
+    ladder_df = load_psr_ladder_current(data_source=data_source, session_type=session_type, app_version=app_version, start_date=str(start_date), end_date=str(end_date))
 except Exception as e:
     st.error(f"Error loading data: {str(e)}")
     st.info("The North Star tables may not be populated yet. Run `dbt run --select +fct_north_star_daily` first.")
@@ -154,28 +154,26 @@ st.divider()
 
 # --- Section B: PSR Ladder ---
 st.subheader("🪜 The Value Ladder")
-st.caption("How sessions progress through the value loop")
+st.caption("Each step is a strict subset of the one above — tracking how sessions progress through the value loop")
 
 if not ladder_df.empty:
     row = ladder_df.iloc[0]
     total = int(row.get('total_sessions', 0))
     genuine = int(row.get('genuine_planning_sessions', 0))
     saves = int(row.get('sessions_with_save', 0))
-    shares = int(row.get('sessions_with_share', 0))
     psr_b = int(row.get('sessions_with_psr_broad', 0))
     psr_s = int(row.get('sessions_with_psr_strict', 0))
     nvr_count = int(row.get('no_value_sessions', 0))
 
     if total > 0:
         fig = go.Figure(go.Funnel(
-            y=['All Sessions', 'Genuine Planning Attempts', 'P1: Saved (SSR)', 'P2: Shared (SHR)', 'PSR Broad: Save+Share', 'PSR Strict: +Validation'],
-            x=[total, genuine, saves, shares, psr_b, psr_s],
-            textinfo="value+percent initial",
+            y=['All Sessions', 'Genuine Planning Attempts', 'Had Save (SSR)', 'Had Save + Share (PSR)', 'Save + Share + Validation'],
+            x=[total, genuine, saves, psr_b, psr_s],
+            textinfo="value+percent initial+percent previous",
             marker=dict(color=[
                 BRAND_COLORS['text_tertiary'],
                 '#6B7280',
                 BRAND_COLORS['info'],
-                BRAND_COLORS['accent'],
                 BRAND_COLORS['success'],
                 '#0D5F56',
             ])
