@@ -207,15 +207,15 @@ if granularity == "Daily (7-day avg)" and not daily_df.empty:
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=trend_df['metric_date'], y=trend_df['ssr_7d_avg'].astype(float) * 100,
-        name='SSR (7d avg)', line=dict(color=BRAND_COLORS['info'], width=2)
+        name='SSR (7d avg)', line=dict(color='#E91E8C', width=2)
     ))
     fig.add_trace(go.Scatter(
         x=trend_df['metric_date'], y=trend_df['shr_7d_avg'].astype(float) * 100,
-        name='SHR (7d avg)', line=dict(color=BRAND_COLORS['accent'], width=2)
+        name='SHR (7d avg)', line=dict(color='#2563EB', width=2)
     ))
     fig.add_trace(go.Scatter(
         x=trend_df['metric_date'], y=trend_df['psr_broad_7d_avg'].astype(float) * 100,
-        name='PSR Broad (7d avg)', line=dict(color=BRAND_COLORS['success'], width=2.5)
+        name='PSR Broad (7d avg)', line=dict(color='#16A34A', width=2.5)
     ))
     fig.update_layout(
         yaxis_title="Rate (%)",
@@ -235,15 +235,15 @@ elif granularity == "Weekly" and not weekly_df.empty:
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=trend_df['metric_week'], y=trend_df['ssr'].astype(float) * 100,
-        name='SSR', line=dict(color=BRAND_COLORS['info'], width=2)
+        name='SSR', line=dict(color='#E91E8C', width=2)
     ))
     fig.add_trace(go.Scatter(
         x=trend_df['metric_week'], y=trend_df['shr'].astype(float) * 100,
-        name='SHR', line=dict(color=BRAND_COLORS['accent'], width=2)
+        name='SHR', line=dict(color='#2563EB', width=2)
     ))
     fig.add_trace(go.Scatter(
         x=trend_df['metric_week'], y=trend_df['psr_broad'].astype(float) * 100,
-        name='PSR Broad', line=dict(color=BRAND_COLORS['success'], width=2.5)
+        name='PSR Broad', line=dict(color='#16A34A', width=2.5)
     ))
     fig.update_layout(
         yaxis_title="Rate (%)",
