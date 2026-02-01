@@ -123,25 +123,26 @@ session_cards as (
     group by ps.session_id
 ),
 
--- Saves: native sessions have session_id, inferred use timestamp overlap
+-- Saves: resolve place_id → src_places for name, then to stg_cards via deck_sku
 session_saves as (
     select
         coalesce(bp.session_id, sb.session_id) as session_id,
         jsonb_agg(
             jsonb_build_object(
-                'card_name', c.name,
-                'card_id', bp.place_id,
+                'card_name', pl.name,
+                'card_id', coalesce(pl.deck_sku, bp.place_id::text),
                 'category', c.category,
                 'board_name', coalesce(b.name, 'Default Board'),
                 'saved_at', bp.added_at
             ) order by bp.added_at
         ) as saves_detail,
         jsonb_agg(
-            jsonb_build_object('card_id', bp.place_id, 'card_name', c.name)
+            jsonb_build_object('card_id', coalesce(pl.deck_sku, bp.place_id::text), 'card_name', pl.name)
             order by bp.added_at
         ) as cards_saved_list
     from {{ ref('src_board_places_v2') }} bp
-    left join {{ ref('stg_cards') }} c on bp.place_id::text = c.card_id
+    left join {{ ref('src_places') }} pl on bp.place_id = pl.place_id
+    left join {{ ref('stg_cards') }} c on coalesce(pl.deck_sku, bp.place_id::text) = c.card_id
     left join {{ ref('src_boards') }} b on bp.board_id = b.id
     left join sessions_base sb
         on bp.session_id is null
@@ -171,19 +172,19 @@ session_shares as (
                 'share_channel', sl.share_channel,
                 'shared_at', sl.created_at,
                 'board_name', b.name,
-                'card_name', c.name,
+                'card_name', pl.name,
                 'unique_viewers', coalesce(sv.unique_viewers, 0),
                 'total_interactions', coalesce(sv.total_interactions, 0)
             ) order by sl.created_at
         ) as shares_detail,
         jsonb_agg(
-            distinct jsonb_build_object('card_id', sl.card_id, 'card_name', c.name)
+            distinct jsonb_build_object('card_id', coalesce(pl.deck_sku, sl.card_id::text), 'card_name', pl.name)
         ) filter (where sl.card_id is not null) as cards_shared_list,
         sum(coalesce(sv.unique_viewers, 0)) as total_share_viewers
     from {{ ref('src_share_links') }} sl
     left join share_viewer_counts sv on sl.id = sv.share_link_id
     left join {{ ref('src_boards') }} b on sl.board_id = b.id
-    left join {{ ref('stg_cards') }} c on sl.card_id::text = c.card_id
+    left join {{ ref('src_places') }} pl on sl.card_id = pl.place_id
     left join sessions_base sb
         on sl.session_id is null
         and sl.sharer_user_id = sb.user_id
@@ -192,7 +193,8 @@ session_shares as (
     group by coalesce(sl.session_id, sb.session_id)
 ),
 
--- Chronological event log (meaningful events only)
+-- Chronological event log — card_id in app_events may be a place_id (UUID),
+-- so resolve via src_places, falling back to stg_cards for legacy card_ids
 session_events_timeline as (
     select
         e.effective_session_id as session_id,
@@ -200,21 +202,15 @@ session_events_timeline as (
             jsonb_build_object(
                 'event', e.event_name,
                 'timestamp', e.event_timestamp,
-                'card_name', c.name,
+                'card_name', coalesce(pl.name, c.name),
                 'card_id', e.card_id
             ) order by e.event_timestamp
         ) as event_timeline,
         count(*) as total_events
     from {{ ref('stg_app_events_enriched') }} e
+    left join {{ ref('src_places') }} pl on e.card_id = pl.place_id::text
     left join {{ ref('stg_cards') }} c on e.card_id::text = c.card_id
     where e.effective_session_id is not null
-      and e.event_name in (
-          'session_started', 'dextr_query',
-          'swipe_right', 'swipe_left', 'saved', 'card_saved',
-          'share', 'card_shared', 'deck_shared',
-          'detail_view_open', 'detail_open',
-          'opened_website', 'book_button_click', 'book_with_deck'
-      )
     group by e.effective_session_id
 )
 
