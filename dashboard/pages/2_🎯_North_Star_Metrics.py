@@ -116,7 +116,7 @@ with col1:
     st.metric(
         label="Unique Active Planners",
         value=f"{headline.get('unique_active_planners', 0):,}",
-        help="Distinct users who saved or shared at least once in the selected period"
+        help="Distinct users who prompted, saved, or shared at least once in the selected period"
     )
 
 with col2:

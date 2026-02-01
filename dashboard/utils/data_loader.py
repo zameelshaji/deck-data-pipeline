@@ -444,7 +444,7 @@ def load_north_star_headline(data_source='all', session_type='all', app_version=
     SELECT COUNT(DISTINCT user_id) as unique_active_planners
     FROM analytics_prod_gold.fct_session_outcomes
     WHERE {uap_where}
-      AND (has_save OR has_share)
+      AND (has_save OR has_share OR is_prompt_session)
     """
 
     try:
