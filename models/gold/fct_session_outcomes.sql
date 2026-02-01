@@ -84,7 +84,7 @@ prompt_sessions as (
 
 version_lookup as (
     select
-        app_version,
+        app_version::text as app_version,
         release_date::date as release_date,
         release_date_end::date as release_date_end
     from {{ ref('app_version_releases') }}
