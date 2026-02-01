@@ -3,7 +3,7 @@ with daily_metrics as (
         session_date as metric_date,
         data_source as ds,
         case when is_prompt_session then 'prompt' else 'non_prompt' end as st,
-        coalesce(app_version, 'unknown') as av,
+        coalesce(effective_app_version, 'unknown') as av,
 
         count(*) as total_sessions,
         count(*) filter (where has_save) as sessions_with_save,

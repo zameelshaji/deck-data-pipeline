@@ -1,0 +1,12 @@
+version: 2
+
+seeds:
+  - name: app_version_releases
+    description: "App version release dates for imputing version on sessions"
+    columns:
+      - name: app_version
+        description: "Version string (e.g., '1.0', '2.6')"
+      - name: release_date
+        description: "Date this version was released"
+      - name: release_date_end
+        description: "Last date this version was current (day before next release)"

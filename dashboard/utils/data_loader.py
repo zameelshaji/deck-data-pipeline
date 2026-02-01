@@ -399,6 +399,75 @@ def load_north_star_weekly(data_source='all', session_type='all', app_version=No
 
 
 @st.cache_data(ttl=300)
+def load_north_star_headline(data_source='all', session_type='all', app_version=None, start_date=None, end_date=None):
+    """Load aggregate headline metrics for the selected period and filters."""
+    engine = get_database_connection()
+
+    av_filter = f"'{app_version}'" if app_version else "'all'"
+    date_conditions = ""
+    if start_date and end_date:
+        date_conditions = f"AND metric_date >= '{start_date}' AND metric_date <= '{end_date}'"
+
+    query = f"""
+    SELECT
+        COALESCE(SUM(total_sessions), 0) as total_sessions,
+        COALESCE(SUM(sessions_with_save), 0) as sessions_with_save,
+        COALESCE(SUM(sessions_with_share), 0) as sessions_with_share,
+        COALESCE(SUM(sessions_with_psr_broad), 0) as sessions_with_psr_broad,
+        COALESCE(SUM(no_value_sessions), 0) as no_value_sessions,
+        COALESCE(SUM(genuine_planning_sessions), 0) as genuine_planning_sessions
+    FROM analytics_prod_gold.fct_north_star_daily
+    WHERE data_source = '{data_source}'
+      AND session_type = '{session_type}'
+      AND app_version = {av_filter}
+      {date_conditions}
+    """
+
+    # Unique active planners needs a separate query against fct_session_outcomes
+    # because distinct user counts can't be summed from daily aggregates
+    session_conditions = ["1=1"]
+    if data_source != 'all':
+        session_conditions.append(f"data_source = '{data_source}'")
+    if session_type == 'prompt':
+        session_conditions.append("is_prompt_session = true")
+    elif session_type == 'non_prompt':
+        session_conditions.append("is_prompt_session = false")
+    if app_version:
+        session_conditions.append(f"effective_app_version = '{app_version}'")
+    if start_date:
+        session_conditions.append(f"session_date >= '{start_date}'")
+    if end_date:
+        session_conditions.append(f"session_date <= '{end_date}'")
+
+    uap_where = " AND ".join(session_conditions)
+    uap_query = f"""
+    SELECT COUNT(DISTINCT user_id) as unique_active_planners
+    FROM analytics_prod_gold.fct_session_outcomes
+    WHERE {uap_where}
+      AND (has_save OR has_share)
+    """
+
+    try:
+        with engine.connect() as conn:
+            agg_df = pd.read_sql(text(query), conn)
+            uap_df = pd.read_sql(text(uap_query), conn)
+
+        result = agg_df.iloc[0].to_dict()
+        result['unique_active_planners'] = int(uap_df.iloc[0]['unique_active_planners'])
+
+        total = result['total_sessions']
+        result['ssr'] = result['sessions_with_save'] / total if total > 0 else 0
+        result['shr'] = result['sessions_with_share'] / total if total > 0 else 0
+        result['psr_broad'] = result['sessions_with_psr_broad'] / total if total > 0 else 0
+        result['nvr'] = result['no_value_sessions'] / total if total > 0 else 0
+
+        return result
+    except Exception as e:
+        st.error(f"Error loading headline metrics: {str(e)}")
+        return {}
+
+
+@st.cache_data(ttl=300)
 def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_version=None, start_date=None, end_date=None):
     """Load current PSR ladder metrics for funnel visualization."""
     engine = get_database_connection()
@@ -434,12 +503,8 @@ def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_
 
 
 @st.cache_data(ttl=300)
-def load_activation_funnel_data(data_source='all', session_type='all'):
-    """Load activation funnel data aggregated, optionally filtered by data_source/session_type.
-
-    When filters are applied, session-level criteria are re-evaluated against
-    fct_session_outcomes with those filters, then joined back to user-level funnel data.
-    """
+def load_activation_funnel_data(data_source='all', session_type='all', start_date=None, end_date=None):
+    """Load activation funnel data, filtered by signup date range and session filters."""
     engine = get_database_connection()
 
     session_conditions = []
@@ -450,71 +515,69 @@ def load_activation_funnel_data(data_source='all', session_type='all'):
     elif session_type == 'non_prompt':
         session_conditions.append("s.is_prompt_session = false")
 
+    session_where = ""
     if session_conditions:
         session_where = "WHERE " + " AND ".join(session_conditions)
-        query = f"""
-        WITH filtered_sessions AS (
-            SELECT user_id, session_date, has_save, has_share, has_post_share_interaction, is_prompt_session
-            FROM analytics_prod_gold.fct_session_outcomes s
-            {session_where}
-        ),
-        users AS (
-            SELECT user_id, signup_date, signup_week
-            FROM analytics_prod_gold.fct_activation_funnel
-        ),
-        user_activity AS (
-            SELECT
-                u.user_id,
-                u.signup_date,
-                BOOL_OR(s.session_date BETWEEN u.signup_date AND u.signup_date + 7) as has_planning_initiation_7d,
-                BOOL_OR(
-                    (s.has_save OR s.has_share OR s.is_prompt_session)
-                    AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
-                ) as has_activation_7d,
-                BOOL_OR(
-                    (s.has_save OR s.has_share OR s.is_prompt_session)
-                    AND s.session_date BETWEEN u.signup_date AND u.signup_date + 30
-                ) as has_activation_30d,
-                BOOL_OR(
-                    s.is_prompt_session AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
-                ) as has_prompt_7d,
-                BOOL_OR(
-                    s.has_share AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
-                ) as has_first_share_7d,
-                BOOL_OR(
-                    s.has_post_share_interaction AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
-                ) as has_first_validation_7d,
-                MIN(s.session_date) FILTER (WHERE s.has_save OR s.has_share OR s.is_prompt_session) as first_activation_date
-            FROM users u
-            LEFT JOIN filtered_sessions s ON u.user_id = s.user_id
-            GROUP BY u.user_id, u.signup_date
-        )
+
+    user_date_filter = ""
+    if start_date and end_date:
+        user_date_filter = f"WHERE u.signup_date >= '{start_date}' AND u.signup_date <= '{end_date}'"
+    elif start_date:
+        user_date_filter = f"WHERE u.signup_date >= '{start_date}'"
+    elif end_date:
+        user_date_filter = f"WHERE u.signup_date <= '{end_date}'"
+
+    # Always use the filtered query approach so we can apply both session and date filters
+    query = f"""
+    WITH filtered_sessions AS (
+        SELECT user_id, session_date, has_save, has_share, has_post_share_interaction, is_prompt_session
+        FROM analytics_prod_gold.fct_session_outcomes s
+        {session_where}
+    ),
+    users AS (
+        SELECT user_id, signup_date, signup_week
+        FROM analytics_prod_gold.fct_activation_funnel u
+        {user_date_filter}
+    ),
+    user_activity AS (
         SELECT
-            COUNT(*) as total_users,
-            COUNT(*) FILTER (WHERE COALESCE(has_planning_initiation_7d, false)) as f1_planning_initiation,
-            COUNT(*) FILTER (WHERE COALESCE(has_activation_7d, false)) as f2_activated,
-            COUNT(*) FILTER (WHERE COALESCE(has_prompt_7d, false)) as f2b_prompted,
-            COUNT(*) FILTER (WHERE COALESCE(has_first_share_7d, false)) as f3_first_share,
-            COUNT(*) FILTER (WHERE COALESCE(has_first_validation_7d, false)) as f4_first_validation,
-            COUNT(*) FILTER (WHERE COALESCE(has_activation_30d, false)) as activated_30d,
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY first_activation_date - signup_date)
-                FILTER (WHERE first_activation_date IS NOT NULL) as median_tta
-        FROM user_activity
-        """
-    else:
-        query = """
-        SELECT
-            COUNT(*) as total_users,
-            COUNT(*) FILTER (WHERE has_planning_initiation_7d) as f1_planning_initiation,
-            COUNT(*) FILTER (WHERE has_activation_7d) as f2_activated,
-            COUNT(*) FILTER (WHERE has_prompt_7d) as f2b_prompted,
-            COUNT(*) FILTER (WHERE has_first_share_7d) as f3_first_share,
-            COUNT(*) FILTER (WHERE has_first_validation_7d) as f4_first_validation,
-            COUNT(*) FILTER (WHERE has_activation_30d) as activated_30d,
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY days_to_activation)
-                FILTER (WHERE days_to_activation IS NOT NULL) as median_tta
-        FROM analytics_prod_gold.fct_activation_funnel
-        """
+            u.user_id,
+            u.signup_date,
+            BOOL_OR(s.session_date BETWEEN u.signup_date AND u.signup_date + 7) as has_planning_initiation_7d,
+            BOOL_OR(
+                (s.has_save OR s.has_share OR s.is_prompt_session)
+                AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
+            ) as has_activation_7d,
+            BOOL_OR(
+                (s.has_save OR s.has_share OR s.is_prompt_session)
+                AND s.session_date BETWEEN u.signup_date AND u.signup_date + 30
+            ) as has_activation_30d,
+            BOOL_OR(
+                s.is_prompt_session AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
+            ) as has_prompt_7d,
+            BOOL_OR(
+                s.has_share AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
+            ) as has_first_share_7d,
+            BOOL_OR(
+                s.has_post_share_interaction AND s.session_date BETWEEN u.signup_date AND u.signup_date + 7
+            ) as has_first_validation_7d,
+            MIN(s.session_date) FILTER (WHERE s.has_save OR s.has_share OR s.is_prompt_session) as first_activation_date
+        FROM users u
+        LEFT JOIN filtered_sessions s ON u.user_id = s.user_id
+        GROUP BY u.user_id, u.signup_date
+    )
+    SELECT
+        COUNT(*) as total_users,
+        COUNT(*) FILTER (WHERE COALESCE(has_planning_initiation_7d, false)) as f1_planning_initiation,
+        COUNT(*) FILTER (WHERE COALESCE(has_activation_7d, false)) as f2_activated,
+        COUNT(*) FILTER (WHERE COALESCE(has_prompt_7d, false)) as f2b_prompted,
+        COUNT(*) FILTER (WHERE COALESCE(has_first_share_7d, false)) as f3_first_share,
+        COUNT(*) FILTER (WHERE COALESCE(has_first_validation_7d, false)) as f4_first_validation,
+        COUNT(*) FILTER (WHERE COALESCE(has_activation_30d, false)) as activated_30d,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY first_activation_date - signup_date)
+            FILTER (WHERE first_activation_date IS NOT NULL) as median_tta
+    FROM user_activity
+    """
 
     try:
         with engine.connect() as conn:
@@ -571,23 +634,23 @@ def load_active_planners_trend():
 
 @st.cache_data(ttl=300)
 def load_available_app_versions():
-    """Get list of distinct app versions from session data."""
+    """Get list of app versions from the release schedule seed, descending."""
     engine = get_database_connection()
 
     query = """
-    SELECT DISTINCT app_version
-    FROM analytics_prod_gold.fct_session_outcomes
-    WHERE app_version IS NOT NULL
-    ORDER BY app_version DESC
+    SELECT app_version
+    FROM analytics_prod_seeds.app_version_releases
+    ORDER BY release_date DESC
     """
 
     try:
         with engine.connect() as conn:
             df = pd.read_sql(text(query), conn)
         return df['app_version'].tolist()
-    except Exception as e:
-        st.error(f"Error loading app versions: {str(e)}")
-        return []
+    except Exception:
+        # Fallback: return known versions if seed table not available
+        return ['2.6', '2.5', '2.4', '2.3', '2.2', '2.1', '2.0',
+                '1.9', '1.8', '1.7', '1.6', '1.5', '1.4', '1.3', '1.2', '1.1', '1.0']
 
 
 @st.cache_data(ttl=300)

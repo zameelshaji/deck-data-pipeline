@@ -318,6 +318,8 @@ models:
               values: ['strong', 'weak']
       - name: app_version
         description: "App version from dextr query context (inferred sessions) or null (native)"
+      - name: effective_app_version
+        description: "Coalesce of native app_version and date-imputed version from app_version_releases seed. Always populated."
       - name: share_attribution_confidence
         description: "Confidence in share attribution: 'high' (native), 'medium' (card share with pack_id), 'low' (share_link time-window match)"
         tests:

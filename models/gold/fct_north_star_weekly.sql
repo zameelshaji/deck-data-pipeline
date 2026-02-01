@@ -3,7 +3,7 @@ with weekly_metrics as (
         session_week as metric_week,
         data_source,
         case when is_prompt_session then 'prompt' else 'non_prompt' end as session_type,
-        coalesce(app_version, 'unknown') as app_version,
+        coalesce(effective_app_version, 'unknown') as app_version,
 
         count(*) as total_sessions,
         count(*) filter (where has_save) as sessions_with_save,
@@ -25,7 +25,7 @@ with weekly_metrics as (
 
     from {{ ref('fct_session_outcomes') }}
     where session_week is not null
-    group by session_week, data_source, case when is_prompt_session then 'prompt' else 'non_prompt' end, coalesce(app_version, 'unknown')
+    group by session_week, data_source, case when is_prompt_session then 'prompt' else 'non_prompt' end, coalesce(effective_app_version, 'unknown')
 ),
 
 -- Recompute "all" aggregation from base data to avoid overcounting distinct users

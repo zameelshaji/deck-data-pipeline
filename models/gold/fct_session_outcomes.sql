@@ -82,6 +82,14 @@ prompt_sessions as (
       and initiation_surface = 'dextr'
 ),
 
+version_lookup as (
+    select
+        app_version,
+        release_date::date as release_date,
+        release_date_end::date as release_date_end
+    from {{ ref('app_version_releases') }}
+),
+
 outcomes as (
     select
         s.session_id,
@@ -96,6 +104,7 @@ outcomes as (
         s.initiation_surface,
         s.device_type,
         s.app_version,
+        coalesce(s.app_version, vl.app_version) as effective_app_version,
         s.has_native_session_id,
         s.is_inferred_session,
         s.data_source,
@@ -152,6 +161,7 @@ outcomes as (
     left join all_shares sh on s.session_id = sh.session_id
     left join post_share_interactions psi on s.session_id = psi.session_id
     left join prompt_sessions ps on s.session_id = ps.session_id
+    left join version_lookup vl on s.session_date between vl.release_date and vl.release_date_end
 )
 
 select * from outcomes

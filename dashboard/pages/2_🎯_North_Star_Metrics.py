@@ -9,6 +9,7 @@ from utils.styling import apply_deck_branding, add_deck_footer, BRAND_COLORS
 from utils.data_loader import (
     load_north_star_daily,
     load_north_star_weekly,
+    load_north_star_headline,
     load_psr_ladder_current,
     load_activation_funnel_data,
     load_retention_activated_summary,
@@ -97,57 +98,49 @@ if daily_df.empty:
     st.info("Run `dbt run --select +fct_north_star_daily` to populate the data.")
     st.stop()
 
-# --- Section A: Executive Summary ---
-st.subheader("📊 Current Performance")
+# --- Section A: Headline Metrics ---
+st.subheader("📊 Headline Metrics")
+st.caption(f"Aggregated for {start_date.strftime('%b %d, %Y')} – {end_date.strftime('%b %d, %Y')}")
 
-latest = daily_df.iloc[0] if not daily_df.empty else {}
+headline = load_north_star_headline(
+    data_source=data_source,
+    session_type=session_type,
+    app_version=app_version,
+    start_date=str(start_date),
+    end_date=str(end_date),
+)
 
 col1, col2, col3, col4 = st.columns(4)
 
 with col1:
-    psr_val = latest.get('psr_broad', 0) or 0
-    psr_wow = latest.get('psr_broad_wow_change', None)
-    delta_str = f"{float(psr_wow)*100:+.1f}pp WoW" if psr_wow is not None and pd.notna(psr_wow) else None
     st.metric(
-        label="PSR (Broad)",
-        value=f"{float(psr_val)*100:.1f}%",
-        delta=delta_str,
-        help="% sessions with ≥1 save AND ≥1 share"
+        label="Unique Active Planners",
+        value=f"{headline.get('unique_active_planners', 0):,}",
+        help="Distinct users who saved or shared at least once in the selected period"
     )
 
 with col2:
-    ssr_val = latest.get('ssr', 0) or 0
-    ssr_wow = latest.get('ssr_wow_change', None)
-    delta_str = f"{float(ssr_wow)*100:+.1f}pp WoW" if ssr_wow is not None and pd.notna(ssr_wow) else None
+    ssr_val = headline.get('ssr', 0)
     st.metric(
-        label="Session Save Rate",
+        label="Session Save Rate (SSR)",
         value=f"{float(ssr_val)*100:.1f}%",
-        delta=delta_str,
-        help="% sessions with ≥1 save"
+        help="% of sessions where the user saved at least one card to a board"
     )
 
 with col3:
-    shr_val = latest.get('shr', 0) or 0
+    shr_val = headline.get('shr', 0)
     st.metric(
-        label="Session Share Rate",
+        label="Session Share Rate (SHR)",
         value=f"{float(shr_val)*100:.1f}%",
-        help="% sessions with ≥1 share"
+        help="% of sessions where the user shared a card or board via link, iMessage, etc."
     )
 
 with col4:
-    # WAP from weekly data
-    wap_val = 0
-    wap_delta = None
-    if not weekly_df.empty:
-        wap_val = int(weekly_df.iloc[0].get('weekly_active_planners', 0) or 0)
-        wap_change = weekly_df.iloc[0].get('wap_wow_change', None)
-        if wap_change is not None and pd.notna(wap_change):
-            wap_delta = f"{int(wap_change):+d} WoW"
+    psr_val = headline.get('psr_broad', 0)
     st.metric(
-        label="Weekly Active Planners",
-        value=f"{wap_val:,}",
-        delta=wap_delta,
-        help="Unique users with ≥1 save or share this week"
+        label="PSR (Broad)",
+        value=f"{float(psr_val)*100:.1f}%",
+        help="% of sessions with at least one save AND at least one share — our north-star quality metric"
     )
 
 st.divider()
@@ -188,8 +181,13 @@ if not ladder_df.empty:
 
         genuine_pct = genuine / total * 100 if total > 0 else 0
         nvr_pct = nvr_count / total * 100 if total > 0 else 0
-        st.info(f"📊 Genuine Planning Attempts: {genuine_pct:.1f}% of sessions had at least one prompt, save, or share")
-        st.warning(f"⚠️ No Value Rate: {nvr_pct:.1f}% of sessions had neither saves nor shares")
+        col_l1, col_l2 = st.columns(2)
+        with col_l1:
+            st.metric("Genuine Planning %", f"{genuine_pct:.1f}%",
+                       help="Sessions where the user did at least one prompt, save, or share — filters out accidental opens")
+        with col_l2:
+            st.metric("No-Value Rate (NVR)", f"{nvr_pct:.1f}%",
+                       help="Sessions with zero saves and zero shares — the user got no lasting value")
     else:
         st.info("No sessions in the selected period.")
 else:
@@ -266,7 +264,7 @@ st.divider()
 st.subheader("🚀 Activation Funnel (7-day window)")
 
 try:
-    funnel_df = load_activation_funnel_data(data_source=data_source, session_type=session_type)
+    funnel_df = load_activation_funnel_data(data_source=data_source, session_type=session_type, start_date=str(start_date), end_date=str(end_date))
 
     if not funnel_df.empty:
         row = funnel_df.iloc[0]
@@ -303,15 +301,18 @@ try:
             col1, col2, col3 = st.columns(3)
             with col1:
                 arate_7d = f2 / total_users * 100 if total_users > 0 else 0
-                st.metric("7-Day Activation Rate", f"{arate_7d:.1f}%")
+                st.metric("7-Day Activation Rate", f"{arate_7d:.1f}%",
+                           help="% of signups who prompted, saved, or shared within 7 days")
             with col2:
                 activated_30d = int(row.get('activated_30d', 0))
                 arate_30d = activated_30d / total_users * 100 if total_users > 0 else 0
-                st.metric("30-Day Activation Rate", f"{arate_30d:.1f}%")
+                st.metric("30-Day Activation Rate", f"{arate_30d:.1f}%",
+                           help="% of signups who prompted, saved, or shared within 30 days")
             with col3:
                 tta = row.get('median_tta', None)
                 tta_str = f"{float(tta):.1f} days" if tta is not None and pd.notna(tta) else "N/A"
-                st.metric("Median Time to Activation", tta_str)
+                st.metric("Median Time to Activation", tta_str,
+                           help="Median days from signup to first prompt, save, or share")
         else:
             st.info("No activation data available.")
     else:
@@ -341,15 +342,15 @@ try:
         with col1:
             r7 = retained_d7 / mature_d7 * 100 if mature_d7 > 0 else 0
             st.metric("D7 Retention", f"{r7:.1f}%",
-                       help=f"% of {mature_d7} activated users active within 7 days")
+                       help=f"% of {mature_d7} activated users who returned within 7 days of activation")
         with col2:
             r30 = retained_d30 / mature_d30 * 100 if mature_d30 > 0 else 0
             st.metric("D30 Retention", f"{r30:.1f}%",
-                       help=f"% of {mature_d30} activated users active within 30 days")
+                       help=f"% of {mature_d30} activated users who returned within 30 days of activation")
         with col3:
             r60 = retained_d60 / mature_d60 * 100 if mature_d60 > 0 else 0
             st.metric("D60 Retention", f"{r60:.1f}%",
-                       help=f"% of {mature_d60} activated users active within 60 days")
+                       help=f"% of {mature_d60} activated users who returned within 60 days of activation")
 
         # Stickiness from active planners
         try:
@@ -359,7 +360,7 @@ try:
                 latest_stickiness = monthly_ap.iloc[0].get('planner_stickiness', None)
                 if latest_stickiness is not None and pd.notna(latest_stickiness):
                     st.metric("Planner Stickiness (WAP/MAP)", f"{float(latest_stickiness)*100:.1f}%",
-                              help="Average Weekly Active Planners / Monthly Active Planners")
+                              help="Weekly Active Planners / Monthly Active Planners — how habitually users return each week")
         except Exception:
             pass
     else:
