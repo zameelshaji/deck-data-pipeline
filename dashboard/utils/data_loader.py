@@ -411,7 +411,8 @@ def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_
         COALESCE(SUM(sessions_with_share), 0) as sessions_with_share,
         COALESCE(SUM(sessions_with_psr_broad), 0) as sessions_with_psr_broad,
         COALESCE(SUM(sessions_with_psr_strict), 0) as sessions_with_psr_strict,
-        COALESCE(SUM(no_value_sessions), 0) as no_value_sessions
+        COALESCE(SUM(no_value_sessions), 0) as no_value_sessions,
+        COALESCE(SUM(genuine_planning_sessions), 0) as genuine_planning_sessions
     FROM analytics_prod_gold.fct_north_star_daily
     WHERE data_source = '{data_source}'
       AND session_type = '{session_type}'

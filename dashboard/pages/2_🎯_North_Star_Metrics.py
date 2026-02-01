@@ -159,6 +159,7 @@ st.caption("How sessions progress through the value loop")
 if not ladder_df.empty:
     row = ladder_df.iloc[0]
     total = int(row.get('total_sessions', 0))
+    genuine = int(row.get('genuine_planning_sessions', 0))
     saves = int(row.get('sessions_with_save', 0))
     shares = int(row.get('sessions_with_share', 0))
     psr_b = int(row.get('sessions_with_psr_broad', 0))
@@ -167,11 +168,12 @@ if not ladder_df.empty:
 
     if total > 0:
         fig = go.Figure(go.Funnel(
-            y=['All Sessions', 'P1: Saved (SSR)', 'P2: Shared (SHR)', 'PSR Broad: Save+Share', 'PSR Strict: +Validation'],
-            x=[total, saves, shares, psr_b, psr_s],
+            y=['All Sessions', 'Genuine Planning Attempts', 'P1: Saved (SSR)', 'P2: Shared (SHR)', 'PSR Broad: Save+Share', 'PSR Strict: +Validation'],
+            x=[total, genuine, saves, shares, psr_b, psr_s],
             textinfo="value+percent initial",
             marker=dict(color=[
                 BRAND_COLORS['text_tertiary'],
+                '#6B7280',
                 BRAND_COLORS['info'],
                 BRAND_COLORS['accent'],
                 BRAND_COLORS['success'],
@@ -186,7 +188,9 @@ if not ladder_df.empty:
         )
         st.plotly_chart(fig, use_container_width=True)
 
+        genuine_pct = genuine / total * 100 if total > 0 else 0
         nvr_pct = nvr_count / total * 100 if total > 0 else 0
+        st.info(f"📊 Genuine Planning Attempts: {genuine_pct:.1f}% of sessions had at least one prompt, save, or share")
         st.warning(f"⚠️ No Value Rate: {nvr_pct:.1f}% of sessions had neither saves nor shares")
     else:
         st.info("No sessions in the selected period.")

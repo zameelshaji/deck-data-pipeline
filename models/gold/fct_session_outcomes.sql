@@ -14,7 +14,10 @@ with sessions_base as (
         true as has_native_session_id,
         false as is_inferred_session,
         'native' as data_source,
-        null::boolean as is_genuine_planning_attempt
+        null::boolean as is_genuine_planning_attempt,
+        0 as inferred_save_count,
+        0 as inferred_share_count,
+        0 as inferred_unique_cards_interacted
     from {{ ref('stg_planning_sessions') }}
 
     union all
@@ -34,7 +37,10 @@ with sessions_base as (
         false as has_native_session_id,
         true as is_inferred_session,
         'inferred' as data_source,
-        is_genuine_planning_attempt
+        is_genuine_planning_attempt,
+        save_count as inferred_save_count,
+        share_count as inferred_share_count,
+        unique_cards_interacted as inferred_unique_cards_interacted
     from {{ ref('stg_inferred_sessions') }}
 ),
 
@@ -46,22 +52,16 @@ sessions_deduped as (
     order by session_id, has_native_session_id desc
 ),
 
--- Combine saves from both paths
+-- Native session saves
 all_saves as (
     select session_id, user_id, save_count, unique_cards_saved, first_save_at, last_save_at
     from {{ ref('stg_session_saves') }}
-    union all
-    select session_id, user_id, save_count, unique_cards_saved, first_save_at, last_save_at
-    from {{ ref('int_inferred_session_saves') }}
 ),
 
--- Combine shares from both paths
+-- Native session shares
 all_shares as (
     select session_id, user_id, share_count, first_share_at, 'high' as share_attribution_confidence
     from {{ ref('stg_session_shares') }}
-    union all
-    select session_id, user_id, share_count, first_share_at, share_attribution_confidence
-    from {{ ref('int_inferred_session_shares') }}
 ),
 
 -- Post-share interactions per session (within 24h, non-sharer)
@@ -100,21 +100,21 @@ outcomes as (
         s.is_inferred_session,
         s.data_source,
 
-        -- Outcome flags
-        coalesce(sv.save_count, 0) > 0 as has_save,
-        coalesce(sh.share_count, 0) > 0 as has_share,
+        -- Outcome flags (native saves/shares from joins, inferred from stg_inferred_sessions)
+        coalesce(sv.save_count, s.inferred_save_count, 0) > 0 as has_save,
+        coalesce(sh.share_count, s.inferred_share_count, 0) > 0 as has_share,
         coalesce(psi.interaction_count, 0) > 0 as has_post_share_interaction,
-        coalesce(sv.save_count, 0) as save_count,
-        coalesce(sv.unique_cards_saved, 0) as unique_cards_saved,
-        coalesce(sh.share_count, 0) as share_count,
+        coalesce(sv.save_count, s.inferred_save_count, 0) as save_count,
+        coalesce(sv.unique_cards_saved, s.inferred_unique_cards_interacted, 0) as unique_cards_saved,
+        coalesce(sh.share_count, s.inferred_share_count, 0) as share_count,
 
         -- Derived metric flags
-        coalesce(sv.save_count, 0) > 0 as meets_ssr,
-        coalesce(sh.share_count, 0) > 0 as meets_shr,
-        (coalesce(sv.save_count, 0) > 0 and coalesce(sh.share_count, 0) > 0) as meets_psr_broad,
-        (coalesce(sv.save_count, 0) > 0 and coalesce(sh.share_count, 0) > 0 and coalesce(psi.interaction_count, 0) > 0) as meets_psr_strict,
-        coalesce(sv.unique_cards_saved, 0) >= 3 as meets_scr3,
-        (coalesce(sv.save_count, 0) = 0 and coalesce(sh.share_count, 0) = 0) as is_no_value_session,
+        coalesce(sv.save_count, s.inferred_save_count, 0) > 0 as meets_ssr,
+        coalesce(sh.share_count, s.inferred_share_count, 0) > 0 as meets_shr,
+        (coalesce(sv.save_count, s.inferred_save_count, 0) > 0 and coalesce(sh.share_count, s.inferred_share_count, 0) > 0) as meets_psr_broad,
+        (coalesce(sv.save_count, s.inferred_save_count, 0) > 0 and coalesce(sh.share_count, s.inferred_share_count, 0) > 0 and coalesce(psi.interaction_count, 0) > 0) as meets_psr_strict,
+        coalesce(sv.unique_cards_saved, s.inferred_unique_cards_interacted, 0) >= 3 as meets_scr3,
+        (coalesce(sv.save_count, s.inferred_save_count, 0) = 0 and coalesce(sh.share_count, s.inferred_share_count, 0) = 0) as is_no_value_session,
 
         -- Timing metrics
         case
@@ -142,7 +142,8 @@ outcomes as (
         coalesce(
             s.is_genuine_planning_attempt,
             (ps.session_id is not null or s.initiation_surface = 'dextr'
-             or coalesce(sv.save_count, 0) > 0 or coalesce(sh.share_count, 0) > 0)
+             or coalesce(sv.save_count, s.inferred_save_count, 0) > 0
+             or coalesce(sh.share_count, s.inferred_share_count, 0) > 0)
         ) as is_genuine_planning_attempt
 
     from sessions_deduped s

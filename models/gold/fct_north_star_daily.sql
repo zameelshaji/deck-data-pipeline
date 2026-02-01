@@ -14,6 +14,7 @@ with daily_metrics as (
         count(*) filter (where is_no_value_session) as no_value_sessions,
         count(*) filter (where has_share and has_post_share_interaction) as sessions_with_pir,
         count(*) filter (where has_native_session_id) as sessions_with_attribution,
+        count(*) filter (where is_genuine_planning_attempt) as genuine_planning_sessions,
 
         -- Density
         avg(save_count) filter (where has_save) as avg_saves_per_saving_session,
@@ -41,6 +42,7 @@ expanded as (
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
+        sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
         avg(median_ttfs)::numeric, avg(median_tts)::numeric
     from daily_metrics
@@ -54,6 +56,7 @@ expanded as (
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
+        sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
         avg(median_ttfs)::numeric, avg(median_tts)::numeric
     from daily_metrics
@@ -67,6 +70,7 @@ expanded as (
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
+        sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
         avg(median_ttfs)::numeric, avg(median_tts)::numeric
     from daily_metrics
@@ -80,6 +84,7 @@ expanded as (
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
+        sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
         avg(median_ttfs)::numeric, avg(median_tts)::numeric
     from daily_metrics
@@ -93,6 +98,7 @@ expanded as (
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
+        sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
         avg(median_ttfs)::numeric, avg(median_tts)::numeric
     from daily_metrics
@@ -106,6 +112,7 @@ expanded as (
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
+        sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
         avg(median_ttfs)::numeric, avg(median_tts)::numeric
     from daily_metrics
@@ -119,6 +126,7 @@ expanded as (
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
+        sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
         avg(median_ttfs)::numeric, avg(median_tts)::numeric
     from daily_metrics
@@ -138,6 +146,7 @@ with_rates as (
         sessions_with_psr_strict,
         sessions_with_scr3,
         no_value_sessions,
+        genuine_planning_sessions,
 
         -- Rates
         case when total_sessions > 0 then round(sessions_with_save::numeric / total_sessions, 4) else 0 end as ssr,
