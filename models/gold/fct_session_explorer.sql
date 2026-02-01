@@ -50,33 +50,43 @@ pack_sessions as (
       and effective_session_id is not null
 ),
 
--- Unify legacy and post-Gemini card interactions
+-- Unify legacy and post-Gemini card interactions with resolved card details
 unified_pack_cards as (
-    -- Legacy cards (right/left)
+    -- Legacy cards (right/left) — card_id maps directly to stg_cards
     select
-        pack_id::text as pack_id,
-        card_id::text as card_id,
-        card_order,
+        dpc.pack_id::text as pack_id,
+        dpc.card_id::text as card_id,
+        c.name as card_name,
+        c.category,
+        c.rating,
+        dpc.card_order,
         case
-            when user_action = 'right' then 'liked'
-            when user_action = 'left' then 'disliked'
+            when dpc.user_action = 'right' then 'liked'
+            when dpc.user_action = 'left' then 'disliked'
             else 'unswiped'
         end as user_action
-    from {{ ref('src_dextr_pack_cards') }}
+    from {{ ref('src_dextr_pack_cards') }} dpc
+    left join {{ ref('stg_cards') }} c on dpc.card_id::text = c.card_id
 
     union all
 
-    -- Post-Gemini places (like/dislike)
+    -- Post-Gemini places (like/dislike) — join via place_id to src_places for name,
+    -- and use deck_sku to match stg_cards for category/rating
     select
-        pack_id::text as pack_id,
-        place_deck_sku as card_id,
+        dp.pack_id::text as pack_id,
+        coalesce(dp.place_deck_sku, pl.deck_sku, dp.place_id::text) as card_id,
+        pl.name as card_name,
+        c.category,
+        coalesce(c.rating, pl.rating) as rating,
         null::integer as card_order,
         case
-            when user_action = 'like' then 'liked'
-            when user_action = 'dislike' then 'disliked'
+            when dp.user_action = 'like' then 'liked'
+            when dp.user_action = 'dislike' then 'disliked'
             else 'unswiped'
         end as user_action
-    from {{ ref('src_dextr_places') }}
+    from {{ ref('src_dextr_places') }} dp
+    left join {{ ref('src_places') }} pl on dp.place_id = pl.place_id
+    left join {{ ref('stg_cards') }} c on coalesce(dp.place_deck_sku, pl.deck_sku) = c.card_id
 ),
 
 session_cards as (
@@ -84,25 +94,25 @@ session_cards as (
         ps.session_id,
         jsonb_agg(
             jsonb_build_object(
-                'card_name', c.name,
+                'card_name', uc.card_name,
                 'card_id', uc.card_id,
-                'category', c.category,
-                'rating', c.rating,
+                'category', uc.category,
+                'rating', uc.rating,
                 'action', uc.user_action,
                 'card_order', uc.card_order
             ) order by uc.card_order nulls last
         ) as cards_generated_detail,
         -- Separate card lists by action
         jsonb_agg(
-            jsonb_build_object('card_id', uc.card_id, 'card_name', c.name)
+            jsonb_build_object('card_id', uc.card_id, 'card_name', uc.card_name)
             order by uc.card_order nulls last
         ) as cards_generated,
         jsonb_agg(
-            jsonb_build_object('card_id', uc.card_id, 'card_name', c.name)
+            jsonb_build_object('card_id', uc.card_id, 'card_name', uc.card_name)
             order by uc.card_order nulls last
         ) filter (where uc.user_action = 'liked') as cards_liked_list,
         jsonb_agg(
-            jsonb_build_object('card_id', uc.card_id, 'card_name', c.name)
+            jsonb_build_object('card_id', uc.card_id, 'card_name', uc.card_name)
             order by uc.card_order nulls last
         ) filter (where uc.user_action = 'disliked') as cards_disliked_list,
         count(*) as total_cards_generated,
@@ -110,7 +120,6 @@ session_cards as (
         count(*) filter (where uc.user_action = 'disliked') as cards_disliked
     from unified_pack_cards uc
     inner join pack_sessions ps on uc.pack_id = ps.pack_id
-    left join {{ ref('stg_cards') }} c on uc.card_id = c.card_id
     group by ps.session_id
 ),
 
