@@ -92,6 +92,19 @@ session_cards as (
                 'card_order', uc.card_order
             ) order by uc.card_order nulls last
         ) as cards_generated_detail,
+        -- Separate card lists by action
+        jsonb_agg(
+            jsonb_build_object('card_id', uc.card_id, 'card_name', c.name)
+            order by uc.card_order nulls last
+        ) as cards_generated,
+        jsonb_agg(
+            jsonb_build_object('card_id', uc.card_id, 'card_name', c.name)
+            order by uc.card_order nulls last
+        ) filter (where uc.user_action = 'liked') as cards_liked_list,
+        jsonb_agg(
+            jsonb_build_object('card_id', uc.card_id, 'card_name', c.name)
+            order by uc.card_order nulls last
+        ) filter (where uc.user_action = 'disliked') as cards_disliked_list,
         count(*) as total_cards_generated,
         count(*) filter (where uc.user_action = 'liked') as cards_liked,
         count(*) filter (where uc.user_action = 'disliked') as cards_disliked
@@ -113,7 +126,11 @@ session_saves as (
                 'board_name', coalesce(b.name, 'Default Board'),
                 'saved_at', bp.added_at
             ) order by bp.added_at
-        ) as saves_detail
+        ) as saves_detail,
+        jsonb_agg(
+            jsonb_build_object('card_id', bp.place_id, 'card_name', c.name)
+            order by bp.added_at
+        ) as cards_saved_list
     from {{ ref('src_board_places_v2') }} bp
     left join {{ ref('stg_cards') }} c on bp.place_id::text = c.card_id
     left join {{ ref('src_boards') }} b on bp.board_id = b.id
@@ -150,6 +167,9 @@ session_shares as (
                 'total_interactions', coalesce(sv.total_interactions, 0)
             ) order by sl.created_at
         ) as shares_detail,
+        jsonb_agg(
+            distinct jsonb_build_object('card_id', sl.card_id, 'card_name', c.name)
+        ) filter (where sl.card_id is not null) as cards_shared_list,
         sum(coalesce(sv.unique_viewers, 0)) as total_share_viewers
     from {{ ref('src_share_links') }} sl
     left join share_viewer_counts sv on sl.id = sv.share_link_id
@@ -198,15 +218,20 @@ select
 
     -- Cards generated
     sc.cards_generated_detail,
+    sc.cards_generated,
+    sc.cards_liked_list,
+    sc.cards_disliked_list,
     coalesce(sc.total_cards_generated, 0) as total_cards_generated,
     coalesce(sc.cards_liked, 0) as cards_liked,
     coalesce(sc.cards_disliked, 0) as cards_disliked,
 
     -- Saves
     ss.saves_detail,
+    ss.cards_saved_list,
 
     -- Shares
     sh.shares_detail,
+    sh.cards_shared_list,
     coalesce(sh.total_share_viewers, 0) as total_share_viewers,
 
     -- Event timeline
