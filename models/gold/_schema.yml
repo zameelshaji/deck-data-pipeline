@@ -434,3 +434,34 @@ models:
         description: "Unique users with at least 1 save or share in period"
       - name: planner_stickiness
         description: "avg(WAP) / MAP ratio (monthly only)"
+
+  - name: fct_session_explorer
+    description: "One row per session with JSONB detail columns for diagnostic exploration. Includes prompt texts, cards generated, saves, shares, and event timelines."
+    columns:
+      - name: session_id
+        description: "Unique session identifier (native or inferred)"
+        tests:
+          - not_null
+          - unique
+      - name: prompts_detail
+        description: "JSONB array of prompts: [{query_text, timestamp, pack_name, location, total_cards_in_pack}]"
+      - name: explorer_prompt_count
+        description: "Number of distinct Dextr prompts in this session"
+      - name: cards_generated_detail
+        description: "JSONB array of cards shown: [{card_name, card_id, category, rating, action (liked/disliked/unswiped), card_order}]"
+      - name: total_cards_generated
+        description: "Total cards presented across all packs in this session"
+      - name: cards_liked
+        description: "Cards swiped right / liked"
+      - name: cards_disliked
+        description: "Cards swiped left / disliked"
+      - name: saves_detail
+        description: "JSONB array of saves: [{card_name, card_id, category, board_name, saved_at}]"
+      - name: shares_detail
+        description: "JSONB array of shares: [{share_type, share_channel, shared_at, board_name, card_name, unique_viewers, total_interactions}]"
+      - name: total_share_viewers
+        description: "Total unique viewers across all shares in this session"
+      - name: event_timeline
+        description: "JSONB array of key events in chronological order: [{event, timestamp, card_name, card_id}]"
+      - name: total_events
+        description: "Count of key events (excludes impressions and minor events)"
