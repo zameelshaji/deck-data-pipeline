@@ -4,10 +4,10 @@ with sessions_base as (
     select * from {{ ref('fct_session_outcomes') }}
 ),
 
--- Link prompts to sessions via app_events (dextr_query events carry pack_id)
+-- Link prompts to sessions via user_id + timestamp within session window
 session_prompts as (
     select
-        e.effective_session_id as session_id,
+        sb.session_id,
         jsonb_agg(
             jsonb_build_object(
                 'query_text', q.query_text,
@@ -19,18 +19,29 @@ session_prompts as (
         ) as prompts_detail,
         count(distinct q.query_id) as prompt_count
     from {{ ref('src_dextr_queries') }} q
-    inner join {{ ref('stg_app_events_enriched') }} e
-        on e.user_id = q.user_id
-        and e.event_name = 'dextr_query'
-        and e.pack_id = q.response_pack_id::text
+    inner join sessions_base sb
+        on q.user_id = sb.user_id
+        and q.query_timestamp between sb.started_at and sb.ended_at
     left join {{ ref('src_dextr_packs') }} p
         on q.response_pack_id = p.pack_id
-    where e.effective_session_id is not null
-    group by e.effective_session_id
+    group by sb.session_id
 ),
 
--- Map packs to sessions
+-- Map packs to sessions via prompts (response_pack_id) and app_events (pack_id)
 pack_sessions as (
+    -- From prompts: query timestamp falls within session
+    select distinct
+        sb.session_id,
+        q.response_pack_id::text as pack_id
+    from {{ ref('src_dextr_queries') }} q
+    inner join sessions_base sb
+        on q.user_id = sb.user_id
+        and q.query_timestamp between sb.started_at and sb.ended_at
+    where q.response_pack_id is not null
+
+    union
+
+    -- From app_events: events that carry pack_id
     select distinct
         effective_session_id as session_id,
         pack_id
