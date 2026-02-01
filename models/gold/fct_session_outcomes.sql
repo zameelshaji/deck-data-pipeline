@@ -13,27 +13,29 @@ with sessions_base as (
         null::text as app_version,
         true as has_native_session_id,
         false as is_inferred_session,
-        'native' as data_source
+        'native' as data_source,
+        null::boolean as is_genuine_planning_attempt
     from {{ ref('stg_planning_sessions') }}
 
     union all
 
-    -- Inferred sessions from historical data
+    -- Inferred sessions from stg_inferred_sessions
     select
-        session_id,
+        inferred_session_id as session_id,
         user_id,
         session_date,
         session_week,
-        started_at,
-        ended_at,
+        session_started_at as started_at,
+        session_ended_at as ended_at,
         session_duration_seconds,
-        initiation_surface,
+        inferred_initiation_surface as initiation_surface,
         null::text as device_type,
-        app_version,
+        null::text as app_version,
         false as has_native_session_id,
         true as is_inferred_session,
-        'inferred' as data_source
-    from {{ ref('int_inferred_sessions') }}
+        'inferred' as data_source,
+        is_genuine_planning_attempt
+    from {{ ref('stg_inferred_sessions') }}
 ),
 
 -- Deduplicate: prefer native sessions
@@ -134,7 +136,14 @@ outcomes as (
         (ps.session_id is not null or s.initiation_surface = 'dextr') as is_prompt_session,
 
         -- Attribution confidence
-        coalesce(sh.share_attribution_confidence, 'high') as share_attribution_confidence
+        coalesce(sh.share_attribution_confidence, 'high') as share_attribution_confidence,
+
+        -- Genuine planning attempt
+        coalesce(
+            s.is_genuine_planning_attempt,
+            (ps.session_id is not null or s.initiation_surface = 'dextr'
+             or coalesce(sv.save_count, 0) > 0 or coalesce(sh.share_count, 0) > 0)
+        ) as is_genuine_planning_attempt
 
     from sessions_deduped s
     left join {{ ref('stg_users') }} u on s.user_id = u.user_id

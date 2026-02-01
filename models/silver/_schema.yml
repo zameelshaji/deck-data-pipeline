@@ -1,0 +1,17 @@
+version: 2
+
+models:
+  - name: stg_inferred_sessions
+    description: "Session-level table inferred from stg_events using 5-minute timeout. Each row is one inferred session."
+    columns:
+      - name: inferred_session_id
+        description: "Unique identifier for the inferred session"
+        tests:
+          - not_null
+          - unique
+      - name: user_id
+        description: "User who owns this session"
+        tests:
+          - not_null
+      - name: is_genuine_planning_attempt
+        description: "TRUE if session had at least one prompt, save, or share"

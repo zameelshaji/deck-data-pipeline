@@ -323,6 +323,8 @@ models:
         tests:
           - accepted_values:
               values: ['high', 'medium', 'low']
+      - name: is_genuine_planning_attempt
+        description: "TRUE if session had at least one prompt (dextr_query), save, or share. Filters out sessions with only browsing/impression activity."
 
   - name: fct_north_star_daily
     description: "Daily aggregate North Star metrics with rates, rolling averages, and WoW changes"
