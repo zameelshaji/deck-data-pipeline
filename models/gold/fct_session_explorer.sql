@@ -141,7 +141,7 @@ session_saves as (
             order by bp.added_at
         ) as cards_saved_list
     from {{ ref('src_board_places_v2') }} bp
-    left join {{ ref('src_places') }} pl on bp.place_id = pl.place_id
+    left join {{ ref('src_places') }} pl on bp.place_id::text = pl.place_id::text
     left join {{ ref('stg_cards') }} c on coalesce(pl.deck_sku, bp.place_id::text) = c.card_id
     left join {{ ref('src_boards') }} b on bp.board_id = b.id
     left join sessions_base sb
@@ -184,7 +184,7 @@ session_shares as (
     from {{ ref('src_share_links') }} sl
     left join share_viewer_counts sv on sl.id = sv.share_link_id
     left join {{ ref('src_boards') }} b on sl.board_id = b.id
-    left join {{ ref('src_places') }} pl on sl.card_id = pl.place_id
+    left join {{ ref('src_places') }} pl on sl.card_id::text = pl.place_id::text
     left join sessions_base sb
         on sl.session_id is null
         and sl.sharer_user_id = sb.user_id
@@ -208,7 +208,7 @@ session_events_timeline as (
         ) as event_timeline,
         count(*) as total_events
     from {{ ref('stg_app_events_enriched') }} e
-    left join {{ ref('src_places') }} pl on e.card_id = pl.place_id::text
+    left join {{ ref('src_places') }} pl on e.card_id::text = pl.place_id::text
     left join {{ ref('stg_cards') }} c on e.card_id::text = c.card_id
     where e.effective_session_id is not null
     group by e.effective_session_id
