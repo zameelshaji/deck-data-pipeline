@@ -14,7 +14,7 @@ from utils.data_loader import (
     load_activation_funnel_data,
     load_retention_activated_summary,
     load_active_planners_trend,
-    load_available_app_versions,
+    load_app_versions_with_dates,
 )
 
 st.set_page_config(
@@ -58,14 +58,15 @@ with st.sidebar:
     }
     session_type = session_type_map[session_type_label]
 
-    app_version_options = load_available_app_versions()
+    app_version_map = load_app_versions_with_dates()
+    app_version_options = list(app_version_map.keys())
     app_version_label = st.selectbox(
         "App Version",
         options=["All Versions"] + app_version_options,
         index=0,
-        help="Filter by app version"
+        help="Filter by app version (release date shown in brackets)"
     )
-    app_version = None if app_version_label == "All Versions" else app_version_label
+    app_version = None if app_version_label == "All Versions" else app_version_map.get(app_version_label)
 
     date_range = st.date_input(
         "Date Range",
