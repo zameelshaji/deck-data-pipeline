@@ -20,6 +20,7 @@ from utils.data_loader import (
     load_time_to_activation_distribution,
     load_retention_by_activation_type,
     load_worst_performing_cohorts,
+    load_app_versions_with_dates,
 )
 
 st.set_page_config(
@@ -33,11 +34,41 @@ apply_deck_branding()
 st.title("🎯 Activation & Retention")
 st.markdown("*Weekly cohort analysis for investor-grade retention metrics*")
 
+# --- Sidebar Filters ---
+with st.sidebar:
+    st.header("Filters")
+
+    date_range = st.date_input(
+        "Date Range",
+        value=(date.today() - timedelta(days=180), date.today()),
+        help="Filter funnel data to signups within this date range"
+    )
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        start_date, end_date = date_range
+    else:
+        start_date, end_date = date.today() - timedelta(days=180), date.today()
+
+    app_version_map = load_app_versions_with_dates()
+    app_version_options = list(app_version_map.keys())
+    app_version_label = st.selectbox(
+        "App Version",
+        options=["All Versions"] + app_version_options,
+        index=0,
+        help="Filter by app version (release date shown in brackets)"
+    )
+    app_version = None if app_version_label == "All Versions" else app_version_map.get(app_version_label)
+
 # --- Load Data ---
 try:
     summary_df = load_activation_summary_metrics()
-    cohort_df = load_retention_by_cohort_week()
-    funnel_df = load_signup_activation_funnel()
+    cohort_df = load_retention_by_cohort_week(
+        start_date=str(start_date),
+        end_date=str(end_date)
+    )
+    funnel_df = load_signup_activation_funnel(
+        start_date=str(start_date),
+        end_date=str(end_date)
+    )
     activation_type_df = load_activation_type_distribution()
     time_to_activation_df = load_time_to_activation_distribution()
 except Exception as e:
@@ -54,6 +85,7 @@ if summary_df.empty:
 # Section A: Executive Summary Cards
 # =============================================================================
 st.subheader("📊 Executive Summary")
+st.caption(f"Cohort and funnel data filtered to {start_date.strftime('%b %d, %Y')} – {end_date.strftime('%b %d, %Y')}")
 
 summary = summary_df.iloc[0] if not summary_df.empty else {}
 

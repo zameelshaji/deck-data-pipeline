@@ -654,6 +654,40 @@ def load_available_app_versions():
 
 
 @st.cache_data(ttl=300)
+def load_app_versions_with_dates():
+    """Get app versions with release dates for display in filters.
+
+    Returns:
+        dict: Mapping of display label (e.g., "2.6 (Jan 27, 2026)") to version (e.g., "2.6")
+    """
+    engine = get_database_connection()
+
+    query = """
+    SELECT app_version, release_date
+    FROM analytics_prod_seeds.app_version_releases
+    ORDER BY release_date DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+
+        # Create display labels with release date
+        version_map = {}
+        for _, row in df.iterrows():
+            version = row['app_version']
+            release_date = pd.to_datetime(row['release_date'])
+            label = f"{version} ({release_date.strftime('%b %d, %Y')})"
+            version_map[label] = version
+        return version_map
+    except Exception:
+        # Fallback: return known versions without dates
+        fallback_versions = ['2.6', '2.5', '2.4', '2.3', '2.2', '2.1', '2.0',
+                             '1.9', '1.8', '1.7', '1.6', '1.5', '1.4', '1.3', '1.2', '1.1', '1.0']
+        return {v: v for v in fallback_versions}
+
+
+@st.cache_data(ttl=300)
 def load_monthly_retention_summary_metrics():
     """Load summary metrics for monthly retention performance"""
     engine = get_database_connection()
@@ -738,13 +772,27 @@ def load_user_activation():
 
 
 @st.cache_data(ttl=300)
-def load_retention_by_cohort_week():
-    """Load weekly cohort retention summary from fct_retention_by_cohort_week."""
+def load_retention_by_cohort_week(start_date=None, end_date=None):
+    """Load weekly cohort retention summary from fct_retention_by_cohort_week.
+
+    Args:
+        start_date: Optional start date filter (inclusive)
+        end_date: Optional end date filter (inclusive)
+    """
     engine = get_database_connection()
 
-    query = """
+    where_clauses = []
+    if start_date:
+        where_clauses.append(f"cohort_week >= '{start_date}'")
+    if end_date:
+        where_clauses.append(f"cohort_week <= '{end_date}'")
+
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+    query = f"""
     SELECT *
     FROM analytics_prod_gold.fct_retention_by_cohort_week
+    {where_sql}
     ORDER BY cohort_week DESC
     """
 
@@ -758,13 +806,27 @@ def load_retention_by_cohort_week():
 
 
 @st.cache_data(ttl=300)
-def load_signup_activation_funnel():
-    """Load signup to activation funnel data from fct_signup_to_activation_funnel."""
+def load_signup_activation_funnel(start_date=None, end_date=None):
+    """Load signup to activation funnel data from fct_signup_to_activation_funnel.
+
+    Args:
+        start_date: Optional start date filter (inclusive)
+        end_date: Optional end date filter (inclusive)
+    """
     engine = get_database_connection()
 
-    query = """
+    where_clauses = []
+    if start_date:
+        where_clauses.append(f"signup_week >= '{start_date}'")
+    if end_date:
+        where_clauses.append(f"signup_week <= '{end_date}'")
+
+    where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+
+    query = f"""
     SELECT *
     FROM analytics_prod_gold.fct_signup_to_activation_funnel
+    {where_sql}
     ORDER BY signup_week DESC
     """
 
