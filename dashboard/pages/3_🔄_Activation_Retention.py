@@ -20,18 +20,17 @@ from utils.data_loader import (
     load_time_to_activation_distribution,
     load_retention_by_activation_type,
     load_worst_performing_cohorts,
-    load_app_versions_with_dates,
 )
 
 st.set_page_config(
     page_title="Activation & Retention | DECK Analytics",
-    page_icon="🎯",
+    page_icon="🔄",
     layout="wide"
 )
 
 apply_deck_branding()
 
-st.title("🎯 Activation & Retention")
+st.title("🔄 Activation & Retention")
 st.markdown("*Weekly cohort analysis for investor-grade retention metrics*")
 
 # --- Sidebar Filters ---
@@ -47,16 +46,6 @@ with st.sidebar:
         start_date, end_date = date_range
     else:
         start_date, end_date = date.today() - timedelta(days=180), date.today()
-
-    app_version_map = load_app_versions_with_dates()
-    app_version_options = list(app_version_map.keys())
-    app_version_label = st.selectbox(
-        "App Version",
-        options=["All Versions"] + app_version_options,
-        index=0,
-        help="Filter by app version (release date shown in brackets)"
-    )
-    app_version = None if app_version_label == "All Versions" else app_version_map.get(app_version_label)
 
 # --- Load Data ---
 try:
