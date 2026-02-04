@@ -467,3 +467,123 @@ models:
         description: "JSONB array of key events in chronological order: [{event, timestamp, card_name, card_id}]"
       - name: total_events
         description: "Count of key events (excludes impressions and minor events)"
+
+  - name: fct_user_activation
+    description: "User-level activation tracking. Each row is one user with their activation details. Activation is defined as first save, share, or AI-prompted save."
+    columns:
+      - name: user_id
+        description: "Unique user identifier"
+        tests:
+          - not_null
+          - unique
+      - name: signup_date
+        description: "User's original signup date"
+        tests:
+          - not_null
+      - name: activation_date
+        description: "Date user first activated (saved, shared, or AI-prompted save). NULL if never activated."
+      - name: cohort_week
+        description: "Monday of the activation week for cohort grouping. NULL if never activated."
+      - name: days_to_activation
+        description: "Days between signup and first activation. NULL if never activated."
+      - name: activation_type
+        description: "First activation action type: save_prompted, saved, shared, or multiple"
+        tests:
+          - accepted_values:
+              values: ['save_prompted', 'saved', 'shared', 'multiple']
+      - name: first_activation_event
+        description: "The specific event that first activated the user"
+      - name: is_activated
+        description: "Boolean flag: TRUE if user has activated"
+        tests:
+          - not_null
+
+  - name: fct_retention_by_cohort_week
+    description: "Weekly cohort retention rates at D7/D30/D60/D90. One row per activation cohort week."
+    columns:
+      - name: cohort_week
+        description: "Monday of activation week for cohort grouping"
+        tests:
+          - not_null
+          - unique
+      - name: cohort_size
+        description: "Number of users who activated in this week"
+        tests:
+          - not_null
+      - name: mature_d7
+        description: "Users with enough time elapsed to measure D7 retention"
+      - name: mature_d30
+        description: "Users with enough time elapsed to measure D30 retention"
+      - name: mature_d60
+        description: "Users with enough time elapsed to measure D60 retention"
+      - name: mature_d90
+        description: "Users with enough time elapsed to measure D90 retention"
+      - name: retained_d7
+        description: "Count of mature users who returned within 7 days of activation"
+      - name: retained_d30
+        description: "Count of mature users who returned within 30 days of activation"
+      - name: retained_d60
+        description: "Count of mature users who returned within 60 days of activation"
+      - name: retained_d90
+        description: "Count of mature users who returned within 90 days of activation"
+      - name: retention_rate_d7
+        description: "D7 retention rate as decimal (0-1). NULL if no mature users."
+      - name: retention_rate_d30
+        description: "D30 retention rate as decimal (0-1). NULL if no mature users."
+      - name: retention_rate_d60
+        description: "D60 retention rate as decimal (0-1). NULL if no mature users."
+      - name: retention_rate_d90
+        description: "D90 retention rate as decimal (0-1). NULL if no mature users."
+      - name: cohort_save_prompted
+        description: "Users in cohort whose first activation was AI-prompted save"
+      - name: cohort_saved
+        description: "Users in cohort whose first activation was save (no prompt)"
+      - name: cohort_shared
+        description: "Users in cohort whose first activation was share"
+      - name: cohort_multiple
+        description: "Users in cohort with multiple activation types"
+
+  - name: fct_signup_to_activation_funnel
+    description: "Weekly funnel from signup through activation. Tracks conversion at each step."
+    columns:
+      - name: signup_week
+        description: "Week of signup for cohort trending"
+        tests:
+          - not_null
+          - unique
+      - name: total_signups
+        description: "F0: Total users who signed up this week"
+        tests:
+          - not_null
+      - name: had_app_open_7d
+        description: "F1: Users who had any event within 7 days of signup"
+      - name: had_planning_initiated_7d
+        description: "F2: Users who started planning (prompt, search, browse featured) within 7 days"
+      - name: had_content_engagement_7d
+        description: "F3: Users who engaged with content (swipe, view detail) within 7 days"
+      - name: had_activation_7d
+        description: "F4: Users who saved or shared within 7 days"
+      - name: conversion_f0_to_f1
+        description: "Conversion rate: signup → app open (decimal 0-1)"
+      - name: conversion_f1_to_f2
+        description: "Conversion rate: app open → planning initiated (decimal 0-1)"
+      - name: conversion_f2_to_f3
+        description: "Conversion rate: planning → content engagement (decimal 0-1)"
+      - name: conversion_f3_to_f4
+        description: "Conversion rate: engagement → activation (decimal 0-1)"
+      - name: overall_activation_rate_7d
+        description: "Overall conversion: signup → activation (decimal 0-1)"
+      - name: activated_with_save
+        description: "Users who activated with at least one save"
+      - name: activated_with_share
+        description: "Users who activated with at least one share"
+      - name: activated_with_save_prompted
+        description: "Users who activated via AI-prompted save"
+      - name: activated_via_prompt
+        description: "Users who activated through Dextr AI prompt"
+      - name: activated_via_search
+        description: "Users who activated through search"
+      - name: activated_via_featured
+        description: "Users who activated through featured content"
+      - name: avg_time_to_activation_hours
+        description: "Median hours from signup to first activation"

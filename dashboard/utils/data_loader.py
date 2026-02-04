@@ -711,3 +711,272 @@ def load_monthly_retention_summary_metrics():
     except Exception as e:
         st.error(f"Error loading monthly retention summary: {str(e)}")
         return pd.DataFrame()
+
+
+# ============================================================================
+# Activation & Retention Dashboard Data Loaders
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_user_activation():
+    """Load user-level activation data from fct_user_activation."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT *
+    FROM analytics_prod_gold.fct_user_activation
+    ORDER BY activation_date DESC NULLS LAST
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading user activation data: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_retention_by_cohort_week():
+    """Load weekly cohort retention summary from fct_retention_by_cohort_week."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT *
+    FROM analytics_prod_gold.fct_retention_by_cohort_week
+    ORDER BY cohort_week DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading retention by cohort week: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_signup_activation_funnel():
+    """Load signup to activation funnel data from fct_signup_to_activation_funnel."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT *
+    FROM analytics_prod_gold.fct_signup_to_activation_funnel
+    ORDER BY signup_week DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading signup activation funnel: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_activation_summary_metrics():
+    """Load aggregate activation metrics for executive summary cards."""
+    engine = get_database_connection()
+
+    query = """
+    WITH activation_metrics AS (
+        SELECT
+            COUNT(*) AS total_users,
+            COUNT(*) FILTER (WHERE is_activated) AS total_activated,
+            COUNT(*) FILTER (WHERE is_activated AND days_to_activation <= 7) AS activated_within_7d,
+            AVG(days_to_activation * 24.0) FILTER (WHERE is_activated) AS avg_hours_to_activation,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY days_to_activation * 24.0)
+                FILTER (WHERE is_activated) AS median_hours_to_activation
+        FROM analytics_prod_gold.fct_user_activation
+    ),
+    retention_metrics AS (
+        SELECT
+            SUM(mature_d7) AS total_mature_d7,
+            SUM(retained_d7) AS total_retained_d7,
+            SUM(mature_d30) AS total_mature_d30,
+            SUM(retained_d30) AS total_retained_d30,
+            SUM(mature_d60) AS total_mature_d60,
+            SUM(retained_d60) AS total_retained_d60,
+            SUM(mature_d90) AS total_mature_d90,
+            SUM(retained_d90) AS total_retained_d90
+        FROM analytics_prod_gold.fct_retention_by_cohort_week
+    )
+    SELECT
+        a.total_users,
+        a.total_activated,
+        a.activated_within_7d,
+        CASE WHEN a.total_users > 0
+            THEN a.activated_within_7d::numeric / a.total_users
+            ELSE 0 END AS activation_rate_7d,
+        a.avg_hours_to_activation,
+        a.median_hours_to_activation,
+        r.total_mature_d7,
+        r.total_retained_d7,
+        CASE WHEN r.total_mature_d7 > 0
+            THEN r.total_retained_d7::numeric / r.total_mature_d7
+            ELSE 0 END AS retention_rate_d7,
+        r.total_mature_d30,
+        r.total_retained_d30,
+        CASE WHEN r.total_mature_d30 > 0
+            THEN r.total_retained_d30::numeric / r.total_mature_d30
+            ELSE 0 END AS retention_rate_d30,
+        r.total_mature_d60,
+        r.total_retained_d60,
+        CASE WHEN r.total_mature_d60 > 0
+            THEN r.total_retained_d60::numeric / r.total_mature_d60
+            ELSE 0 END AS retention_rate_d60,
+        r.total_mature_d90,
+        r.total_retained_d90,
+        CASE WHEN r.total_mature_d90 > 0
+            THEN r.total_retained_d90::numeric / r.total_mature_d90
+            ELSE 0 END AS retention_rate_d90
+    FROM activation_metrics a
+    CROSS JOIN retention_metrics r
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading activation summary metrics: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_activation_type_distribution():
+    """Load distribution of activation types."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        activation_type,
+        COUNT(*) AS user_count
+    FROM analytics_prod_gold.fct_user_activation
+    WHERE is_activated = true
+      AND activation_type IS NOT NULL
+    GROUP BY activation_type
+    ORDER BY user_count DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading activation type distribution: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_time_to_activation_distribution():
+    """Load time to activation distribution for histogram."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        days_to_activation,
+        COUNT(*) AS user_count
+    FROM analytics_prod_gold.fct_user_activation
+    WHERE is_activated = true
+      AND days_to_activation IS NOT NULL
+      AND days_to_activation <= 30  -- Focus on first 30 days
+    GROUP BY days_to_activation
+    ORDER BY days_to_activation
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading time to activation distribution: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_retention_by_activation_type():
+    """Load retention rates broken down by activation type."""
+    engine = get_database_connection()
+
+    query = """
+    WITH user_retention AS (
+        SELECT
+            ua.user_id,
+            ua.activation_date,
+            ua.activation_type,
+            -- Maturity flags
+            current_date >= ua.activation_date + 7 AS is_mature_d7,
+            current_date >= ua.activation_date + 30 AS is_mature_d30,
+            -- Retention flags
+            BOOL_OR(s.session_date BETWEEN ua.activation_date + 1 AND ua.activation_date + 7) AS had_activity_d7,
+            BOOL_OR(s.session_date BETWEEN ua.activation_date + 1 AND ua.activation_date + 30) AS had_activity_d30
+        FROM analytics_prod_gold.fct_user_activation ua
+        LEFT JOIN analytics_prod_gold.fct_session_outcomes s
+            ON ua.user_id = s.user_id AND (s.has_save OR s.has_share)
+        WHERE ua.is_activated = true
+        GROUP BY ua.user_id, ua.activation_date, ua.activation_type
+    )
+    SELECT
+        activation_type,
+        COUNT(*) AS total_users,
+        COUNT(*) FILTER (WHERE is_mature_d7) AS mature_d7,
+        COUNT(*) FILTER (WHERE is_mature_d7 AND COALESCE(had_activity_d7, false)) AS retained_d7,
+        COUNT(*) FILTER (WHERE is_mature_d30) AS mature_d30,
+        COUNT(*) FILTER (WHERE is_mature_d30 AND COALESCE(had_activity_d30, false)) AS retained_d30,
+        CASE WHEN COUNT(*) FILTER (WHERE is_mature_d7) > 0
+            THEN COUNT(*) FILTER (WHERE is_mature_d7 AND COALESCE(had_activity_d7, false))::numeric
+                 / COUNT(*) FILTER (WHERE is_mature_d7)
+            ELSE NULL END AS retention_rate_d7,
+        CASE WHEN COUNT(*) FILTER (WHERE is_mature_d30) > 0
+            THEN COUNT(*) FILTER (WHERE is_mature_d30 AND COALESCE(had_activity_d30, false))::numeric
+                 / COUNT(*) FILTER (WHERE is_mature_d30)
+            ELSE NULL END AS retention_rate_d30
+    FROM user_retention
+    WHERE activation_type IS NOT NULL
+    GROUP BY activation_type
+    ORDER BY total_users DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading retention by activation type: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_worst_performing_cohorts(limit=10):
+    """Load worst performing cohorts for investigation."""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT
+        cohort_week,
+        cohort_size,
+        mature_d7,
+        retained_d7,
+        retention_rate_d7,
+        mature_d30,
+        retained_d30,
+        retention_rate_d30
+    FROM analytics_prod_gold.fct_retention_by_cohort_week
+    WHERE mature_d7 >= 5  -- Only cohorts with enough users
+      AND retention_rate_d7 IS NOT NULL
+    ORDER BY retention_rate_d7 ASC
+    LIMIT {limit}
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading worst performing cohorts: {str(e)}")
+        return pd.DataFrame()
