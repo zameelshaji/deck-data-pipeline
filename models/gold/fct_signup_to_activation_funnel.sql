@@ -158,10 +158,10 @@ user_complete_funnel as (
 
         ua.first_activation_date,
 
-        -- Calculate time to activation in hours
+        -- Calculate time to activation in hours (date subtraction returns days in PostgreSQL)
         case
             when ua.first_activation_date is not null and uf.signup_timestamp is not null
-                then extract(epoch from (ua.first_activation_date - date(uf.signup_timestamp))) / 3600.0
+                then (ua.first_activation_date - date(uf.signup_timestamp)) * 24.0
             else null
         end as hours_to_activation
 
