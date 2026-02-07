@@ -10,8 +10,10 @@ from utils.data_loader import (
     load_latest_wau,
     load_total_multiplayer_sessions,
     load_total_decks_created,
-    load_referral_metrics, 
-    load_giveaway_metrics
+    load_referral_metrics,
+    load_total_saves,
+    load_total_shares,
+    load_total_activated_users,
 )
 from utils.styling import apply_deck_branding, add_deck_footer
 
@@ -43,7 +45,9 @@ try:
     multiplayer_sessions_data = load_total_multiplayer_sessions()
     decks_created_data = load_total_decks_created()
     referral_data = load_referral_metrics()
-    giveaway_data = load_giveaway_metrics()
+    saves_data = load_total_saves()
+    shares_data = load_total_shares()
+    activated_users_data = load_total_activated_users()
 
     if exec_summary.empty or headline_metrics.empty:
         st.warning("⚠️ No data available")
@@ -57,13 +61,9 @@ try:
     multiplayer_total = multiplayer_sessions_data.iloc[0]['total_multiplayer_sessions'] if not multiplayer_sessions_data.empty else 0
     decks_total = decks_created_data.iloc[0]['total_decks_created'] if not decks_created_data.empty else 0
     referral_metrics = referral_data.iloc[0] if not referral_data.empty else None
-    giveaway_metrics = giveaway_data.iloc[0] if not giveaway_data.empty else None
-
-
-    # Calculate MAU % of Total Users
-    mau_percentage = 0
-    if mau is not None and latest['total_users'] > 0:
-        mau_percentage = (mau['monthly_active_users'] / latest['total_users']) * 100
+    total_saves = saves_data.iloc[0]['total_saves'] if not saves_data.empty else 0
+    total_shares = shares_data.iloc[0]['total_shares'] if not shares_data.empty else 0
+    total_activated_users = activated_users_data.iloc[0]['total_activated_users'] if not activated_users_data.empty else 0
 
     # Display last updated
     st.caption(f"📅 Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -108,22 +108,22 @@ try:
 
     with col2:
         st.metric(
+            label="✅ Activated Users",
+            value=f"{int(total_activated_users):,}",
+            delta=None,
+            help="Total number of users who have completed an activation action (save, share, or prompt)"
+        )
+
+    with col3:
+        st.metric(
             label="📊 Monthly Active Users (MAU)",
             value=f"{int(mau['monthly_active_users']):,}" if mau is not None else "N/A",
             delta=f"{mau['mom_growth_percent']:.1f}%" if mau is not None and pd.notna(mau['mom_growth_percent']) else None,
             help="Unique users who performed at least one action in the last 30 days"
         )
 
-    with col3:
-        st.metric(
-            label="📈 MAU % of Total Users",
-            value=f"{mau_percentage:.1f}%",
-            delta=None,
-            help="Percentage of total registered users who were active in the last 30 days"
-        )
-
     # Row 2
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
 
     with col1:
         st.metric(
@@ -143,10 +143,18 @@ try:
 
     with col3:
         st.metric(
-            label="🎮 Multiplayer Sessions",
-            value=f"{int(multiplayer_total):,}",
+            label="💾 Total Saves",
+            value=f"{int(total_saves):,}",
             delta=None,
-            help="Total number of collaborative planning sessions created"
+            help="Total number of cards saved by all users"
+        )
+
+    with col4:
+        st.metric(
+            label="📤 Total Shares",
+            value=f"{int(total_shares):,}",
+            delta=None,
+            help="Total number of shares made by all users"
         )
 
     # Row 3
@@ -162,18 +170,18 @@ try:
 
     with col2:
         st.metric(
-            label="🎁 Referrals Made",
-            value=f"{int(referral_metrics['total_referrals_made']):,}" if referral_metrics is not None else "0",
+            label="🎮 Multiplayer Sessions",
+            value=f"{int(multiplayer_total):,}",
             delta=None,
-            help="Number of users who provided their referral codes to new users"
+            help="Total number of collaborative planning sessions created"
         )
 
     with col3:
         st.metric(
-            label="✅ Giveaways Claimed",
-            value=f"{int(giveaway_metrics['giveaways_claimed']):,}" if giveaway_metrics is not None else "0",
+            label="🎁 Referrals Made",
+            value=f"{int(referral_metrics['total_referrals_made']):,}" if referral_metrics is not None else "0",
             delta=None,
-            help="Number of giveaway claims made"
+            help="Number of users who provided their referral codes to new users"
         )
 
     st.markdown('</div>', unsafe_allow_html=True)
