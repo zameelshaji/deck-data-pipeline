@@ -123,7 +123,7 @@ try:
         )
 
     # Row 2
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         st.metric(
@@ -142,19 +142,12 @@ try:
         )
 
     with col3:
+        total_saves_shares = int(total_saves) + int(total_shares)
         st.metric(
-            label="💾 Total Saves",
-            value=f"{int(total_saves):,}",
+            label="💾 Total Saves & Shares",
+            value=f"{total_saves_shares:,}",
             delta=None,
-            help="Total number of cards saved by all users"
-        )
-
-    with col4:
-        st.metric(
-            label="📤 Total Shares",
-            value=f"{int(total_shares):,}",
-            delta=None,
-            help="Total number of shares made by all users"
+            help="Total number of cards saved and shared by all users"
         )
 
     # Row 3
