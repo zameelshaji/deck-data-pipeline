@@ -61,9 +61,15 @@ total_boards as (
     select count(*) as total_boards from {{ ref('src_boards') }} where is_default = false
 ),
 
--- Total multiplayer sessions
+-- Total multiplayer sessions (only sessions with 2+ participants)
 total_multiplayer as (
-    select count(*) as total_multiplayer_sessions from {{ ref('src_multiplayer_sessions') }}
+    select count(*) as total_multiplayer_sessions
+    from (
+        select sp.multiplayer_id
+        from {{ ref('src_session_participants') }} sp
+        group by sp.multiplayer_id
+        having count(*) >= 2
+    ) real_multiplayer
 ),
 
 -- MAU (EXCLUDES test users, only activated users) — unique activated users with >=1 event in last 30 days
