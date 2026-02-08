@@ -423,12 +423,28 @@ def load_north_star_headline(data_source='all', session_type='all', app_version=
       {date_conditions}
     """
 
-    # Unique active planners = activated users (from fct_user_activation)
-    # This is more inclusive than session-based counting
-    uap_query = """
-    SELECT COUNT(*) as unique_active_planners
-    FROM analytics_prod_gold.fct_user_activation
-    WHERE is_activated = true
+    # Unique active planners — distinct users with save/share/prompt in the filtered period
+    # Uses fct_session_outcomes so date, data_source, session_type, and app_version filters apply
+    session_conditions = ["1=1"]
+    if data_source != 'all':
+        session_conditions.append(f"data_source = '{data_source}'")
+    if session_type == 'prompt':
+        session_conditions.append("is_prompt_session = true")
+    elif session_type == 'non_prompt':
+        session_conditions.append("is_prompt_session = false")
+    if app_version:
+        session_conditions.append(f"effective_app_version = '{app_version}'")
+    if start_date:
+        session_conditions.append(f"session_date >= '{start_date}'")
+    if end_date:
+        session_conditions.append(f"session_date <= '{end_date}'")
+
+    uap_where = " AND ".join(session_conditions)
+    uap_query = f"""
+    SELECT COUNT(DISTINCT user_id) as unique_active_planners
+    FROM analytics_prod_gold.fct_session_outcomes
+    WHERE {uap_where}
+      AND (has_save OR has_share OR is_prompt_session)
     """
 
     try:
