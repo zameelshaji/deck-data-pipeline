@@ -1100,3 +1100,197 @@ def load_total_activated_users():
     except Exception as e:
         st.error(f"Error loading total activated users: {str(e)}")
         return pd.DataFrame({'total_activated_users': [0]})
+
+
+# ============================================================================
+# Onboarding Analytics Data Loaders
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_onboarding_funnel_summary():
+    """Load daily onboarding summary from onboarding_daily_summary."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT *
+    FROM analytics_prod_gold.onboarding_daily_summary
+    ORDER BY onboarding_date DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading onboarding funnel summary: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_onboarding_funnel_current():
+    """Load current overall funnel totals for headline metrics."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        COUNT(*) as total_users_started,
+        COUNT(*) FILTER (WHERE completed_onboarding) as total_completed,
+        CASE WHEN COUNT(*) > 0
+            THEN ROUND(100.0 * COUNT(*) FILTER (WHERE completed_onboarding) / COUNT(*), 2)
+            ELSE 0 END as completion_rate,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY time_to_complete_seconds)
+            FILTER (WHERE completed_onboarding AND time_to_complete_seconds IS NOT NULL) as median_time_to_complete_seconds,
+        CASE WHEN COUNT(*) FILTER (WHERE reached_location) > 0
+            THEN ROUND(100.0 * COUNT(*) FILTER (WHERE location_granted) / COUNT(*) FILTER (WHERE reached_location), 2)
+            ELSE 0 END as location_grant_rate,
+        CASE WHEN COUNT(*) FILTER (WHERE reached_notification) > 0
+            THEN ROUND(100.0 * COUNT(*) FILTER (WHERE notification_granted) / COUNT(*) FILTER (WHERE reached_notification), 2)
+            ELSE 0 END as notification_grant_rate,
+        CASE WHEN COUNT(*) FILTER (WHERE reached_contacts) > 0
+            THEN ROUND(100.0 * COUNT(*) FILTER (WHERE contacts_granted) / COUNT(*) FILTER (WHERE reached_contacts), 2)
+            ELSE 0 END as contacts_grant_rate,
+        -- Step counts for funnel
+        COUNT(*) FILTER (WHERE reached_welcome) as reached_welcome,
+        COUNT(*) FILTER (WHERE reached_referral) as reached_referral,
+        COUNT(*) FILTER (WHERE reached_location) as reached_location,
+        COUNT(*) FILTER (WHERE reached_notification) as reached_notification,
+        COUNT(*) FILTER (WHERE reached_contacts) as reached_contacts,
+        COUNT(*) FILTER (WHERE reached_feature_router) as reached_feature_router,
+        COUNT(*) FILTER (WHERE reached_completion) as reached_completion
+    FROM analytics_prod_gold.fct_onboarding_funnel
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading onboarding funnel current: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_onboarding_user_journeys(limit=100):
+    """Load individual user onboarding journeys."""
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT
+        user_id,
+        signup_date,
+        onboarding_date,
+        completed_onboarding,
+        time_to_complete_seconds,
+        reached_welcome,
+        reached_referral,
+        reached_location,
+        reached_notification,
+        reached_contacts,
+        reached_feature_router,
+        reached_completion,
+        location_granted,
+        notification_granted,
+        contacts_granted,
+        referral_submitted,
+        feature_selected
+    FROM analytics_prod_gold.fct_onboarding_funnel
+    ORDER BY onboarding_date DESC
+    LIMIT {limit}
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading onboarding user journeys: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_onboarding_feature_distribution():
+    """Load distribution of feature selections during onboarding."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        COALESCE(feature_selected, 'Skipped') as feature,
+        COUNT(*) as user_count
+    FROM analytics_prod_gold.fct_onboarding_funnel
+    WHERE reached_feature_router = true
+    GROUP BY COALESCE(feature_selected, 'Skipped')
+    ORDER BY user_count DESC
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading feature distribution: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_onboarding_time_distribution():
+    """Load time to complete distribution for histogram."""
+    engine = get_database_connection()
+
+    query = """
+    SELECT
+        time_to_complete_seconds / 60.0 as time_to_complete_minutes
+    FROM analytics_prod_gold.fct_onboarding_funnel
+    WHERE completed_onboarding = true
+      AND time_to_complete_seconds IS NOT NULL
+      AND time_to_complete_seconds > 0
+      AND time_to_complete_seconds <= 3600  -- Cap at 1 hour for reasonable distribution
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading time distribution: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_onboarding_completion_rate_prior_7d():
+    """Load completion rate for the prior 7-day period for delta comparison."""
+    engine = get_database_connection()
+
+    query = """
+    WITH recent_period AS (
+        SELECT
+            COUNT(*) as users_started,
+            COUNT(*) FILTER (WHERE completed_onboarding) as completed
+        FROM analytics_prod_gold.fct_onboarding_funnel
+        WHERE onboarding_date >= current_date - 7
+          AND onboarding_date < current_date
+    ),
+    prior_period AS (
+        SELECT
+            COUNT(*) as users_started,
+            COUNT(*) FILTER (WHERE completed_onboarding) as completed
+        FROM analytics_prod_gold.fct_onboarding_funnel
+        WHERE onboarding_date >= current_date - 14
+          AND onboarding_date < current_date - 7
+    )
+    SELECT
+        CASE WHEN r.users_started > 0
+            THEN ROUND(100.0 * r.completed / r.users_started, 2)
+            ELSE 0 END as recent_completion_rate,
+        CASE WHEN p.users_started > 0
+            THEN ROUND(100.0 * p.completed / p.users_started, 2)
+            ELSE 0 END as prior_completion_rate
+    FROM recent_period r, prior_period p
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading prior period completion rate: {str(e)}")
+        return pd.DataFrame()
