@@ -389,6 +389,7 @@ st.caption("Activated users grouped by activation month, showing D7 / D30 / D60 
 if not cohort_df.empty:
     # Aggregate weekly cohorts into monthly activation cohorts
     monthly_df = cohort_df.copy()
+    monthly_df['cohort_week'] = pd.to_datetime(monthly_df['cohort_week'])
     monthly_df['cohort_month'] = monthly_df['cohort_week'].dt.to_period('M').dt.to_timestamp()
 
     monthly_agg = monthly_df.groupby('cohort_month').agg(
