@@ -84,14 +84,14 @@ models:
         description: "Qualitative AI feature health assessment"
 
   - name: user_cohort_retention_monthly
-    description: "Monthly cohort retention analysis showing how users return over months"
+    description: "Monthly cohort retention analysis showing how activated users return over months"
     columns:
       - name: cohort_month
-        description: "Month when the cohort of users signed up"
+        description: "Month when the cohort of users first activated"
       - name: cohort_size
-        description: "Total number of users who signed up in this cohort month"
-      - name: months_since_signup
-        description: "Number of months since the cohort signed up (0 = signup month)"
+        description: "Total number of users who activated in this cohort month"
+      - name: months_since_activation
+        description: "Number of months since the cohort activated (1 = first month after activation)"
       - name: month_label
         description: "Human-readable label for the month (e.g., 'Month 1', 'Month 3')"
       - name: users_active
@@ -99,9 +99,9 @@ models:
       - name: retention_rate
         description: "Percentage of cohort users who were active (0-100)"
       - name: cohort_quarter
-        description: "Quarter of cohort signup for grouping"
+        description: "Quarter of cohort activation for grouping"
       - name: cohort_year
-        description: "Year of cohort signup for grouping"
+        description: "Year of cohort activation for grouping"
 
   - name: user_segmentation
     description: "Customer segmentation model identifying 'Planners' (users who actively initiate planning) vs 'Passengers' (passive engagers). Critical for retention strategies."

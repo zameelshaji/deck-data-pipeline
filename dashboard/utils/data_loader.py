@@ -317,14 +317,14 @@ def load_cohort_retention_monthly(months=12):
     SELECT
         cohort_month,
         cohort_size,
-        months_since_signup,
+        months_since_activation,
         month_label,
         users_active,
         retention_rate
     FROM analytics_prod_gold.user_cohort_retention_monthly
     WHERE cohort_month >= current_date - interval '{months} months'
-        AND months_since_signup <= 12  -- Show up to 12 months of retention
-    ORDER BY cohort_month DESC, months_since_signup ASC
+        AND months_since_activation <= 12  -- Show up to 12 months of retention
+    ORDER BY cohort_month DESC, months_since_activation ASC
     """
 
     try:
@@ -698,38 +698,38 @@ def load_monthly_retention_summary_metrics():
         SELECT
             cohort_month,
             cohort_size,
-            months_since_signup,
+            months_since_activation,
             retention_rate
         FROM analytics_prod_gold.user_cohort_retention_monthly
         WHERE cohort_month >= current_date - interval '6 months'
             AND cohort_month < current_date - interval '1 month'  -- Exclude current month
-            AND months_since_signup IN (1, 2, 3, 6)  -- Month 1, 2, 3, and 6 retention
+            AND months_since_activation IN (1, 2, 3, 6)  -- Month 1, 2, 3, and 6 retention
     )
 
     SELECT
         -- Average retention rates
-        AVG(CASE WHEN months_since_signup = 1 THEN retention_rate END) as avg_month1_retention,
-        AVG(CASE WHEN months_since_signup = 2 THEN retention_rate END) as avg_month2_retention,
-        AVG(CASE WHEN months_since_signup = 3 THEN retention_rate END) as avg_month3_retention,
-        AVG(CASE WHEN months_since_signup = 6 THEN retention_rate END) as avg_month6_retention,
+        AVG(CASE WHEN months_since_activation = 1 THEN retention_rate END) as avg_month1_retention,
+        AVG(CASE WHEN months_since_activation = 2 THEN retention_rate END) as avg_month2_retention,
+        AVG(CASE WHEN months_since_activation = 3 THEN retention_rate END) as avg_month3_retention,
+        AVG(CASE WHEN months_since_activation = 6 THEN retention_rate END) as avg_month6_retention,
 
         -- Best performing cohort
-        MAX(CASE WHEN months_since_signup = 1 THEN retention_rate END) as best_month1_retention,
-        MAX(CASE WHEN months_since_signup = 3 THEN retention_rate END) as best_month3_retention,
+        MAX(CASE WHEN months_since_activation = 1 THEN retention_rate END) as best_month1_retention,
+        MAX(CASE WHEN months_since_activation = 3 THEN retention_rate END) as best_month3_retention,
 
         -- Cohort sizes
         AVG(cohort_size) as avg_cohort_size,
-        SUM(CASE WHEN months_since_signup = 1 THEN cohort_size END) as total_users_analyzed,
+        SUM(CASE WHEN months_since_activation = 1 THEN cohort_size END) as total_users_analyzed,
 
         -- Retention trend (comparing early vs later cohorts)
         AVG(CASE
-            WHEN months_since_signup = 1
+            WHEN months_since_activation = 1
                 AND cohort_month >= current_date - interval '3 months'
             THEN retention_rate
         END) as recent_month1_retention,
 
         AVG(CASE
-            WHEN months_since_signup = 1
+            WHEN months_since_activation = 1
                 AND cohort_month < current_date - interval '3 months'
                 AND cohort_month >= current_date - interval '6 months'
             THEN retention_rate

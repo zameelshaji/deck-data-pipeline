@@ -331,7 +331,7 @@ def create_monthly_cohort_heatmap(df):
     Create a monthly cohort retention heatmap
     
     Args:
-        df: DataFrame with cohort_month, months_since_signup, and retention_rate columns
+        df: DataFrame with cohort_month, months_since_activation, and retention_rate columns
     
     Returns:
         Plotly figure
@@ -341,7 +341,7 @@ def create_monthly_cohort_heatmap(df):
     # Pivot data for heatmap
     pivot_df = df.pivot(
         index='cohort_month', 
-        columns='months_since_signup', 
+        columns='months_since_activation', 
         values='retention_rate'
     )
     
@@ -375,8 +375,8 @@ def create_monthly_cohort_heatmap(df):
     
     fig.update_layout(
         title="Monthly Cohort Retention Heatmap",
-        xaxis_title="Months Since Signup",
-        yaxis_title="Cohort (Signup Month)",
+        xaxis_title="Months Since Activation",
+        yaxis_title="Cohort (Activation Month)",
         height=550,
         plot_bgcolor='#FFFFFF',
         paper_bgcolor='#FFFFFF',
@@ -406,7 +406,7 @@ def create_monthly_retention_curve(df):
     Create monthly retention curve showing average retention over time
     
     Args:
-        df: DataFrame with months_since_signup and retention_rate columns
+        df: DataFrame with months_since_activation and retention_rate columns
     
     Returns:
         Plotly figure
@@ -414,17 +414,17 @@ def create_monthly_retention_curve(df):
     import pandas as pd
     
     # Calculate average retention by month
-    avg_retention = df.groupby('months_since_signup')['retention_rate'].mean().reset_index()
+    avg_retention = df.groupby('months_since_activation')['retention_rate'].mean().reset_index()
     
     # Calculate min/max for range
-    min_retention = df.groupby('months_since_signup')['retention_rate'].min().reset_index()
-    max_retention = df.groupby('months_since_signup')['retention_rate'].max().reset_index()
+    min_retention = df.groupby('months_since_activation')['retention_rate'].min().reset_index()
+    max_retention = df.groupby('months_since_activation')['retention_rate'].max().reset_index()
     
     fig = go.Figure()
     
     # Add range (min to max) as shaded area
     fig.add_trace(go.Scatter(
-        x=list(min_retention['months_since_signup']) + list(max_retention['months_since_signup'][::-1]),
+        x=list(min_retention['months_since_activation']) + list(max_retention['months_since_activation'][::-1]),
         y=list(min_retention['retention_rate']) + list(max_retention['retention_rate'][::-1]),
         fill='toself',
         fillcolor='rgba(233, 30, 140, 0.1)',
@@ -436,7 +436,7 @@ def create_monthly_retention_curve(df):
     
     # Add average retention line
     fig.add_trace(go.Scatter(
-        x=avg_retention['months_since_signup'],
+        x=avg_retention['months_since_activation'],
         y=avg_retention['retention_rate'],
         mode='lines+markers',
         name='Average Retention',
@@ -448,11 +448,11 @@ def create_monthly_retention_curve(df):
     # Add individual cohort lines (lighter, for context) - show last 6 cohorts
     unique_cohorts = sorted(df['cohort_month'].unique(), reverse=True)[:6]
     for cohort in unique_cohorts:
-        cohort_data = df[df['cohort_month'] == cohort].sort_values('months_since_signup')
+        cohort_data = df[df['cohort_month'] == cohort].sort_values('months_since_activation')
         cohort_label = pd.to_datetime(cohort).strftime('%b %Y')
         
         fig.add_trace(go.Scatter(
-            x=cohort_data['months_since_signup'],
+            x=cohort_data['months_since_activation'],
             y=cohort_data['retention_rate'],
             mode='lines',
             name=f'{cohort_label}',
@@ -463,7 +463,7 @@ def create_monthly_retention_curve(df):
     
     fig.update_layout(
         title="Monthly Retention Curve",
-        xaxis_title="Months Since Signup",
+        xaxis_title="Months Since Activation",
         yaxis_title="Retention Rate (%)",
         height=450,
         plot_bgcolor='#FFFFFF',
@@ -513,7 +513,7 @@ def create_retention_comparison_chart(weekly_df, monthly_df):
     """
     # Calculate averages
     weekly_avg = weekly_df.groupby('weeks_since_signup')['retention_rate'].mean().reset_index()
-    monthly_avg = monthly_df.groupby('months_since_signup')['retention_rate'].mean().reset_index()
+    monthly_avg = monthly_df.groupby('months_since_activation')['retention_rate'].mean().reset_index()
     
     # Convert weeks to months for comparison (approximate: 4 weeks = 1 month)
     weekly_avg['months_equivalent'] = weekly_avg['weeks_since_signup'] / 4.33
@@ -533,7 +533,7 @@ def create_retention_comparison_chart(weekly_df, monthly_df):
     
     # Add monthly retention line
     fig.add_trace(go.Scatter(
-        x=monthly_avg['months_since_signup'],
+        x=monthly_avg['months_since_activation'],
         y=monthly_avg['retention_rate'],
         mode='lines+markers',
         name='Monthly View',
@@ -544,7 +544,7 @@ def create_retention_comparison_chart(weekly_df, monthly_df):
     
     fig.update_layout(
         title="Retention Comparison: Weekly vs Monthly View",
-        xaxis_title="Months Since Signup",
+        xaxis_title="Months Since Activation",
         yaxis_title="Retention Rate (%)",
         height=400,
         plot_bgcolor='#FFFFFF',

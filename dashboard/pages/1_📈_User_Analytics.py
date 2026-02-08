@@ -252,21 +252,21 @@ try:
                 st.metric(
                     label="Avg Month 1 Retention",
                     value=f"{summary['avg_month1_retention']:.1f}%" if pd.notna(summary['avg_month1_retention']) else "N/A",
-                    help="Average percentage of users who return in their first month after signup"
+                    help="Average percentage of users who return in their first month after activation"
                 )
 
             with col2:
                 st.metric(
                     label="Avg Month 3 Retention",
                     value=f"{summary['avg_month3_retention']:.1f}%" if pd.notna(summary['avg_month3_retention']) else "N/A",
-                    help="Average percentage of users who return in their third month after signup"
+                    help="Average percentage of users who return in their third month after activation"
                 )
 
             st.markdown("---")
 
             # Monthly cohort retention heatmap
             st.markdown("#### 📊 Monthly Cohort Retention Heatmap")
-            st.caption("💡 Darker pink = higher retention. Each row is a signup month cohort.")
+            st.caption("💡 Darker pink = higher retention. Each row is an activation month cohort.")
 
             monthly_heatmap_fig = create_monthly_cohort_heatmap(monthly_retention_data)
             st.plotly_chart(monthly_heatmap_fig, use_container_width=True, config={'displayModeBar': False})
