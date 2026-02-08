@@ -18,14 +18,13 @@ with sessions_base as (
         save_count as inline_save_count,
         share_count as inline_share_count,
         unique_cards_interacted as inline_unique_cards_interacted,
-        unique_cards_saved as inline_unique_cards_saved,
         query_count as inline_query_count
     from {{ ref('stg_unified_sessions') }}
 ),
 
 -- Native session saves (from app_events via stg_session_saves)
 native_saves as (
-    select session_id, user_id, save_count, unique_cards_saved, first_save_at, last_save_at
+    select session_id, user_id, save_count, first_save_at, last_save_at
     from {{ ref('stg_session_saves') }}
 ),
 
@@ -85,7 +84,6 @@ outcomes as (
         coalesce(sh.share_count, s.inline_share_count, 0) > 0 as has_share,
         coalesce(psi.interaction_count, 0) > 0 as has_post_share_interaction,
         coalesce(sv.save_count, s.inline_save_count, 0) as save_count,
-        coalesce(sv.unique_cards_saved, s.inline_unique_cards_saved, 0) as unique_cards_saved,
         coalesce(sh.share_count, s.inline_share_count, 0) as share_count,
 
         -- PSR ladder flags
@@ -93,7 +91,6 @@ outcomes as (
         coalesce(sh.share_count, s.inline_share_count, 0) > 0 as meets_shr,
         (coalesce(sv.save_count, s.inline_save_count, 0) > 0 and coalesce(sh.share_count, s.inline_share_count, 0) > 0) as meets_psr_broad,
         (coalesce(sv.save_count, s.inline_save_count, 0) > 0 and coalesce(sh.share_count, s.inline_share_count, 0) > 0 and coalesce(psi.interaction_count, 0) > 0) as meets_psr_strict,
-        coalesce(sv.unique_cards_saved, s.inline_unique_cards_saved, 0) >= 3 as meets_scr3,
         (coalesce(sv.save_count, s.inline_save_count, 0) = 0 and coalesce(sh.share_count, s.inline_share_count, 0) = 0) as is_no_value_session,
 
         -- Timing metrics

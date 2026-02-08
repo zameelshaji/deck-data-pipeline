@@ -10,7 +10,6 @@ with weekly_metrics as (
         count(*) filter (where has_share) as sessions_with_share,
         count(*) filter (where meets_psr_broad) as sessions_with_psr_broad,
         count(*) filter (where meets_psr_strict) as sessions_with_psr_strict,
-        count(*) filter (where meets_scr3) as sessions_with_scr3,
         count(*) filter (where is_no_value_session) as no_value_sessions,
 
         -- Unique active planners
@@ -40,7 +39,6 @@ all_combined as (
         count(*) filter (where has_share) as sessions_with_share,
         count(*) filter (where meets_psr_broad) as sessions_with_psr_broad,
         count(*) filter (where meets_psr_strict) as sessions_with_psr_strict,
-        count(*) filter (where meets_scr3) as sessions_with_scr3,
         count(*) filter (where is_no_value_session) as no_value_sessions,
         count(distinct user_id) filter (where has_save or has_share) as weekly_active_planners,
         count(distinct user_id) filter (where has_save) as weekly_active_savers,
@@ -65,7 +63,6 @@ all_av_per_ds_st as (
         count(*) filter (where has_share) as sessions_with_share,
         count(*) filter (where meets_psr_broad) as sessions_with_psr_broad,
         count(*) filter (where meets_psr_strict) as sessions_with_psr_strict,
-        count(*) filter (where meets_scr3) as sessions_with_scr3,
         count(*) filter (where is_no_value_session) as no_value_sessions,
         count(distinct user_id) filter (where has_save or has_share) as weekly_active_planners,
         count(distinct user_id) filter (where has_save) as weekly_active_savers,

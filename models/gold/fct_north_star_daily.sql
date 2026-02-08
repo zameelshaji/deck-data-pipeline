@@ -10,7 +10,6 @@ with daily_metrics as (
         count(*) filter (where has_share) as sessions_with_share,
         count(*) filter (where meets_psr_broad) as sessions_with_psr_broad,
         count(*) filter (where meets_psr_strict) as sessions_with_psr_strict,
-        count(*) filter (where meets_scr3) as sessions_with_scr3,
         count(*) filter (where is_no_value_session) as no_value_sessions,
         count(*) filter (where has_share and has_post_share_interaction) as sessions_with_pir,
         count(*) filter (where has_native_session_id) as sessions_with_attribution,
@@ -40,7 +39,7 @@ expanded as (
     select
         metric_date, ds, st, 'all' as av,
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
-        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
+        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
@@ -54,7 +53,7 @@ expanded as (
     select
         metric_date, 'all' as ds, st, av,
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
-        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
+        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
@@ -68,7 +67,7 @@ expanded as (
     select
         metric_date, ds, 'all' as st, av,
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
-        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
+        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
@@ -82,7 +81,7 @@ expanded as (
     select
         metric_date, 'all' as ds, 'all' as st, av,
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
-        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
+        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
@@ -96,7 +95,7 @@ expanded as (
     select
         metric_date, 'all' as ds, st, 'all' as av,
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
-        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
+        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
@@ -110,7 +109,7 @@ expanded as (
     select
         metric_date, ds, 'all' as st, 'all' as av,
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
-        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
+        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
@@ -124,7 +123,7 @@ expanded as (
     select
         metric_date, 'all' as ds, 'all' as st, 'all' as av,
         sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
-        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict), sum(sessions_with_scr3),
+        sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
         avg(avg_saves_per_saving_session), avg(median_saves_per_saving_session),
@@ -144,7 +143,6 @@ with_rates as (
         sessions_with_share,
         sessions_with_psr_broad,
         sessions_with_psr_strict,
-        sessions_with_scr3,
         no_value_sessions,
         genuine_planning_sessions,
 
@@ -154,7 +152,6 @@ with_rates as (
         case when sessions_with_share > 0 then round(sessions_with_pir::numeric / sessions_with_share, 4) else 0 end as pir,
         case when total_sessions > 0 then round(sessions_with_psr_broad::numeric / total_sessions, 4) else 0 end as psr_broad,
         case when total_sessions > 0 then round(sessions_with_psr_strict::numeric / total_sessions, 4) else 0 end as psr_strict,
-        case when total_sessions > 0 then round(sessions_with_scr3::numeric / total_sessions, 4) else 0 end as scr3_rate,
         case when total_sessions > 0 then round(no_value_sessions::numeric / total_sessions, 4) else 0 end as nvr,
         case when sessions_with_share > 0 then round(sessions_with_pir::numeric / sessions_with_share, 4) else 0 end as validation_rate,
         case when total_sessions > 0 then round(sessions_with_attribution::numeric / total_sessions, 4) else 0 end as attribution_rate,
