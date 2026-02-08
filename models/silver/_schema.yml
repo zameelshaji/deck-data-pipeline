@@ -1,17 +1,62 @@
 version: 2
 
 models:
-  - name: stg_inferred_sessions
-    description: "Session-level table inferred from stg_events using 5-minute timeout. Each row is one inferred session."
+  - name: stg_unified_events
+    description: "Unified event stream combining all data eras (card system, places system, telemetry) into a single consistent format."
     columns:
-      - name: inferred_session_id
-        description: "Unique identifier for the inferred session"
-        tests:
-          - not_null
-          - unique
       - name: user_id
-        description: "User who owns this session"
-        tests:
-          - not_null
+        description: "User who performed the event"
+      - name: event_timestamp
+        description: "When the event occurred"
+      - name: event_type
+        description: "Normalized event type (query, swipe_right, swipe_left, save, card_share, deck_share, share, conversion, etc.)"
+      - name: card_id
+        description: "Card identifier (always TEXT)"
+      - name: pack_id
+        description: "Pack identifier if applicable"
+      - name: source_table
+        description: "Source table this event originated from"
+      - name: data_era
+        description: "Data era: card_system, places_system, or telemetry"
+      - name: app_version
+        description: "App version if available"
+      - name: event_category
+        description: "High-level category: AI, Swipe, Save, Share, Conversion, Other"
+
+  - name: stg_unified_sessions
+    description: "Unified sessions combining inferred sessions (5-min timeout) and native planning sessions."
+    columns:
+      - name: session_id
+        description: "Unique session identifier"
+      - name: user_id
+        description: "User who owns the session"
+      - name: started_at
+        description: "Session start timestamp"
+      - name: ended_at
+        description: "Session end timestamp"
+      - name: session_date
+        description: "Date the session started"
+      - name: session_week
+        description: "Week the session started"
+      - name: session_duration_seconds
+        description: "Duration in seconds"
+      - name: event_count
+        description: "Total events in the session"
+      - name: query_count
+        description: "Number of AI queries"
+      - name: swipe_count
+        description: "Number of swipes"
+      - name: save_count
+        description: "Number of saves"
+      - name: share_count
+        description: "Number of shares"
+      - name: unique_cards_interacted
+        description: "Distinct cards interacted with"
+      - name: session_source
+        description: "Whether session is 'inferred' or 'native'"
+      - name: has_native_session_id
+        description: "TRUE if from native planning_sessions"
+      - name: data_era
+        description: "Data era of the session"
       - name: is_genuine_planning_attempt
         description: "TRUE if session had at least one prompt, save, or share"

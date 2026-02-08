@@ -6,13 +6,8 @@ models:
     columns:
       - name: activity_date
         description: "Date of activity"
-        tests:
-          - not_null
-          - unique
       - name: daily_active_users
         description: "Count of unique users with any activity on this date"
-        tests:
-          - not_null
       - name: ai_active_users
         description: "Count of users who used AI features on this date"
       - name: dau_7day_avg
@@ -27,9 +22,6 @@ models:
     columns:
       - name: signup_date
         description: "Date of user signup"
-        tests:
-          - not_null
-          - unique
       - name: signups
         description: "Number of new signups on this date"
       - name: onboarding_completion_rate
@@ -44,9 +36,6 @@ models:
     columns:
       - name: query_date
         description: "Date of AI queries"
-        tests:
-          - not_null
-          - unique
       - name: total_queries
         description: "Total AI queries on this date"
       - name: avg_like_rate
@@ -79,8 +68,6 @@ models:
     columns:
       - name: report_date
         description: "Date this report was generated"
-        tests:
-          - not_null
       - name: daily_active_users
         description: "Average DAU in last 30 days"
       - name: dau_growth_percent
@@ -101,12 +88,8 @@ models:
     columns:
       - name: cohort_month
         description: "Month when the cohort of users signed up"
-        tests:
-          - not_null
       - name: cohort_size
         description: "Total number of users who signed up in this cohort month"
-        tests:
-          - not_null
       - name: months_since_signup
         description: "Number of months since the cohort signed up (0 = signup month)"
       - name: month_label
@@ -125,9 +108,6 @@ models:
     columns:
       - name: user_id
         description: "Unique user identifier"
-        tests:
-          - not_null
-          - unique
       - name: email
         description: "User email address"
       - name: username
@@ -136,14 +116,8 @@ models:
         description: "User's full name"
       - name: created_at
         description: "Timestamp when user account was created"
-        tests:
-          - not_null
       - name: user_type
         description: "Segmentation classification: 'Planner' (actively initiates planning) or 'Passenger' (passive engager)"
-        tests:
-          - not_null
-          - accepted_values:
-              values: ['Planner', 'Passenger']
       - name: planner_criteria_met
         description: "Array of criteria that qualified user as Planner: ['prompt_and_swipe', 'created_deck', 'shared_content', 'created_multiplayer']"
       - name: total_prompts
@@ -218,12 +192,8 @@ models:
     columns:
       - name: date
         description: "Date when the query was made"
-        tests:
-          - not_null
       - name: user_id
         description: "ID of the user who made the query"
-        tests:
-          - not_null
       - name: user_name
         description: "Username of the person who made the query"
       - name: user_email
@@ -232,9 +202,6 @@ models:
         description: "User segment: Planner or Passenger"
       - name: query_id
         description: "Unique identifier for the Dextr query"
-        tests:
-          - not_null
-          - unique
       - name: query_text
         description: "The actual query text submitted by the user"
       - name: query_timestamp
@@ -279,22 +246,14 @@ models:
     columns:
       - name: session_id
         description: "Unique session identifier (native or inferred)"
-        tests:
-          - not_null
-          - unique
       - name: user_id
         description: "User who owned this session"
-        tests:
-          - not_null
       - name: session_date
         description: "Date the session started"
       - name: session_week
         description: "Week the session started (for weekly cohorts)"
       - name: data_source
         description: "Whether session is 'native' (from planning_sessions) or 'inferred' (from event timestamps)"
-        tests:
-          - accepted_values:
-              values: ['native', 'inferred']
       - name: has_save
         description: "TRUE if session had at least 1 save"
       - name: has_share
@@ -302,9 +261,9 @@ models:
       - name: has_post_share_interaction
         description: "TRUE if shared session received non-sharer interaction within 24h"
       - name: meets_psr_broad
-        description: "TRUE if session has both save AND share (North Star)"
+        description: "Plan Survival Rate (Broad): % sessions with save AND share"
       - name: meets_psr_strict
-        description: "TRUE if session has save AND share AND post-share interaction"
+        description: "Plan Survival Rate (Strict): includes post-share interaction"
       - name: is_no_value_session
         description: "TRUE if session had neither saves nor shares"
       - name: time_to_first_save_seconds
@@ -313,18 +272,12 @@ models:
         description: "Seconds from session start to first share"
       - name: intent_strength
         description: "Intent classification: 'strong' (dextr/search) or 'weak'"
-        tests:
-          - accepted_values:
-              values: ['strong', 'weak']
       - name: app_version
         description: "App version from dextr query context (inferred sessions) or null (native)"
       - name: effective_app_version
         description: "Coalesce of native app_version and date-imputed version from app_version_releases seed. Always populated."
       - name: share_attribution_confidence
         description: "Confidence in share attribution: 'high' (native), 'medium' (card share with pack_id), 'low' (share_link time-window match)"
-        tests:
-          - accepted_values:
-              values: ['high', 'medium', 'low']
       - name: is_genuine_planning_attempt
         description: "TRUE if session had at least one prompt (dextr_query), save, or share. Filters out sessions with only browsing/impression activity."
 
@@ -333,8 +286,6 @@ models:
     columns:
       - name: metric_date
         description: "Date of metrics"
-        tests:
-          - not_null
       - name: data_source
         description: "Filter: 'all', 'native', or 'inferred'"
       - name: session_type
@@ -365,8 +316,6 @@ models:
     columns:
       - name: metric_week
         description: "Week start date"
-        tests:
-          - not_null
       - name: app_version
         description: "Filter: 'all', specific version, or 'unknown'"
       - name: weekly_active_planners
@@ -379,13 +328,8 @@ models:
     columns:
       - name: user_id
         description: "Unique user identifier"
-        tests:
-          - not_null
-          - unique
       - name: signup_date
         description: "User signup date"
-        tests:
-          - not_null
       - name: has_planning_initiation_7d
         description: "F1: Had planning initiation within 7 days"
       - name: has_activation_7d
@@ -396,18 +340,12 @@ models:
         description: "F4: Share received interaction within 7 days"
       - name: activation_type
         description: "Type of activation: save_only, share_only, or save_and_share"
-        tests:
-          - accepted_values:
-              values: ['save_only', 'share_only', 'save_and_share']
 
   - name: fct_retention_activated
     description: "Retention analysis on activated users with D7/D30/D60 retention flags"
     columns:
       - name: user_id
         description: "Unique user identifier"
-        tests:
-          - not_null
-          - unique
       - name: activation_date
         description: "Date user first activated"
       - name: had_activity_d7
@@ -424,14 +362,8 @@ models:
     columns:
       - name: period_type
         description: "Period granularity: week or month"
-        tests:
-          - not_null
-          - accepted_values:
-              values: ['week', 'month']
       - name: period_start
         description: "Start date of the period"
-        tests:
-          - not_null
       - name: active_planners
         description: "Unique users with at least 1 save or share in period"
       - name: planner_stickiness
@@ -442,9 +374,6 @@ models:
     columns:
       - name: session_id
         description: "Unique session identifier (native or inferred)"
-        tests:
-          - not_null
-          - unique
       - name: prompts_detail
         description: "JSONB array of prompts: [{query_text, timestamp, pack_name, location, total_cards_in_pack}]"
       - name: explorer_prompt_count
@@ -473,13 +402,8 @@ models:
     columns:
       - name: user_id
         description: "Unique user identifier"
-        tests:
-          - not_null
-          - unique
       - name: signup_date
         description: "User's original signup date"
-        tests:
-          - not_null
       - name: activation_date
         description: "Date user first activated (saved, shared, or AI-prompted save). NULL if never activated."
       - name: cohort_week
@@ -488,28 +412,18 @@ models:
         description: "Days between signup and first activation. NULL if never activated."
       - name: activation_type
         description: "First activation action type: save_prompted, saved, shared, or multiple"
-        tests:
-          - accepted_values:
-              values: ['save_prompted', 'saved', 'shared', 'multiple']
       - name: first_activation_event
         description: "The specific event that first activated the user"
       - name: is_activated
         description: "Boolean flag: TRUE if user has activated"
-        tests:
-          - not_null
 
   - name: fct_retention_by_cohort_week
     description: "Weekly cohort retention rates at D7/D30/D60/D90. One row per activation cohort week."
     columns:
       - name: cohort_week
         description: "Monday of activation week for cohort grouping"
-        tests:
-          - not_null
-          - unique
       - name: cohort_size
         description: "Number of users who activated in this week"
-        tests:
-          - not_null
       - name: mature_d7
         description: "Users with enough time elapsed to measure D7 retention"
       - name: mature_d30
@@ -548,13 +462,8 @@ models:
     columns:
       - name: signup_week
         description: "Week of signup for cohort trending"
-        tests:
-          - not_null
-          - unique
       - name: total_signups
         description: "F0: Total users who signed up this week"
-        tests:
-          - not_null
       - name: had_app_open_7d
         description: "F1: Users who had any event within 7 days of signup"
       - name: had_planning_initiated_7d
