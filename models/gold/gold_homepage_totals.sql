@@ -3,10 +3,10 @@
 -- Homepage totals: includes test users for all metrics EXCEPT MAU and total_activated_users
 
 with
--- Count ALL signups from auth.users (including test users)
+-- Count ALL signups from stg_users (including test users)
 total_signups as (
     select count(*) as total_signups
-    from {{ ref('src_users') }}
+    from {{ ref('stg_users') }}
 ),
 
 -- Total prompts across all eras (including test users)
