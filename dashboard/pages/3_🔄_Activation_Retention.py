@@ -20,6 +20,8 @@ from utils.data_loader import (
     load_time_to_activation_distribution,
     load_retention_by_activation_type,
     load_worst_performing_cohorts,
+    load_homepage_totals,
+    load_cohort_retention_monthly,
 )
 
 st.set_page_config(
@@ -63,6 +65,8 @@ try:
     )
     activation_type_df = load_activation_type_distribution()
     time_to_activation_df = load_time_to_activation_distribution()
+    homepage_totals_df = load_homepage_totals()
+    monthly_retention_df = load_cohort_retention_monthly(months=12)
 except Exception as e:
     st.error(f"Error loading data: {str(e)}")
     st.info("The activation/retention tables may not be populated yet. Run `dbt run --select +fct_user_activation +fct_retention_by_cohort_week +fct_signup_to_activation_funnel` first.")
@@ -85,11 +89,15 @@ summary = summary_df.iloc[0] if not summary_df.empty else {}
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    total_activated = int(summary.get('total_activated', 0))
+    # Use all-time count from gold_homepage_totals to match Home page
+    if not homepage_totals_df.empty:
+        total_activated = int(homepage_totals_df.iloc[0].get('total_activated_users', 0))
+    else:
+        total_activated = int(summary.get('total_activated', 0))
     st.metric(
         label="Total Activated Users",
         value=f"{total_activated:,}",
-        help="Users who have prompted, saved, or shared at least once"
+        help="All-time users who have prompted, saved, or shared at least once"
     )
 
 with col2:
@@ -373,6 +381,96 @@ if not cohort_df.empty:
         st.info("Not enough mature cohorts for heatmap visualization.")
 else:
     st.info("No cohort retention data available.")
+
+st.divider()
+
+# =============================================================================
+# Section C2: Monthly Cohort Retention Heatmap
+# =============================================================================
+st.subheader("📆 Monthly Cohort Retention Heatmap")
+
+if not monthly_retention_df.empty:
+    # Pivot to create a matrix: rows = cohort_month, columns = months_since_signup
+    monthly_pivot = monthly_retention_df.pivot_table(
+        index='cohort_month',
+        columns='months_since_signup',
+        values='retention_rate',
+        aggfunc='first'
+    ).sort_index(ascending=False)
+
+    # Get cohort sizes for labels
+    cohort_sizes = monthly_retention_df.drop_duplicates('cohort_month').set_index('cohort_month')['cohort_size']
+
+    # Limit to reasonable number of months
+    monthly_pivot = monthly_pivot[[c for c in monthly_pivot.columns if c <= 12]]
+    monthly_pivot = monthly_pivot.head(12)  # Last 12 cohorts
+
+    if not monthly_pivot.empty:
+        cohort_labels = [
+            f"{pd.to_datetime(m).strftime('%b %Y')} (n={int(cohort_sizes.get(m, 0))})"
+            for m in monthly_pivot.index
+        ]
+        month_labels = [f"M{int(c)}" for c in monthly_pivot.columns]
+
+        z_data = monthly_pivot.values.tolist()
+        hover_data = []
+        for idx, row_vals in enumerate(z_data):
+            row_hover = []
+            for j, val in enumerate(row_vals):
+                if val is not None and not pd.isna(val):
+                    row_hover.append(f"Month {int(monthly_pivot.columns[j])}: {val:.1f}%")
+                else:
+                    row_hover.append(f"Month {int(monthly_pivot.columns[j])}: Not mature yet")
+            hover_data.append(row_hover)
+
+        fig_monthly = go.Figure(data=go.Heatmap(
+            z=z_data,
+            x=month_labels,
+            y=cohort_labels,
+            colorscale=[
+                [0, '#FEE2E2'],
+                [0.2, '#FEF3C7'],
+                [0.4, '#D1FAE5'],
+                [0.6, '#6EE7B7'],
+                [1.0, BRAND_COLORS['success']],
+            ],
+            colorbar=dict(
+                title="Retention %",
+                ticksuffix="%"
+            ),
+            hovertext=hover_data,
+            hoverinfo='text',
+            zmin=0,
+            zmax=100,
+        ))
+
+        fig_monthly.update_layout(
+            font=dict(family="Inter", size=11),
+            margin=dict(l=200, r=20, t=20, b=40),
+            height=max(400, len(monthly_pivot) * 30 + 100),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            xaxis=dict(side='top'),
+            yaxis=dict(autorange='reversed'),
+        )
+
+        # Add text annotations
+        for i, row_vals in enumerate(z_data):
+            for j, val in enumerate(row_vals):
+                if val is not None and not pd.isna(val):
+                    fig_monthly.add_annotation(
+                        x=month_labels[j],
+                        y=cohort_labels[i],
+                        text=f"{val:.0f}%",
+                        showarrow=False,
+                        font=dict(size=10, color='white' if val > 50 else BRAND_COLORS['text_primary'])
+                    )
+
+        st.plotly_chart(fig_monthly, use_container_width=True)
+    else:
+        st.info("Not enough monthly cohort data for heatmap.")
+else:
+    st.info("No monthly cohort retention data available.")
 
 st.divider()
 
