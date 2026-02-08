@@ -9,12 +9,13 @@ with activated_users as (
       and activation_date is not null
 ),
 
+-- Return activity = session with ≥1 prompt OR ≥1 save OR ≥1 share
 user_activity_dates as (
     select distinct
         user_id,
         session_date
     from {{ ref('fct_session_outcomes') }}
-    where has_save or has_share
+    where has_save or has_share or is_prompt_session
 ),
 
 retention as (

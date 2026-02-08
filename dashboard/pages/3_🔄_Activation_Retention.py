@@ -49,7 +49,10 @@ with st.sidebar:
 
 # --- Load Data ---
 try:
-    summary_df = load_activation_summary_metrics()
+    summary_df = load_activation_summary_metrics(
+        start_date=str(start_date),
+        end_date=str(end_date)
+    )
     cohort_df = load_retention_by_cohort_week(
         start_date=str(start_date),
         end_date=str(end_date)
@@ -78,14 +81,15 @@ st.caption(f"Cohort and funnel data filtered to {start_date.strftime('%b %d, %Y'
 
 summary = summary_df.iloc[0] if not summary_df.empty else {}
 
-col1, col2, col3, col4, col5 = st.columns(5)
+# Row 1: Activation metrics
+col1, col2, col3 = st.columns(3)
 
 with col1:
     total_activated = int(summary.get('total_activated', 0))
     st.metric(
         label="Total Activated Users",
         value=f"{total_activated:,}",
-        help="Users who have saved, shared, or been prompted to save (all time)"
+        help="Users who have prompted, saved, or shared at least once"
     )
 
 with col2:
@@ -97,13 +101,15 @@ with col2:
     )
 
 with col3:
-    median_hours = summary.get('median_hours_to_activation', None)
-    if median_hours is not None and pd.notna(median_hours):
-        hours_val = float(median_hours)
-        if hours_val >= 24:
-            time_str = f"{hours_val/24:.1f}d"
+    median_mins = summary.get('median_minutes_to_activation', None)
+    if median_mins is not None and pd.notna(median_mins):
+        mins_val = float(median_mins)
+        if mins_val >= 1440:
+            time_str = f"{mins_val/1440:.1f}d"
+        elif mins_val >= 60:
+            time_str = f"{mins_val/60:.1f}h"
         else:
-            time_str = f"{hours_val:.1f}h"
+            time_str = f"{mins_val:.0f}m"
     else:
         time_str = "N/A"
     st.metric(
@@ -112,24 +118,39 @@ with col3:
         help="Median time from signup to first activation"
     )
 
+# Row 2: Retention metrics (D7, D30, D60)
+col4, col5, col6 = st.columns(3)
+
 with col4:
     d7_rate = float(summary.get('retention_rate_d7', 0)) * 100
     st.metric(
-        label="D7 Retention",
+        label="D7 Activated Retention",
         value=f"{d7_rate:.1f}%",
-        help="% of activated users who return within 7 days"
+        help="% of activated users who return (prompt/save/share) within 7 days of activation"
     )
 
 with col5:
     d30_rate = float(summary.get('retention_rate_d30', 0)) * 100
     st.metric(
-        label="D30 Retention",
+        label="D30 Activated Retention",
         value=f"{d30_rate:.1f}%",
-        help="% of activated users who return within 30 days"
+        help="% of activated users who return (prompt/save/share) within 30 days of activation"
     )
 
-# Benchmark comparison
-st.caption("*EQT Benchmarks: Best-in-class D7 >40%, D30 >20% | Acceptable early-stage: D7 >20%, D30 >10%*")
+with col6:
+    d60_rate = float(summary.get('retention_rate_d60', 0)) * 100
+    st.metric(
+        label="D60 Activated Retention",
+        value=f"{d60_rate:.1f}%",
+        help="% of activated users who return (prompt/save/share) within 60 days of activation"
+    )
+
+# Definitions and benchmarks
+st.caption(
+    "**Definitions:** Activated = ≥1 prompt OR ≥1 save OR ≥1 share. "
+    "Retained = activated user returned and did ≥1 prompt/save/share within the window. "
+    "| **EQT Benchmarks:** Best-in-class D7 >40%, D30 >20% | Acceptable early-stage: D7 >20%, D30 >10%"
+)
 
 st.divider()
 

@@ -1,6 +1,7 @@
 -- Weekly cohort retention summary
 -- Aggregates activated users by cohort_week (Monday of activation week)
 -- Tracks D7/D30/D60/D90 retention with maturity flags
+-- Retention = had another session with ≥1 prompt OR ≥1 save OR ≥1 share after activation_date
 
 with activated_users as (
     select
@@ -13,14 +14,13 @@ with activated_users as (
       and activation_date is not null
 ),
 
--- Get all activity dates per user from session outcomes
--- Retention = had another session with save OR share after activation_date
+-- Retention = had another session with prompt, save, or share after activation_date
 user_activity_dates as (
     select distinct
         user_id,
         session_date
     from {{ ref('fct_session_outcomes') }}
-    where has_save or has_share
+    where has_save or has_share or is_prompt_session
 ),
 
 -- Calculate retention flags for each user

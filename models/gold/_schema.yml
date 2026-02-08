@@ -349,11 +349,11 @@ models:
       - name: activation_date
         description: "Date user first activated"
       - name: had_activity_d7
-        description: "Had activity within 7 days of activation"
+        description: "Had meaningful activity (prompt, save, or share) within 7 days of activation"
       - name: had_activity_d30
-        description: "Had activity within 30 days of activation"
+        description: "Had meaningful activity (prompt, save, or share) within 30 days of activation"
       - name: had_activity_d60
-        description: "Had activity within 60 days of activation"
+        description: "Had meaningful activity (prompt, save, or share) within 60 days of activation"
       - name: is_mature_d7
         description: "TRUE if enough time has passed to measure D7 retention"
 
@@ -433,13 +433,13 @@ models:
       - name: mature_d90
         description: "Users with enough time elapsed to measure D90 retention"
       - name: retained_d7
-        description: "Count of mature users who returned within 7 days of activation"
+        description: "Count of mature users who returned (prompted, saved, or shared) within 7 days of activation"
       - name: retained_d30
-        description: "Count of mature users who returned within 30 days of activation"
+        description: "Count of mature users who returned (prompted, saved, or shared) within 30 days of activation"
       - name: retained_d60
-        description: "Count of mature users who returned within 60 days of activation"
+        description: "Count of mature users who returned (prompted, saved, or shared) within 60 days of activation"
       - name: retained_d90
-        description: "Count of mature users who returned within 90 days of activation"
+        description: "Count of mature users who returned (prompted, saved, or shared) within 90 days of activation"
       - name: retention_rate_d7
         description: "D7 retention rate as decimal (0-1). NULL if no mature users."
       - name: retention_rate_d30
@@ -496,3 +496,94 @@ models:
         description: "Users who activated through featured content"
       - name: avg_time_to_activation_hours
         description: "Median hours from signup to first activation"
+
+  - name: fct_user_retention
+    description: "Comprehensive user-level retention fact table for CEO/executive reporting. One row per activated user with retention flags, engagement depth, and segmentation. Activated = ≥1 prompt OR ≥1 save OR ≥1 share. Retained = returned and did ≥1 prompt/save/share within window."
+    columns:
+      - name: user_id
+        description: "Unique user identifier"
+        tests:
+          - not_null
+          - unique
+      - name: email
+        description: "User email address"
+      - name: username
+        description: "User display name"
+      - name: full_name
+        description: "User full name"
+      - name: signup_date
+        description: "Date user created account"
+        tests:
+          - not_null
+      - name: activation_date
+        description: "Date user first activated (prompted, saved, or shared)"
+        tests:
+          - not_null
+      - name: cohort_week
+        description: "Monday of activation week for cohort grouping"
+      - name: days_to_activation
+        description: "Days from signup to first activation"
+      - name: activation_type
+        description: "First activation event type: save_prompted, saved, shared, or multiple"
+      - name: user_type
+        description: "Planner or Passenger segmentation"
+      - name: is_mature_d7
+        description: "TRUE if enough time has passed to measure D7 retention"
+      - name: is_mature_d30
+        description: "TRUE if enough time has passed to measure D30 retention"
+      - name: is_mature_d60
+        description: "TRUE if enough time has passed to measure D60 retention"
+      - name: is_mature_d90
+        description: "TRUE if enough time has passed to measure D90 retention"
+      - name: retained_d7
+        description: "TRUE if user returned (prompted, saved, or shared) within 7 days of activation"
+      - name: retained_d30
+        description: "TRUE if user returned (prompted, saved, or shared) within 30 days of activation"
+      - name: retained_d60
+        description: "TRUE if user returned (prompted, saved, or shared) within 60 days of activation"
+      - name: retained_d90
+        description: "TRUE if user returned (prompted, saved, or shared) within 90 days of activation"
+      - name: sessions_d7
+        description: "Number of sessions in first 7 days after activation"
+      - name: sessions_d30
+        description: "Number of sessions in first 30 days after activation"
+      - name: sessions_d60
+        description: "Number of sessions in first 60 days after activation"
+      - name: sessions_d90
+        description: "Number of sessions in first 90 days after activation"
+      - name: sessions_post_activation
+        description: "Total sessions after activation date (all time)"
+      - name: total_sessions_to_date
+        description: "Total sessions to date (all sessions including activation day)"
+      - name: last_meaningful_activity_date
+        description: "Most recent date the user had a prompt, save, or share"
+      - name: saves_d7
+        description: "Total saves in first 7 days after activation"
+      - name: saves_d30
+        description: "Total saves in first 30 days after activation"
+      - name: shares_d7
+        description: "Total shares in first 7 days after activation"
+      - name: shares_d30
+        description: "Total shares in first 30 days after activation"
+      - name: total_prompts
+        description: "All-time AI prompt count"
+      - name: total_saves
+        description: "All-time save count"
+      - name: total_shares
+        description: "All-time share count"
+      - name: total_decks_created
+        description: "All-time decks (boards) created"
+      - name: total_multiplayer_sessions_created
+        description: "All-time multiplayer sessions created"
+      - name: total_referrals_given
+        description: "All-time referrals given"
+      - name: total_conversions
+        description: "All-time conversion actions (opened_website, book_with_deck, etc.)"
+      - name: days_active
+        description: "Distinct days with any activity"
+      - name: last_activity_date
+        description: "Most recent activity date"
+      - name: days_since_last_activity
+        description: "Days since last activity (NULL if never active post-signup)"
+      - name: is_churned
+        description: "TRUE if no activity in the last 30 days"

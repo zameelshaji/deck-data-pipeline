@@ -840,20 +840,37 @@ def load_signup_activation_funnel(start_date=None, end_date=None):
 
 
 @st.cache_data(ttl=300)
-def load_activation_summary_metrics():
-    """Load aggregate activation metrics for executive summary cards."""
+def load_activation_summary_metrics(start_date=None, end_date=None):
+    """Load activation and retention summary metrics, optionally filtered by date range."""
     engine = get_database_connection()
 
-    query = """
+    # Build WHERE clauses for activation (by signup_date)
+    activation_where_clauses = []
+    if start_date:
+        activation_where_clauses.append(f"signup_date >= '{start_date}'")
+    if end_date:
+        activation_where_clauses.append(f"signup_date <= '{end_date}'")
+    activation_where = f"WHERE {' AND '.join(activation_where_clauses)}" if activation_where_clauses else ""
+
+    # Build WHERE clauses for retention (by cohort_week)
+    retention_where_clauses = []
+    if start_date:
+        retention_where_clauses.append(f"cohort_week >= '{start_date}'")
+    if end_date:
+        retention_where_clauses.append(f"cohort_week <= '{end_date}'")
+    retention_where = f"WHERE {' AND '.join(retention_where_clauses)}" if retention_where_clauses else ""
+
+    query = f"""
     WITH activation_metrics AS (
         SELECT
             COUNT(*) AS total_users,
             COUNT(*) FILTER (WHERE is_activated) AS total_activated,
             COUNT(*) FILTER (WHERE is_activated AND days_to_activation <= 7) AS activated_within_7d,
-            AVG(days_to_activation * 24.0) FILTER (WHERE is_activated) AS avg_hours_to_activation,
-            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY days_to_activation * 24.0)
-                FILTER (WHERE is_activated) AS median_hours_to_activation
+            AVG(days_to_activation * 1440.0) FILTER (WHERE is_activated) AS avg_minutes_to_activation,
+            PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY days_to_activation * 1440.0)
+                FILTER (WHERE is_activated) AS median_minutes_to_activation
         FROM analytics_prod_gold.fct_user_activation
+        {activation_where}
     ),
     retention_metrics AS (
         SELECT
@@ -866,6 +883,7 @@ def load_activation_summary_metrics():
             SUM(mature_d90) AS total_mature_d90,
             SUM(retained_d90) AS total_retained_d90
         FROM analytics_prod_gold.fct_retention_by_cohort_week
+        {retention_where}
     )
     SELECT
         a.total_users,
@@ -874,8 +892,8 @@ def load_activation_summary_metrics():
         CASE WHEN a.total_users > 0
             THEN a.activated_within_7d::numeric / a.total_users
             ELSE 0 END AS activation_rate_7d,
-        a.avg_hours_to_activation,
-        a.median_hours_to_activation,
+        a.avg_minutes_to_activation,
+        a.median_minutes_to_activation,
         r.total_mature_d7,
         r.total_retained_d7,
         CASE WHEN r.total_mature_d7 > 0
@@ -979,7 +997,7 @@ def load_retention_by_activation_type():
             BOOL_OR(s.session_date BETWEEN ua.activation_date + 1 AND ua.activation_date + 30) AS had_activity_d30
         FROM analytics_prod_gold.fct_user_activation ua
         LEFT JOIN analytics_prod_gold.fct_session_outcomes s
-            ON ua.user_id = s.user_id AND (s.has_save OR s.has_share)
+            ON ua.user_id = s.user_id AND (s.has_save OR s.has_share OR s.is_prompt_session)
         WHERE ua.is_activated = true
         GROUP BY ua.user_id, ua.activation_date, ua.activation_type
     )
