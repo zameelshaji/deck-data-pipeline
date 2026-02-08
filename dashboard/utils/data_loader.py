@@ -1139,9 +1139,9 @@ def load_onboarding_funnel_current(start_date=None, end_date=None, app_version=N
 
     conditions = ["1=1"]
     if start_date:
-        conditions.append(f"onboarding_date >= '{start_date}'")
+        conditions.append(f"onboarding_date >= '{start_date}'::date")
     if end_date:
-        conditions.append(f"onboarding_date <= '{end_date}'")
+        conditions.append(f"onboarding_date <= '{end_date}'::date")
     if app_version:
         conditions.append(f"app_version = '{app_version}'")
 
@@ -1266,9 +1266,9 @@ def load_onboarding_time_distribution(start_date=None, end_date=None, app_versio
         "time_to_complete_seconds <= 3600"  # Cap at 1 hour
     ]
     if start_date:
-        conditions.append(f"onboarding_date >= '{start_date}'")
+        conditions.append(f"onboarding_date >= '{start_date}'::date")
     if end_date:
-        conditions.append(f"onboarding_date <= '{end_date}'")
+        conditions.append(f"onboarding_date <= '{end_date}'::date")
     if app_version:
         conditions.append(f"app_version = '{app_version}'")
 
