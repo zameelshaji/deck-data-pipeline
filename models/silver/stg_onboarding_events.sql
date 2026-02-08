@@ -19,15 +19,26 @@ with onboarding_events as (
         on ae.user_id = u.user_id
     where ae.event_name like 'onboarding_%'
       and u.is_test_user = 0
+),
+
+version_lookup as (
+    select
+        app_version::text as app_version,
+        release_date::date as release_date,
+        release_date_end::date as release_date_end
+    from {{ ref('app_version_releases') }}
 )
 
 select
-    id,
-    event_name,
-    event_timestamp,
-    user_id,
-    permission_granted,
-    feature_selected,
-    event_date
-from onboarding_events
-order by user_id, event_timestamp
+    oe.id,
+    oe.event_name,
+    oe.event_timestamp,
+    oe.user_id,
+    oe.permission_granted,
+    oe.feature_selected,
+    oe.event_date,
+    v.app_version as imputed_app_version
+from onboarding_events oe
+left join version_lookup v
+    on oe.event_date between v.release_date and v.release_date_end
+order by oe.user_id, oe.event_timestamp

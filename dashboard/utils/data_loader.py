@@ -1127,11 +1127,27 @@ def load_onboarding_funnel_summary():
 
 
 @st.cache_data(ttl=300)
-def load_onboarding_funnel_current():
-    """Load current overall funnel totals for headline metrics."""
+def load_onboarding_funnel_current(start_date=None, end_date=None, app_version=None):
+    """Load current overall funnel totals for headline metrics.
+
+    Args:
+        start_date: Optional start date filter (inclusive)
+        end_date: Optional end date filter (inclusive)
+        app_version: Optional app version filter
+    """
     engine = get_database_connection()
 
-    query = """
+    conditions = ["1=1"]
+    if start_date:
+        conditions.append(f"onboarding_date >= '{start_date}'")
+    if end_date:
+        conditions.append(f"onboarding_date <= '{end_date}'")
+    if app_version:
+        conditions.append(f"app_version = '{app_version}'")
+
+    where_clause = " AND ".join(conditions)
+
+    query = f"""
     SELECT
         COUNT(*) as total_users_started,
         COUNT(*) FILTER (WHERE completed_onboarding) as total_completed,
@@ -1158,6 +1174,7 @@ def load_onboarding_funnel_current():
         COUNT(*) FILTER (WHERE reached_feature_router) as reached_feature_router,
         COUNT(*) FILTER (WHERE reached_completion) as reached_completion
     FROM analytics_prod_gold.fct_onboarding_funnel
+    WHERE {where_clause}
     """
 
     try:
@@ -1232,18 +1249,36 @@ def load_onboarding_feature_distribution():
 
 
 @st.cache_data(ttl=300)
-def load_onboarding_time_distribution():
-    """Load time to complete distribution for histogram."""
+def load_onboarding_time_distribution(start_date=None, end_date=None, app_version=None):
+    """Load time to complete distribution for histogram.
+
+    Args:
+        start_date: Optional start date filter (inclusive)
+        end_date: Optional end date filter (inclusive)
+        app_version: Optional app version filter
+    """
     engine = get_database_connection()
 
-    query = """
+    conditions = [
+        "completed_onboarding = true",
+        "time_to_complete_seconds IS NOT NULL",
+        "time_to_complete_seconds > 0",
+        "time_to_complete_seconds <= 3600"  # Cap at 1 hour
+    ]
+    if start_date:
+        conditions.append(f"onboarding_date >= '{start_date}'")
+    if end_date:
+        conditions.append(f"onboarding_date <= '{end_date}'")
+    if app_version:
+        conditions.append(f"app_version = '{app_version}'")
+
+    where_clause = " AND ".join(conditions)
+
+    query = f"""
     SELECT
         time_to_complete_seconds / 60.0 as time_to_complete_minutes
     FROM analytics_prod_gold.fct_onboarding_funnel
-    WHERE completed_onboarding = true
-      AND time_to_complete_seconds IS NOT NULL
-      AND time_to_complete_seconds > 0
-      AND time_to_complete_seconds <= 3600  -- Cap at 1 hour for reasonable distribution
+    WHERE {where_clause}
     """
 
     try:
@@ -1256,11 +1291,17 @@ def load_onboarding_time_distribution():
 
 
 @st.cache_data(ttl=300)
-def load_onboarding_completion_rate_prior_7d():
-    """Load completion rate for the prior 7-day period for delta comparison."""
+def load_onboarding_completion_rate_prior_7d(app_version=None):
+    """Load completion rate for the prior 7-day period for delta comparison.
+
+    Args:
+        app_version: Optional app version filter
+    """
     engine = get_database_connection()
 
-    query = """
+    app_version_filter = f"AND app_version = '{app_version}'" if app_version else ""
+
+    query = f"""
     WITH recent_period AS (
         SELECT
             COUNT(*) as users_started,
@@ -1268,6 +1309,7 @@ def load_onboarding_completion_rate_prior_7d():
         FROM analytics_prod_gold.fct_onboarding_funnel
         WHERE onboarding_date >= current_date - 7
           AND onboarding_date < current_date
+          {app_version_filter}
     ),
     prior_period AS (
         SELECT
@@ -1276,6 +1318,7 @@ def load_onboarding_completion_rate_prior_7d():
         FROM analytics_prod_gold.fct_onboarding_funnel
         WHERE onboarding_date >= current_date - 14
           AND onboarding_date < current_date - 7
+          {app_version_filter}
     )
     SELECT
         CASE WHEN r.users_started > 0

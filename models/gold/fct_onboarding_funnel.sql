@@ -44,7 +44,10 @@ with user_onboarding_events as (
         bool_or(event_name = 'onboarding_referral_submitted') as referral_submitted,
 
         -- Feature selected (take the first one if multiple)
-        min(feature_selected) filter (where event_name = 'onboarding_feature_selected') as feature_selected
+        min(feature_selected) filter (where event_name = 'onboarding_feature_selected') as feature_selected,
+
+        -- App version (from the first onboarding event - welcome viewed)
+        min(imputed_app_version) filter (where event_name = 'onboarding_welcome_viewed') as app_version
 
     from {{ ref('stg_onboarding_events') }}
     group by user_id
@@ -101,7 +104,10 @@ select
     extract(epoch from (uoe.completed_at - uoe.welcome_viewed_at)) as time_to_complete_seconds,
 
     -- Onboarding date (date when they started)
-    date(uoe.welcome_viewed_at) as onboarding_date
+    date(uoe.welcome_viewed_at) as onboarding_date,
+
+    -- App version (imputed from seed based on onboarding date)
+    uoe.app_version
 
 from user_onboarding_events uoe
 inner join user_signup_dates usd

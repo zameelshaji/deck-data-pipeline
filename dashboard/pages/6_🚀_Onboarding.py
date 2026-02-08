@@ -4,6 +4,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from datetime import date, timedelta
 from utils.styling import apply_deck_branding, add_deck_footer, BRAND_COLORS
 from utils.data_loader import (
     load_onboarding_funnel_summary,
@@ -12,6 +13,7 @@ from utils.data_loader import (
     load_onboarding_feature_distribution,
     load_onboarding_time_distribution,
     load_onboarding_completion_rate_prior_7d,
+    load_app_versions_with_dates,
 )
 
 st.set_page_config(
@@ -25,11 +27,39 @@ apply_deck_branding()
 st.title("🚀 Onboarding Analytics")
 st.markdown("*Tracking the user onboarding funnel and permission grants*")
 
+# --- Sidebar Filters ---
+with st.sidebar:
+    st.header("Filters")
+
+    app_version_map = load_app_versions_with_dates()
+    app_version_options = list(app_version_map.keys())
+    app_version_label = st.selectbox(
+        "App Version",
+        options=["All Versions"] + app_version_options,
+        index=0,
+        help="Filter by app version (release date shown in brackets)"
+    )
+    app_version = None if app_version_label == "All Versions" else app_version_map.get(app_version_label)
+
+    date_range = st.date_input(
+        "Date Range",
+        value=(date.today() - timedelta(days=90), date.today()),
+        help="Filter metrics by onboarding date range"
+    )
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        start_date, end_date = date_range
+    else:
+        start_date, end_date = date.today() - timedelta(days=90), date.today()
+
 # --- Load Data ---
 try:
-    current_df = load_onboarding_funnel_current()
+    current_df = load_onboarding_funnel_current(
+        start_date=str(start_date),
+        end_date=str(end_date),
+        app_version=app_version
+    )
     summary_df = load_onboarding_funnel_summary()
-    prior_rates_df = load_onboarding_completion_rate_prior_7d()
+    prior_rates_df = load_onboarding_completion_rate_prior_7d(app_version=app_version)
 except Exception as e:
     st.error(f"Error loading data: {str(e)}")
     with st.expander("Troubleshooting"):
@@ -46,7 +76,7 @@ except Exception as e:
     st.stop()
 
 if current_df.empty:
-    st.warning("No onboarding data available. The onboarding tables may not be populated yet.")
+    st.warning("No onboarding data available for the selected filters.")
     with st.expander("Troubleshooting"):
         st.markdown("""
         Run `dbt run --select +onboarding_daily_summary` to populate the data.
@@ -55,6 +85,8 @@ if current_df.empty:
 
 # --- Section A: Headline KPIs ---
 st.subheader("📊 Headline KPIs")
+st.caption(f"Aggregated for {start_date.strftime('%b %d, %Y')} – {end_date.strftime('%b %d, %Y')}"
+           + (f" | App Version: {app_version}" if app_version else ""))
 
 row = current_df.iloc[0]
 total_started = int(row.get('total_users_started', 0))
@@ -271,7 +303,11 @@ st.divider()
 st.subheader("⏱️ Time to Complete Distribution")
 
 try:
-    time_df = load_onboarding_time_distribution()
+    time_df = load_onboarding_time_distribution(
+        start_date=str(start_date),
+        end_date=str(end_date),
+        app_version=app_version
+    )
     if not time_df.empty and len(time_df) > 0:
         median_minutes = time_df['time_to_complete_minutes'].median()
 
