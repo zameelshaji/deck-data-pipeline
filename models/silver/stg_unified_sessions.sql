@@ -67,6 +67,7 @@ inferred_session_aggregates as (
         count(*) filter (where event_type = 'save') as save_count,
         count(*) filter (where event_category = 'Share') as share_count,
         count(distinct card_id) as unique_cards_interacted,
+        count(distinct card_id) filter (where event_type = 'save') as unique_cards_saved,
 
         -- First event source for initiation surface
         (array_agg(source_table order by event_timestamp))[1] as first_event_source,
@@ -99,6 +100,7 @@ inferred_sessions as (
         save_count,
         share_count,
         unique_cards_interacted,
+        unique_cards_saved,
         case
             when first_event_source in ('dextr_queries') then 'dextr'
             when first_event_source = 'featured_section_actions' then 'featured'
@@ -141,7 +143,8 @@ native_event_counts as (
         count(*) filter (where e.event_type in ('swipe_right', 'swipe_left')) as swipe_count,
         count(*) filter (where e.event_type = 'save') as save_count,
         count(*) filter (where e.event_category = 'Share') as share_count,
-        count(distinct e.card_id) as unique_cards_interacted
+        count(distinct e.card_id) as unique_cards_interacted,
+        count(distinct e.card_id) filter (where e.event_type = 'save') as unique_cards_saved
     from native_sessions_base ns
     inner join {{ ref('stg_unified_events') }} e
         on ns.user_id = e.user_id
@@ -166,6 +169,7 @@ native_sessions as (
         coalesce(ec.save_count, 0) as save_count,
         coalesce(ec.share_count, 0) as share_count,
         coalesce(ec.unique_cards_interacted, 0) as unique_cards_interacted,
+        coalesce(ec.unique_cards_saved, 0) as unique_cards_saved,
         ns.initiation_surface,
         ns.device_type,
         ns.app_version,
