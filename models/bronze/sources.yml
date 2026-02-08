@@ -8,6 +8,8 @@ sources:
     tables:
       - name: user_profiles
         description: "User profile information"
+        meta:
+          status: current
         columns:
           - name: id
             description: "Primary key"
@@ -16,68 +18,121 @@ sources:
               - not_null
       - name: user_preferences
         description: "User preference settings"
+        meta:
+          status: current
       - name: user_sessions
         description: "User app sessions and swipe interactions"
+        meta:
+          status: current
 
       # Experience & Content
       - name: experience_cards
-        description: "AI-generated places and experiences"
+        description: "AI-generated places and experiences. Deprecated Jan 10 2026, replaced by places."
+        meta:
+          status: historical
+          deprecated_date: "2026-01-10"
       - name: featured_cards
         description: "Featured/partnership places"
+        meta:
+          status: current
       - name: featured_categories
         description: "Categories for featured content"
+        meta:
+          status: current
       - name: featured_cards_category_mapping
         description: "Mapping between featured cards and categories"
+        meta:
+          status: current
 
       # AI/Dextr System
       - name: dextr_queries
-        description: "AI chatbot queries from users"
+        description: "AI chatbot queries from users. Active from Sep 5 2025."
+        meta:
+          status: current
       - name: dextr_packs
-        description: "Generated card packs from AI queries"
+        description: "Generated card packs from AI queries. Active from Sep 5 2025."
+        meta:
+          status: current
       - name: dextr_pack_cards
-        description: "Individual cards within generated packs"
+        description: "Legacy swipe records. Active Sep 5 - Nov 19 2025."
+        meta:
+          status: historical
+          deprecated_date: "2025-11-19"
 
       # User Actions
       - name: featured_section_actions
-        description: "User interactions in featured section"
+        description: "User interactions in featured section. Active Sep 7 2025 - Jan 29 2026."
+        meta:
+          status: historical
+          deprecated_date: "2026-01-29"
       - name: core_card_actions
-        description: "All user actions on experience cards"
+        description: "All user actions on experience cards. Active Sep 12 2025 - Jan 29 2026."
+        meta:
+          status: historical
+          deprecated_date: "2026-01-29"
 
       # Multiplayer Features
       - name: multiplayer_sessions
         description: "Group planning sessions"
+        meta:
+          status: current
       - name: session_participants
         description: "Users participating in multiplayer sessions"
+        meta:
+          status: current
       - name: session_places
         description: "Places added to multiplayer sessions"
+        meta:
+          status: current
       - name: session_votes
         description: "User votes on places in multiplayer sessions"
+        meta:
+          status: current
 
-      - name: places 
-        description: 'Post Gemini cards/places revamp'
+      - name: places
+        description: "Post Gemini cards/places revamp. Active from Nov 20 2025."
+        meta:
+          status: current
       - name: dextr_places
-        description: 'post gemini dextr_pack_cards'
+        description: "Post Gemini dextr_pack_cards. Active from Nov 20 2025."
+        meta:
+          status: current
 
       # Personal Organization
       - name: boards
         description: "User-created boards/wishlists"
+        meta:
+          status: current
       - name: board_places
-        description: "Places saved to user boards"
+        description: "Places saved to user boards. Deprecated Jan 2 2026."
+        meta:
+          status: historical
+          deprecated_date: "2026-01-02"
       - name: board_places_v2
-        description: "Places saved to user boards v2"
+        description: "Current board-place relationships. Replaced board_places from Jan 2 2026."
+        meta:
+          status: current
 
       # Referrals
       - name: referral_codes
         description: "User referral codes for inviting others"
+        meta:
+          status: current
       - name: referral_usages
         description: "Tracking of referral code usage during onboarding"
+        meta:
+          status: current
 
       - name: giveaway_claims
         description: "Tracking the claims made on places"
+        meta:
+          status: current
 
-      # North Star Metrics - Planning & Sharing
+      # North Star Metrics - Planning & Sharing (TelemetryManager, Jan 30 2026+)
       - name: planning_sessions
-        description: "User planning sessions tracking lifecycle from start to completion"
+        description: "User planning sessions tracking lifecycle from start to completion. Active from Jan 30 2026."
+        meta:
+          status: current
         columns:
           - name: id
             description: "Primary key"
@@ -85,7 +140,9 @@ sources:
               - unique
               - not_null
       - name: app_events
-        description: "Application events tied to planning sessions"
+        description: "TelemetryManager event stream. Active from Jan 30 2026."
+        meta:
+          status: current
         columns:
           - name: id
             description: "Primary key"
@@ -93,7 +150,9 @@ sources:
               - unique
               - not_null
       - name: share_links
-        description: "Share links created by users for decks, cards, and multiplayer sessions"
+        description: "Share links created by users for decks, cards, and multiplayer sessions. Active from Jan 30 2026."
+        meta:
+          status: current
         columns:
           - name: id
             description: "Primary key"
@@ -101,7 +160,9 @@ sources:
               - unique
               - not_null
       - name: share_interactions
-        description: "Interactions on shared links by viewers"
+        description: "Interactions on shared links by viewers. Active from Jan 30 2026."
+        meta:
+          status: current
         columns:
           - name: id
             description: "Primary key"
@@ -109,18 +170,24 @@ sources:
               - unique
               - not_null
 
-  - name: legacy 
+  - name: legacy
     description: "Raw Supabase tables - legacy"
     database: postgres
     schema: legacy
     tables:
       - name: user_swipes_ver2
-        description: "Legacy swipes"
+        description: "Legacy table. Used for homepage totals only."
+        meta:
+          status: historical
       - name: user_liked_places
-        description: "Legacy featured likes"
+        description: "Legacy table. Used for homepage totals only."
+        meta:
+          status: historical
       - name: learned_places
-        description: "legacy cards table"
-  
+        description: "Legacy table. Used for homepage totals only."
+        meta:
+          status: historical
+
   - name: auth
     description: "Raw auth tables"
     database: postgres
@@ -128,3 +195,5 @@ sources:
     tables:
       - name: users
         description: "Auth users created by supabase when user creates"
+        meta:
+          status: current

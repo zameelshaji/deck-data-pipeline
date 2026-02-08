@@ -51,11 +51,46 @@ models:
         +enabled: false
       stg_dextr_category_metrics:
         +enabled: false
+      stg_category_interestcount:
+        +enabled: false
+      # Replaced by stg_unified_events
+      stg_events:
+        +enabled: false
+      stg_events_intent:
+        +enabled: false
+      stg_events_count:
+        +enabled: false
+      # Replaced by stg_unified_sessions
+      stg_inferred_sessions:
+        +enabled: false
+      int_inferred_session_events:
+        +enabled: false
+      int_inferred_sessions:
+        +enabled: false
+      int_inferred_session_saves:
+        +enabled: false
+      int_inferred_session_shares:
+        +enabled: false
 
     gold:
       +materialized: table
       +schema: gold
       supplier_performance:
+        +enabled: false
+      # Depended on broken stg_events_intent
+      category_combination_intent:
+        +enabled: false
+      category_combination_metrics:
+        +enabled: false
+      category_price_combinations:
+        +enabled: false
+      category_combination_ratings:
+        +enabled: false
+      price_band_performance:
+        +enabled: false
+      category_intent_count:
+        +enabled: false
+      interest_to_conversion:
         +enabled: false
 
 vars:

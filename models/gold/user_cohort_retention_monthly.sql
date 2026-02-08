@@ -2,7 +2,6 @@
 -- Tracks how many users from each signup cohort return in subsequent months
 
 with user_cohorts as (
-    -- Assign each user to their signup cohort (by month)
     select
         user_id,
         date_trunc('month', created_at)::date as cohort_month,
@@ -12,21 +11,18 @@ with user_cohorts as (
 ),
 
 user_activity_months as (
-    -- Get all months where each user was active
     select distinct
         e.user_id,
         date_trunc('month', e.event_timestamp)::date as activity_month
-    from {{ ref('stg_events') }} e
+    from {{ ref('stg_unified_events') }} e
     where e.user_id is not null
 ),
 
 cohort_activity as (
-    -- Join cohorts with their activity months
     select
         uc.cohort_month,
         uc.user_id,
         uam.activity_month,
-        -- Calculate months since signup
         extract(year from age(uam.activity_month, uc.cohort_month)) * 12 +
         extract(month from age(uam.activity_month, uc.cohort_month)) as months_since_signup
     from user_cohorts uc
@@ -35,7 +31,6 @@ cohort_activity as (
 ),
 
 cohort_size as (
-    -- Count total users in each cohort
     select
         cohort_month,
         count(distinct user_id) as cohort_size
@@ -44,18 +39,16 @@ cohort_size as (
 ),
 
 cohort_retention_counts as (
-    -- Count how many users returned in each month
     select
         ca.cohort_month,
         ca.months_since_signup,
         count(distinct ca.user_id) as users_active
     from cohort_activity ca
-    where ca.months_since_signup > 0  -- Only count from signup month onwards
+    where ca.months_since_signup > 0
     group by ca.cohort_month, ca.months_since_signup
 ),
 
 cohort_retention_rates as (
-    -- Calculate retention rates as percentage
     select
         crc.cohort_month,
         cs.cohort_size,
@@ -63,7 +56,6 @@ cohort_retention_rates as (
         crc.users_active,
         round(100.0 * crc.users_active / cs.cohort_size, 1) as retention_rate,
 
-        -- Add labels for easier reading
         case
             when crc.months_since_signup = 1 then 'Month 1'
             when crc.months_since_signup = 2 then 'Month 2'
@@ -86,7 +78,6 @@ select
     users_active,
     retention_rate,
 
-    -- Add quarter/year for grouping
     date_trunc('quarter', cohort_month)::date as cohort_quarter,
     extract(year from cohort_month) as cohort_year
 

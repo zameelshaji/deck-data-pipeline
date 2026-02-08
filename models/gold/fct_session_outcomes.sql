@@ -1,5 +1,4 @@
 with sessions_base as (
-    -- Native sessions from planning_sessions table
     select
         session_id,
         user_id,
@@ -10,56 +9,27 @@ with sessions_base as (
         session_duration_seconds,
         initiation_surface,
         device_type,
-        null::text as app_version,
-        true as has_native_session_id,
-        false as is_inferred_session,
-        'native' as data_source,
-        null::boolean as is_genuine_planning_attempt,
-        0 as inferred_save_count,
-        0 as inferred_share_count,
-        0 as inferred_unique_cards_interacted
-    from {{ ref('stg_planning_sessions') }}
-
-    union all
-
-    -- Inferred sessions from stg_inferred_sessions
-    select
-        inferred_session_id as session_id,
-        user_id,
-        session_date,
-        session_week,
-        session_started_at as started_at,
-        session_ended_at as ended_at,
-        session_duration_seconds,
-        inferred_initiation_surface as initiation_surface,
-        null::text as device_type,
-        null::text as app_version,
-        false as has_native_session_id,
-        true as is_inferred_session,
-        'inferred' as data_source,
+        app_version,
+        has_native_session_id,
+        not has_native_session_id as is_inferred_session,
+        session_source as data_source,
         is_genuine_planning_attempt,
-        save_count as inferred_save_count,
-        share_count as inferred_share_count,
-        unique_cards_interacted as inferred_unique_cards_interacted
-    from {{ ref('stg_inferred_sessions') }}
+        -- Inline counts from unified sessions (used for inferred sessions)
+        save_count as inline_save_count,
+        share_count as inline_share_count,
+        unique_cards_interacted as inline_unique_cards_interacted,
+        query_count as inline_query_count
+    from {{ ref('stg_unified_sessions') }}
 ),
 
--- Deduplicate: prefer native sessions
-sessions_deduped as (
-    select distinct on (session_id)
-        *
-    from sessions_base
-    order by session_id, has_native_session_id desc
-),
-
--- Native session saves
-all_saves as (
-    select session_id, user_id, save_count, unique_cards_saved, first_save_at, last_save_at
+-- Native session saves (from app_events via stg_session_saves)
+native_saves as (
+    select session_id, user_id, save_count, first_save_at, last_save_at
     from {{ ref('stg_session_saves') }}
 ),
 
--- Native session shares
-all_shares as (
+-- Native session shares (from app_events via stg_session_shares)
+native_shares as (
     select session_id, user_id, share_count, first_share_at, 'high' as share_attribution_confidence
     from {{ ref('stg_session_shares') }}
 ),
@@ -74,7 +44,7 @@ post_share_interactions as (
     group by si.session_id
 ),
 
--- Check if session had a dextr prompt
+-- Check if session had a dextr prompt (for native sessions)
 prompt_sessions as (
     select distinct effective_session_id as session_id
     from {{ ref('stg_app_events_enriched') }}
@@ -109,21 +79,19 @@ outcomes as (
         s.is_inferred_session,
         s.data_source,
 
-        -- Outcome flags (native saves/shares from joins, inferred from stg_inferred_sessions)
-        coalesce(sv.save_count, s.inferred_save_count, 0) > 0 as has_save,
-        coalesce(sh.share_count, s.inferred_share_count, 0) > 0 as has_share,
+        -- Outcome flags: use native saves/shares for native sessions, inline counts for inferred
+        coalesce(sv.save_count, s.inline_save_count, 0) > 0 as has_save,
+        coalesce(sh.share_count, s.inline_share_count, 0) > 0 as has_share,
         coalesce(psi.interaction_count, 0) > 0 as has_post_share_interaction,
-        coalesce(sv.save_count, s.inferred_save_count, 0) as save_count,
-        coalesce(sv.unique_cards_saved, s.inferred_unique_cards_interacted, 0) as unique_cards_saved,
-        coalesce(sh.share_count, s.inferred_share_count, 0) as share_count,
+        coalesce(sv.save_count, s.inline_save_count, 0) as save_count,
+        coalesce(sh.share_count, s.inline_share_count, 0) as share_count,
 
-        -- Derived metric flags
-        coalesce(sv.save_count, s.inferred_save_count, 0) > 0 as meets_ssr,
-        coalesce(sh.share_count, s.inferred_share_count, 0) > 0 as meets_shr,
-        (coalesce(sv.save_count, s.inferred_save_count, 0) > 0 and coalesce(sh.share_count, s.inferred_share_count, 0) > 0) as meets_psr_broad,
-        (coalesce(sv.save_count, s.inferred_save_count, 0) > 0 and coalesce(sh.share_count, s.inferred_share_count, 0) > 0 and coalesce(psi.interaction_count, 0) > 0) as meets_psr_strict,
-        coalesce(sv.unique_cards_saved, s.inferred_unique_cards_interacted, 0) >= 3 as meets_scr3,
-        (coalesce(sv.save_count, s.inferred_save_count, 0) = 0 and coalesce(sh.share_count, s.inferred_share_count, 0) = 0) as is_no_value_session,
+        -- PSR ladder flags
+        coalesce(sv.save_count, s.inline_save_count, 0) > 0 as meets_ssr,
+        coalesce(sh.share_count, s.inline_share_count, 0) > 0 as meets_shr,
+        (coalesce(sv.save_count, s.inline_save_count, 0) > 0 and coalesce(sh.share_count, s.inline_share_count, 0) > 0) as meets_psr_broad,
+        (coalesce(sv.save_count, s.inline_save_count, 0) > 0 and coalesce(sh.share_count, s.inline_share_count, 0) > 0 and coalesce(psi.interaction_count, 0) > 0) as meets_psr_strict,
+        (coalesce(sv.save_count, s.inline_save_count, 0) = 0 and coalesce(sh.share_count, s.inline_share_count, 0) = 0) as is_no_value_session,
 
         -- Timing metrics
         case
@@ -142,26 +110,28 @@ outcomes as (
             when s.initiation_surface in ('dextr', 'search') then 'strong'
             else 'weak'
         end as intent_strength,
-        (ps.session_id is not null or s.initiation_surface = 'dextr') as is_prompt_session,
+        (ps.session_id is not null or s.initiation_surface = 'dextr' or s.inline_query_count > 0) as is_prompt_session,
 
         -- Attribution confidence
-        coalesce(sh.share_attribution_confidence, 'high') as share_attribution_confidence,
+        coalesce(sh.share_attribution_confidence, case when s.has_native_session_id then 'high' else 'medium' end) as share_attribution_confidence,
 
         -- Genuine planning attempt
         coalesce(
             s.is_genuine_planning_attempt,
             (ps.session_id is not null or s.initiation_surface = 'dextr'
-             or coalesce(sv.save_count, s.inferred_save_count, 0) > 0
-             or coalesce(sh.share_count, s.inferred_share_count, 0) > 0)
+             or coalesce(sv.save_count, s.inline_save_count, 0) > 0
+             or coalesce(sh.share_count, s.inline_share_count, 0) > 0)
         ) as is_genuine_planning_attempt
 
-    from sessions_deduped s
-    left join {{ ref('stg_users') }} u on s.user_id = u.user_id
-    left join all_saves sv on s.session_id = sv.session_id
-    left join all_shares sh on s.session_id = sh.session_id
+    from sessions_base s
+    inner join {{ ref('stg_users') }} u on s.user_id = u.user_id
+    left join native_saves sv on s.session_id = sv.session_id
+    left join native_shares sh on s.session_id = sh.session_id
     left join post_share_interactions psi on s.session_id = psi.session_id
     left join prompt_sessions ps on s.session_id = ps.session_id
     left join version_lookup vl on s.session_date between vl.release_date and vl.release_date_end
+    -- CRITICAL: Exclude test users
+    where u.is_test_user = 0
 )
 
 select * from outcomes

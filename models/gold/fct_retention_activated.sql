@@ -1,11 +1,12 @@
 with activated_users as (
     select
         user_id,
-        coalesce(first_activation_date, signup_date) as activation_date,
-        date_trunc('week', coalesce(first_activation_date, signup_date))::date as activation_week,
+        activation_date,
+        activation_week,
         activation_type
-    from {{ ref('fct_activation_funnel') }}
-    where has_activation_7d = true
+    from {{ ref('fct_user_activation') }}
+    where is_activated = true
+      and activation_date is not null
 ),
 
 user_activity_dates as (
@@ -13,6 +14,7 @@ user_activity_dates as (
         user_id,
         session_date
     from {{ ref('fct_session_outcomes') }}
+    where has_save or has_share
 ),
 
 retention as (
