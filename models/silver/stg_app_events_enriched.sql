@@ -13,7 +13,7 @@ enriched as (
         e.event_name,
         e.event_timestamp,
         e.user_id,
-        coalesce(e.session_id, ins.inferred_session_id) as effective_session_id,
+        coalesce(e.session_id, us.session_id) as effective_session_id,
         e.session_id is not null as has_native_session_id,
         e.session_id is null as is_inferred_session,
         case when e.session_id is not null then 'native' else 'inferred' end as data_source,
@@ -27,23 +27,24 @@ enriched as (
         -- Session context from planning_sessions (if native)
         ps.initiation_surface,
         ps.device_type,
-        coalesce(ps.started_at, ins.session_started_at) as session_started_at,
+        coalesce(ps.started_at, us.started_at) as session_started_at,
 
-        -- Inferred session context
-        ins.inferred_initiation_surface,
+        -- Unified session context
+        us.initiation_surface as unified_initiation_surface,
         coalesce(
-            ins.is_genuine_planning_attempt,
+            us.is_genuine_planning_attempt,
             (ps.session_id is not null or ps.initiation_surface = 'dextr')
         ) as is_genuine_planning_attempt
 
     from deduplicated_events e
     left join {{ ref('stg_planning_sessions') }} ps
         on e.session_id = ps.session_id
-    left join {{ ref('stg_inferred_sessions') }} ins
+    left join {{ ref('stg_unified_sessions') }} us
         on e.session_id is null
-        and e.user_id = ins.user_id
-        and e.event_timestamp >= ins.session_started_at
-        and e.event_timestamp <= ins.session_ended_at
+        and e.user_id = us.user_id
+        and us.session_source = 'inferred'
+        and e.event_timestamp >= us.started_at
+        and e.event_timestamp <= us.ended_at
 )
 
 select * from enriched

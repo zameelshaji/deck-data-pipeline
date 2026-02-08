@@ -10,27 +10,27 @@ with
 
             -- AI Interaction metrics
             count(
-                case when e.event_name = 'dextr_query' then 1 end
+                case when e.event_type = 'dextr_query' then 1 end
             ) as total_prompts,
 
             -- Swipe metrics (left + right from all sources)
             count(
                 case
-                    when e.event_name in ('swipe_left', 'swipe_right') then 1
+                    when e.event_type in ('swipe_left', 'swipe_right') then 1
                 end
             ) as total_swipes,
 
             -- Save metrics
-            count(case when e.event_name = 'saved' then 1 end) as total_saves,
+            count(case when e.event_type = 'saved' then 1 end) as total_saves,
 
             -- Share metrics from events
-            count(case when e.event_name = 'share' then 1 end) as total_shares_events,
+            count(case when e.event_type = 'share' then 1 end) as total_shares_events,
 
             -- Conversion metrics
             count(
                 case
                     when
-                        e.event_name in (
+                        e.event_type in (
                             'opened_website',
                             'book_with_deck',
                             'click_directions',
@@ -44,7 +44,7 @@ with
             count(distinct date(e.event_timestamp)) as days_active,
             max(date(e.event_timestamp)) as last_activity_date
 
-        from {{ ref("stg_events") }} e
+        from {{ ref("stg_unified_events") }} e
         group by e.user_id
     ),
 

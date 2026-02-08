@@ -3,10 +3,10 @@ with monthly_user_activity as (
     select
         date_trunc('month', event_timestamp)::date as activity_month,
         user_id,
-        event_source,
+        source_table,
         event_category,
         count(*) as monthly_events
-    from {{ ref('stg_events') }}
+    from {{ ref('stg_unified_events') }}
     group by 1, 2, 3, 4
 ),
 
@@ -14,13 +14,11 @@ monthly_metrics as (
     select
         activity_month,
         count(distinct user_id) as monthly_active_users,
-        count(distinct case when event_source = 'dextr' then user_id end) as mau_ai_users,
-        count(distinct case when event_category = 'Content Curation' then user_id end) as mau_curation_users,
-        count(distinct case when event_category = 'Conversion Action' then user_id end) as mau_conversion_users,
-        count(distinct case when event_source = 'multiplayer' then user_id end) as mau_multiplayer_users,
-        count(distinct case when event_source = 'featured_section' then user_id end) as mau_featured_users,
+        count(distinct case when source_table = 'dextr_queries' then user_id end) as mau_ai_users,
+        count(distinct case when event_category in ('Swipe', 'Save') then user_id end) as mau_curation_users,
+        count(distinct case when event_category = 'Conversion' then user_id end) as mau_conversion_users,
+        count(distinct case when source_table = 'featured_section_actions' then user_id end) as mau_featured_users,
 
-        -- Engagement intensity
         avg(monthly_events) as avg_events_per_user,
         percentile_cont(0.5) within group (order by monthly_events) as median_events_per_user,
         max(monthly_events) as max_events_per_user
@@ -31,11 +29,8 @@ monthly_metrics as (
 monthly_with_growth as (
     select
         *,
-        -- Month-over-month growth
         lag(monthly_active_users, 1) over (order by activity_month) as mau_last_month,
         lag(monthly_active_users, 3) over (order by activity_month) as mau_3_months_ago,
-
-        -- 3-month rolling average
         avg(monthly_active_users) over (
             order by activity_month
             rows between 2 preceding and current row
@@ -49,14 +44,13 @@ select
     mau_ai_users as ai_active_users,
     mau_curation_users as curation_active_users,
     mau_conversion_users as conversion_active_users,
-    mau_multiplayer_users as multiplayer_active_users,
+    0 as multiplayer_active_users,
     mau_featured_users as featured_active_users,
     avg_events_per_user,
     median_events_per_user,
     max_events_per_user,
     mau_3month_avg as rolling_3month_avg,
 
-    -- Growth calculations
     case
         when mau_last_month > 0
         then round(100.0 * (monthly_active_users - mau_last_month) / mau_last_month, 2)
@@ -69,7 +63,6 @@ select
         else null
     end as growth_vs_3_months_ago_percent,
 
-    -- Engagement ratios
     case
         when monthly_active_users > 0
         then round(100.0 * mau_ai_users / monthly_active_users, 2)
@@ -82,11 +75,7 @@ select
         else 0
     end as conversion_user_rate,
 
-    case
-        when monthly_active_users > 0
-        then round(100.0 * mau_multiplayer_users / monthly_active_users, 2)
-        else 0
-    end as multiplayer_adoption_rate,
+    0 as multiplayer_adoption_rate,
 
     case
         when monthly_active_users > 0

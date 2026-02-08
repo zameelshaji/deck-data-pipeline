@@ -19,10 +19,10 @@ user_events as (
         e.user_id,
         e.event_timestamp,
         date(e.event_timestamp) as event_date,
-        e.event_name,
-        e.event_source,
+        e.event_type,
+        e.source_table,
         e.event_category
-    from {{ ref('stg_events') }} e
+    from {{ ref('stg_unified_events') }} e
 ),
 
 -- Get session-level data for activation tracking
@@ -54,16 +54,16 @@ user_funnel as (
         bool_or(
             e.event_date between u.signup_date and u.signup_date + 7
             and (
-                e.event_name = 'dextr_query'  -- AI prompt
-                or e.event_source in ('featured_section', 'featured_carousel')  -- Browse featured
-                or e.event_name in ('category_clicked', 'spotlight_click')  -- Browse/search
+                e.event_type = 'query'  -- AI prompt
+                or e.source_table = 'featured_section_actions'  -- Browse featured
+                or e.event_type in ('category_clicked', 'spotlight_click')  -- Browse/search
             )
         ) as had_planning_initiated_7d,
 
         -- F3: Content Engagement (swipe, view detail within 7 days)
         bool_or(
             e.event_date between u.signup_date and u.signup_date + 7
-            and e.event_name in (
+            and e.event_type in (
                 'swipe_right', 'swipe_left',  -- Card swiping
                 'detail_view_open', 'detail_open',  -- Viewing card details
                 'click'  -- Click on content
