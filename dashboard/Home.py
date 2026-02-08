@@ -4,16 +4,10 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from utils.data_loader import (
-    load_executive_summary,
-    load_headline_metrics,
+    load_homepage_totals,
     load_latest_mau,
     load_latest_wau,
-    load_total_multiplayer_sessions,
-    load_total_decks_created,
     load_referral_metrics,
-    load_total_saves,
-    load_total_shares,
-    load_total_activated_users,
 )
 from utils.styling import apply_deck_branding, add_deck_footer
 
@@ -37,33 +31,21 @@ if st.button("🔄 Refresh Data"):
     st.rerun()
 
 try:
-    # Load data
-    exec_summary = load_executive_summary()
-    headline_metrics = load_headline_metrics(days=1)  # Get latest
+    # Load data — gold_homepage_totals is the single source of truth
+    homepage = load_homepage_totals()
     mau_data = load_latest_mau()
     wau_data = load_latest_wau()
-    multiplayer_sessions_data = load_total_multiplayer_sessions()
-    decks_created_data = load_total_decks_created()
     referral_data = load_referral_metrics()
-    saves_data = load_total_saves()
-    shares_data = load_total_shares()
-    activated_users_data = load_total_activated_users()
 
-    if exec_summary.empty or headline_metrics.empty:
-        st.warning("⚠️ No data available")
+    if homepage.empty:
+        st.warning("⚠️ No data available. Run `dbt run` to populate gold_homepage_totals.")
         st.stop()
 
-    # Extract values
-    summary = exec_summary.iloc[0]
-    latest = headline_metrics.iloc[0]
+    # Extract values from the single-row homepage totals table
+    h = homepage.iloc[0]
     mau = mau_data.iloc[0] if not mau_data.empty else None
     wau = wau_data.iloc[0] if not wau_data.empty else None
-    multiplayer_total = multiplayer_sessions_data.iloc[0]['total_multiplayer_sessions'] if not multiplayer_sessions_data.empty else 0
-    decks_total = decks_created_data.iloc[0]['total_decks_created'] if not decks_created_data.empty else 0
     referral_metrics = referral_data.iloc[0] if not referral_data.empty else None
-    total_saves = saves_data.iloc[0]['total_saves'] if not saves_data.empty else 0
-    total_shares = shares_data.iloc[0]['total_shares'] if not shares_data.empty else 0
-    total_activated_users = activated_users_data.iloc[0]['total_activated_users'] if not activated_users_data.empty else 0
 
     # Display last updated
     st.caption(f"📅 Last Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -101,7 +83,7 @@ try:
     with col1:
         st.metric(
             label="👥 Total Users",
-            value=f"{int(latest['total_users']):,}",
+            value=f"{int(h['total_signups']):,}",
             delta=None,
             help="Total number of registered users on the platform"
         )
@@ -109,17 +91,17 @@ try:
     with col2:
         st.metric(
             label="✅ Activated Users",
-            value=f"{int(total_activated_users):,}",
+            value=f"{int(h['total_activated_users']):,}",
             delta=None,
-            help="Total number of users who have completed an activation action (save, share, or prompt)"
+            help="Total number of users who have completed an activation action (save, share, or prompt). Excludes test users."
         )
 
     with col3:
         st.metric(
             label="📊 Monthly Active Users (MAU)",
-            value=f"{int(mau['monthly_active_users']):,}" if mau is not None else "N/A",
-            delta=f"{mau['mom_growth_percent']:.1f}%" if mau is not None and pd.notna(mau['mom_growth_percent']) else None,
-            help="Unique users who performed at least one action in the last 30 days"
+            value=f"{int(h['mau']):,}",
+            delta=f"{mau['mom_growth_percent']:.1f}%" if mau is not None and pd.notna(mau.get('mom_growth_percent')) else None,
+            help="Unique users who performed at least one action in the last 30 days. Excludes test users."
         )
 
     # Row 2
@@ -128,7 +110,7 @@ try:
     with col1:
         st.metric(
             label="💬 Total Prompts",
-            value=f"{int(latest['total_prompts']):,}",
+            value=f"{int(h['total_prompts']):,}",
             delta=None,
             help="Cumulative number of AI queries submitted by all users"
         )
@@ -136,13 +118,13 @@ try:
     with col2:
         st.metric(
             label="👆 Total Swipes",
-            value=f"{int(latest['total_swipes']):,}",
+            value=f"{int(h['total_swipes']):,}",
             delta=None,
             help="Cumulative number of card swipes (left or right) by all users"
         )
 
     with col3:
-        total_saves_shares = int(total_saves) + int(total_shares)
+        total_saves_shares = int(h['total_saves']) + int(h['total_shares'])
         st.metric(
             label="💾 Total Saves & Shares",
             value=f"{total_saves_shares:,}",
@@ -156,7 +138,7 @@ try:
     with col1:
         st.metric(
             label="🎨 Decks Created",
-            value=f"{int(decks_total):,}",
+            value=f"{int(h['total_boards']):,}",
             delta=None,
             help="Total number of custom boards/wishlists created by users"
         )
@@ -164,7 +146,7 @@ try:
     with col2:
         st.metric(
             label="🎮 Multiplayer Sessions",
-            value=f"{int(multiplayer_total):,}",
+            value=f"{int(h['total_multiplayer_sessions']):,}",
             delta=None,
             help="Total number of collaborative planning sessions created"
         )

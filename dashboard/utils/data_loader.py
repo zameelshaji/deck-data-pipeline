@@ -1045,13 +1045,14 @@ def load_worst_performing_cohorts(limit=10):
 
 
 @st.cache_data(ttl=300)
-def load_total_saves():
-    """Load total number of saves (cards saved) across all sessions."""
+def load_homepage_totals():
+    """Load all homepage metrics from gold_homepage_totals (single row)."""
     engine = get_database_connection()
 
     query = """
-    SELECT COALESCE(SUM(save_count), 0) as total_saves
-    FROM analytics_prod_silver.stg_session_saves
+    SELECT *
+    FROM analytics_prod_gold.gold_homepage_totals
+    LIMIT 1
     """
 
     try:
@@ -1059,47 +1060,8 @@ def load_total_saves():
             df = pd.read_sql(text(query), conn)
         return df
     except Exception as e:
-        st.error(f"Error loading total saves: {str(e)}")
-        return pd.DataFrame({'total_saves': [0]})
-
-
-@st.cache_data(ttl=300)
-def load_total_shares():
-    """Load total number of shares across all sessions."""
-    engine = get_database_connection()
-
-    query = """
-    SELECT COALESCE(SUM(share_count), 0) as total_shares
-    FROM analytics_prod_silver.stg_session_shares
-    """
-
-    try:
-        with engine.begin() as conn:
-            df = pd.read_sql(text(query), conn)
-        return df
-    except Exception as e:
-        st.error(f"Error loading total shares: {str(e)}")
-        return pd.DataFrame({'total_shares': [0]})
-
-
-@st.cache_data(ttl=300)
-def load_total_activated_users():
-    """Load total number of activated users."""
-    engine = get_database_connection()
-
-    query = """
-    SELECT COUNT(*) as total_activated_users
-    FROM analytics_prod_gold.fct_user_activation
-    WHERE is_activated = true
-    """
-
-    try:
-        with engine.begin() as conn:
-            df = pd.read_sql(text(query), conn)
-        return df
-    except Exception as e:
-        st.error(f"Error loading total activated users: {str(e)}")
-        return pd.DataFrame({'total_activated_users': [0]})
+        st.error(f"Error loading homepage totals: {str(e)}")
+        return pd.DataFrame()
 
 
 # ============================================================================

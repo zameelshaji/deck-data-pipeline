@@ -66,11 +66,12 @@ total_multiplayer as (
     select count(*) as total_multiplayer_sessions from {{ ref('src_multiplayer_sessions') }}
 ),
 
--- MAU (EXCLUDES test users) — unique users with >=1 event in last 30 days
+-- MAU (EXCLUDES test users, only activated users) — unique activated users with >=1 event in last 30 days
 mau as (
     select count(distinct e.user_id) as mau
     from {{ ref('stg_unified_events') }} e
     inner join {{ ref('stg_users') }} u on e.user_id = u.user_id
+    inner join {{ ref('fct_user_activation') }} a on e.user_id = a.user_id and a.is_activated = true
     where u.is_test_user = 0
       and e.event_timestamp >= current_date - interval '30 days'
 ),
