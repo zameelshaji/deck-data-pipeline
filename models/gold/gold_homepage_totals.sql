@@ -19,16 +19,16 @@ total_prompts as (
 total_swipes as (
     select count(*) as total_swipes from (
         -- Legacy swipes
-        select id from {{ ref('src_user_swipes_v2') }}
+        select 1 from {{ ref('src_user_swipes_v2') }}
         union all
-        select id from {{ ref('src_user_liked_places') }}
+        select 1 from {{ ref('src_user_liked_places') }}
         union all
         -- dextr_pack_cards swipes (pre Nov 20)
-        select id from {{ ref('src_dextr_pack_cards') }}
+        select 1 from {{ ref('src_dextr_pack_cards') }}
         where user_action in ('left', 'right') and created_at < '2025-11-20'
         union all
         -- dextr_places swipes (Nov 20+)
-        select id from {{ ref('src_dextr_places') }}
+        select 1 from {{ ref('src_dextr_places') }}
         where user_action in ('like', 'dislike') and created_at >= '2025-11-20'
     ) s
 ),
@@ -36,18 +36,18 @@ total_swipes as (
 -- Total saves (including test users)
 total_saves as (
     select count(*) as total_saves from (
-        select id from {{ ref('src_core_card_actions') }} where action_type = 'saved' and timestamp < '2026-01-30'
+        select 1 from {{ ref('src_core_card_actions') }} where action_type = 'saved' and timestamp < '2026-01-30'
         union all
-        select id from {{ ref('src_app_events') }} where event_name = 'card_saved' and event_timestamp >= '2026-01-30'
+        select 1 from {{ ref('src_app_events') }} where event_name = 'card_saved' and event_timestamp >= '2026-01-30'
     ) s
 ),
 
 -- Total shares (including test users)
 total_shares as (
     select count(*) as total_shares from (
-        select id from {{ ref('src_core_card_actions') }} where action_type = 'share' and timestamp < '2026-01-30'
+        select 1 from {{ ref('src_core_card_actions') }} where action_type = 'share' and timestamp < '2026-01-30'
         union all
-        select id from {{ ref('src_app_events') }} where event_name in ('card_shared', 'deck_shared') and event_timestamp >= '2026-01-30'
+        select 1 from {{ ref('src_app_events') }} where event_name in ('card_shared', 'deck_shared') and event_timestamp >= '2026-01-30'
     ) s
 ),
 
