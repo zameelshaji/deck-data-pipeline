@@ -534,12 +534,18 @@ models:
         description: "Referrals given to other users"
       - name: user_archetype
         description: "Post-activation archetype: one_and_done, browser, saver, planner, power_planner. NULL if not activated."
+        tests:
+          - accepted_values:
+              values: ['one_and_done', 'browser', 'saver', 'planner', 'power_planner']
       - name: is_planner
         description: "TRUE if user has saved AND shared at least once (lifetime)"
       - name: is_passenger
         description: "TRUE if activated but NOT a planner (has not both saved and shared)"
       - name: churn_risk
         description: "Churn risk level: high (14+ days inactive, <3 sessions), medium (7-14 days), low (active within 7 days)"
+        tests:
+          - accepted_values:
+              values: ['high', 'medium', 'low']
       - name: is_churned
         description: "TRUE if no activity in 30+ days"
       - name: retained_d7
@@ -568,8 +574,12 @@ models:
     columns:
       - name: user_id
         description: "Unique user identifier"
+        tests:
+          - not_null
       - name: activity_week
         description: "Monday of the activity week"
+        tests:
+          - not_null
       - name: activation_week
         description: "Monday of activation week (cohort key)"
       - name: weeks_since_activation
@@ -614,6 +624,7 @@ models:
         description: "Unique Dextr query identifier"
         tests:
           - not_null
+          - unique
       - name: user_id
         description: "User who submitted the prompt"
       - name: query_text
@@ -640,6 +651,9 @@ models:
         description: "TRUE if no cards were saved from this prompt"
       - name: performance_category
         description: "Processing speed: fast (<3s), normal (3-8s), slow (>8s)"
+        tests:
+          - accepted_values:
+              values: ['fast', 'normal', 'slow']
       - name: led_to_save
         description: "TRUE if the session had at least one save"
       - name: led_to_share
@@ -652,8 +666,14 @@ models:
         description: "TRUE if the user was retained at D30"
       - name: prompt_intent
         description: "Derived prompt intent category: date_night, group_outing, solo_explore, dining, drinks, culture, adventure, shopping, wellness, general"
+        tests:
+          - accepted_values:
+              values: ['date_night', 'group_outing', 'solo_explore', 'dining', 'drinks', 'culture', 'adventure', 'shopping', 'wellness', 'general']
       - name: prompt_specificity
         description: "Prompt specificity level: high (specific venue/area), medium (category + area), low (vague)"
+        tests:
+          - accepted_values:
+              values: ['high', 'medium', 'low']
       - name: location_mentioned
         description: "TRUE if a location was provided with the prompt"
 
@@ -709,6 +729,9 @@ models:
     columns:
       - name: card_id
         description: "Unique card identifier (deck_sku for post-Gemini, integer for legacy)"
+        tests:
+          - not_null
+          - unique
       - name: place_name
         description: "Name of the place/card"
       - name: category
@@ -753,6 +776,9 @@ models:
     columns:
       - name: pack_id
         description: "Unique pack identifier"
+        tests:
+          - not_null
+          - unique
       - name: query_id
         description: "Dextr query that generated this pack"
       - name: query_text
@@ -777,12 +803,18 @@ models:
         description: "Share events / shown cards ratio"
       - name: prompt_intent_category
         description: "Derived prompt intent: date_night, group_outing, solo_explore, dining, drinks, culture, adventure, general"
+        tests:
+          - accepted_values:
+              values: ['date_night', 'group_outing', 'solo_explore', 'dining', 'drinks', 'culture', 'adventure', 'general']
 
   - name: fct_conversion_signals
     description: "Booking intent and monetisation readiness signals. One row per conversion action (opened_website, book_with_deck, click_directions, click_phone). Answers: how many saves lead to clicks, which categories convert, prompt-initiated vs organic."
     columns:
       - name: action_id
         description: "Sequential action identifier"
+        tests:
+          - not_null
+          - unique
       - name: user_id
         description: "User who performed the conversion action"
       - name: card_id
@@ -793,6 +825,10 @@ models:
         description: "Category of the place"
       - name: action_type
         description: "Type of conversion: opened_website, book_with_deck, click_directions, click_phone"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['opened_website', 'book_with_deck', 'click_directions', 'click_phone']
       - name: action_date
         description: "Date of the conversion action"
       - name: was_saved_first
@@ -809,6 +845,9 @@ models:
     columns:
       - name: share_link_id
         description: "Unique share link identifier"
+        tests:
+          - not_null
+          - unique
       - name: sharer_user_id
         description: "User who created the share"
       - name: sharer_archetype
