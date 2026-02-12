@@ -62,8 +62,8 @@ with
     user_segments as (
         select
             user_id,
-            user_type
-        from {{ ref("user_segmentation") }}
+            case when is_planner then 'Planner' else 'Passenger' end as user_type
+        from {{ ref('fct_user_segments') }}
     )
 
 select

@@ -536,7 +536,8 @@ models:
         description: "Post-activation archetype: one_and_done, browser, saver, planner, power_planner. NULL if not activated."
         tests:
           - accepted_values:
-              values: ['one_and_done', 'browser', 'saver', 'planner', 'power_planner']
+              arguments:
+                values: ['one_and_done', 'browser', 'saver', 'planner', 'power_planner']
       - name: is_planner
         description: "TRUE if user has saved AND shared at least once (lifetime)"
       - name: is_passenger
@@ -545,7 +546,8 @@ models:
         description: "Churn risk level: high (14+ days inactive, <3 sessions), medium (7-14 days), low (active within 7 days)"
         tests:
           - accepted_values:
-              values: ['high', 'medium', 'low']
+              arguments:
+                values: ['high', 'medium', 'low']
       - name: is_churned
         description: "TRUE if no activity in 30+ days"
       - name: retained_d7
@@ -653,7 +655,8 @@ models:
         description: "Processing speed: fast (<3s), normal (3-8s), slow (>8s)"
         tests:
           - accepted_values:
-              values: ['fast', 'normal', 'slow']
+              arguments:
+                values: ['fast', 'normal', 'slow']
       - name: led_to_save
         description: "TRUE if the session had at least one save"
       - name: led_to_share
@@ -668,12 +671,14 @@ models:
         description: "Derived prompt intent category: date_night, group_outing, solo_explore, dining, drinks, culture, adventure, shopping, wellness, general"
         tests:
           - accepted_values:
-              values: ['date_night', 'group_outing', 'solo_explore', 'dining', 'drinks', 'culture', 'adventure', 'shopping', 'wellness', 'general']
+              arguments:
+                values: ['date_night', 'group_outing', 'solo_explore', 'dining', 'drinks', 'culture', 'adventure', 'shopping', 'wellness', 'general']
       - name: prompt_specificity
         description: "Prompt specificity level: high (specific venue/area), medium (category + area), low (vague)"
         tests:
           - accepted_values:
-              values: ['high', 'medium', 'low']
+              arguments:
+                values: ['high', 'medium', 'low']
       - name: location_mentioned
         description: "TRUE if a location was provided with the prompt"
 
@@ -805,7 +810,8 @@ models:
         description: "Derived prompt intent: date_night, group_outing, solo_explore, dining, drinks, culture, adventure, general"
         tests:
           - accepted_values:
-              values: ['date_night', 'group_outing', 'solo_explore', 'dining', 'drinks', 'culture', 'adventure', 'general']
+              arguments:
+                values: ['date_night', 'group_outing', 'solo_explore', 'dining', 'drinks', 'culture', 'adventure', 'general']
 
   - name: fct_conversion_signals
     description: "Booking intent and monetisation readiness signals. One row per conversion action (opened_website, book_with_deck, click_directions, click_phone). Answers: how many saves lead to clicks, which categories convert, prompt-initiated vs organic."
@@ -828,7 +834,8 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['opened_website', 'book_with_deck', 'click_directions', 'click_phone']
+              arguments:
+                values: ['opened_website', 'book_with_deck', 'click_directions', 'click_phone']
       - name: action_date
         description: "Date of the conversion action"
       - name: was_saved_first

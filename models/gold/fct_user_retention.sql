@@ -20,25 +20,25 @@ with activated_users as (
       and activation_date is not null
 ),
 
--- User profile & segmentation
+-- User profile & segmentation (from fct_user_segments, replaces disabled user_segmentation)
 user_profiles as (
     select
         user_id,
         email,
         username,
         full_name,
-        user_type,
+        case when is_planner then 'Planner' else 'Passenger' end as user_type,
         total_prompts,
         total_saves,
         total_shares,
-        total_decks_created,
-        total_multiplayer_sessions_created,
+        total_boards_created as total_decks_created,
+        total_multiplayer_sessions as total_multiplayer_sessions_created,
         total_referrals_given,
         total_conversions,
         days_active,
         last_activity_date,
         days_since_last_activity
-    from {{ ref('user_segmentation') }}
+    from {{ ref('fct_user_segments') }}
 ),
 
 -- Post-activation session activity (prompt/save/share only)
