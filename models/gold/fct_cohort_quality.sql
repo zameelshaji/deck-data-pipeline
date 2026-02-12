@@ -31,11 +31,12 @@ with user_data as (
       and us.activation_week is not null
 ),
 
--- First-session metrics per user
+-- First-session metrics per user (join to unified_sessions for swipe data)
 first_session_metrics as (
     select distinct on (s.user_id)
         s.user_id,
         s.save_count as first_session_saves,
+        coalesce(us.swipe_count, 0) as first_session_swipes,
         case
             when s.save_count > 0 or s.share_count > 0 then true
             else false
@@ -44,6 +45,8 @@ first_session_metrics as (
     from {{ ref('fct_session_outcomes') }} s
     inner join {{ ref('fct_user_activation') }} a
         on s.user_id = a.user_id
+    left join {{ ref('stg_unified_sessions') }} us
+        on s.session_id = us.session_id
     where a.is_activated = true
     order by s.user_id, s.started_at
 ),
@@ -72,7 +75,7 @@ first_week_prompts as (
     inner join {{ ref('fct_user_activation') }} a
         on e.user_id = a.user_id
     where a.is_activated = true
-      and e.event_type = 'dextr_query'
+      and e.event_type = 'query'
       and date(e.event_timestamp) between a.activation_date and a.activation_date + 7
     group by e.user_id
 ),
@@ -143,6 +146,7 @@ select
 
     -- Quality signals
     round(avg(fsm.first_session_saves), 2) as avg_first_session_saves,
+    round(avg(fsm.first_session_swipes), 2) as avg_first_session_swipes,
     round(100.0 * count(*) filter (where ud.activated_in_first_session) / count(*), 1) as pct_activated_in_first_session,
     case
         when count(*) filter (where ud.is_churned) > 0

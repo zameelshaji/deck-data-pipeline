@@ -75,9 +75,9 @@ models:
     gold:
       +materialized: table
       +schema: gold
+      # --- Disabled: broken dependencies (stg_events_intent) ---
       supplier_performance:
         +enabled: false
-      # Depended on broken stg_events_intent
       category_combination_intent:
         +enabled: false
       category_combination_metrics:
@@ -91,6 +91,15 @@ models:
       category_intent_count:
         +enabled: false
       interest_to_conversion:
+        +enabled: false
+      # --- Disabled: obsolete duplicates replaced by fct_/vis_ models ---
+      user_session_derived:
+        +enabled: false
+      user_segmentation:
+        +enabled: false
+      user_segmentation_summary:
+        +enabled: false
+      user_cohort_retention_monthly:
         +enabled: false
 
 vars:

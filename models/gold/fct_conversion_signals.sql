@@ -49,6 +49,18 @@ conversion_sessions as (
     inner join {{ ref('fct_session_outcomes') }} so
         on ce.user_id = so.user_id
         and ce.event_timestamp between so.started_at and so.ended_at
+),
+
+-- Get prompt text for prompt-initiated conversions
+session_prompts as (
+    select distinct on (dq.user_id, s.session_id)
+        s.session_id,
+        dq.query_text as prompt_text
+    from {{ ref('src_dextr_queries') }} dq
+    inner join {{ ref('fct_session_outcomes') }} s
+        on dq.user_id = s.user_id
+        and dq.query_timestamp between s.started_at and s.ended_at
+    order by dq.user_id, s.session_id, dq.query_timestamp
 )
 
 select
@@ -80,7 +92,8 @@ select
 
     -- Session context
     cs.session_id,
-    coalesce(cs.is_prompt_session, false) as was_prompt_initiated
+    coalesce(cs.is_prompt_session, false) as was_prompt_initiated,
+    sp.prompt_text
 
 from conversion_events ce
 left join {{ ref('stg_cards') }} c on ce.card_id = c.card_id
@@ -91,3 +104,5 @@ left join prior_saves ps
 left join conversion_sessions cs
     on ce.user_id = cs.user_id
     and ce.event_timestamp = cs.event_timestamp
+left join session_prompts sp
+    on cs.session_id = sp.session_id

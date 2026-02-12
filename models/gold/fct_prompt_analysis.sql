@@ -155,6 +155,26 @@ select
     coalesce(qs.has_share, false) as led_to_share,
     coalesce(qs.has_post_share_interaction, false) as led_to_post_share_interaction,
 
+    -- Prompt classification (keyword-based heuristic)
+    case
+        when lower(q.query_text) ~* '(date night|romantic|couple)' then 'date_night'
+        when lower(q.query_text) ~* '(group|friends|mates|gang|crew)' then 'group_outing'
+        when lower(q.query_text) ~* '(solo|alone|myself|by myself)' then 'solo_explore'
+        when lower(q.query_text) ~* '(restaurant|food|eat|dinner|lunch|brunch|breakfast)' then 'dining'
+        when lower(q.query_text) ~* '(bar|drink|cocktail|pub|wine|beer)' then 'drinks'
+        when lower(q.query_text) ~* '(museum|gallery|art|theatre|theater|culture|history)' then 'culture'
+        when lower(q.query_text) ~* '(adventure|outdoor|hike|walk|park|nature)' then 'adventure'
+        when lower(q.query_text) ~* '(shop|shopping|market|store)' then 'shopping'
+        when lower(q.query_text) ~* '(spa|wellness|gym|fitness|health)' then 'wellness'
+        else 'general'
+    end as prompt_intent,
+    case
+        when q.query_text ~* '(in |near |around |at )\w+ \w+' then 'high'
+        when q.query_text ~* '(restaurant|bar|cafe|museum|park)' then 'medium'
+        else 'low'
+    end as prompt_specificity,
+    q.location is not null and q.location != '' as location_mentioned,
+
     -- User context
     uc.activation_week as user_activation_week,
     coalesce(upp.user_total_prior_prompts, 0) as user_total_prior_prompts,

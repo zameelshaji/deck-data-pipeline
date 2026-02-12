@@ -5,8 +5,8 @@
 -- Answers: "Who are your best users?", "What % are one-and-done?",
 --          "Top 10 users by saves", "Users who shared 3+ times — what do they have in common?"
 --
--- Activation: first prompt OR save OR share
--- Planner:   >5 prompts AND (saved or shared at least once)
+-- Activation: first prompt OR save OR share (deliberately low bar)
+-- Planner:   saved AND shared at least once (lifetime)
 -- Passenger:  any activated user who is NOT a planner
 
 with activation as (
@@ -49,9 +49,9 @@ session_metrics as (
 user_activity as (
     select
         user_id,
-        count(*) filter (where event_type = 'dextr_query') as total_prompts,
+        count(*) filter (where event_type = 'query') as total_prompts,
         count(*) filter (where event_type in ('swipe_left', 'swipe_right')) as total_swipes,
-        count(*) filter (where event_type = 'saved') as total_saves,
+        count(*) filter (where event_type in ('save', 'saved')) as total_saves,
         count(*) filter (where event_category = 'Share') as total_shares,
         count(*) filter (
             where event_type in ('opened_website', 'book_with_deck', 'click_directions', 'click_phone')
@@ -239,18 +239,19 @@ select
         else 'browser'
     end as user_archetype,
 
-    -- Planner/Passenger (plan definition: >5 prompts AND saved or shared at least once)
+    -- Planner = saved AND shared at least once (lifetime)
+    -- Passenger = any activated user who is NOT a planner
     case
         when is_activated
-             and total_prompts > 5
-             and (total_saves > 0 or total_shares > 0)
+             and total_saves > 0
+             and total_shares > 0
         then true
         else false
     end as is_planner,
 
     case
         when is_activated
-             and not (total_prompts > 5 and (total_saves > 0 or total_shares > 0))
+             and not (total_saves > 0 and total_shares > 0)
         then true
         else false
     end as is_passenger,

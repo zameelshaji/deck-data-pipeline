@@ -1,7 +1,7 @@
 version: 2
 
 models:
-  - name: daily_active_users
+  - name: vis_daily_active_users
     description: "Daily active user metrics with engagement breakdown and growth indicators"
     columns:
       - name: activity_date
@@ -17,7 +17,7 @@ models:
       - name: ai_adoption_rate
         description: "Percentage of DAU who used AI features"
 
-  - name: user_acquisition_funnel
+  - name: vis_user_acquisition_funnel
     description: "User acquisition and onboarding funnel analysis by signup date"
     columns:
       - name: signup_date
@@ -31,7 +31,7 @@ models:
       - name: week_1_activation_rate
         description: "Percentage active in first week after signup"
 
-  - name: dextr_performance
+  - name: vis_dextr_performance
     description: "AI system performance and user satisfaction metrics"
     columns:
       - name: query_date
@@ -47,7 +47,7 @@ models:
       - name: power_user_percentage
         description: "Percentage of users making 6+ queries"
 
-  - name: content_performance
+  - name: vis_content_performance
     description: "Content performance across all card types and sources"
     columns:
       - name: metric_type
@@ -63,7 +63,7 @@ models:
       - name: engagement_score
         description: "Weighted engagement score based on action values"
 
-  - name: executive_summary
+  - name: vis_executive_summary
     description: "High-level executive dashboard with key business metrics"
     columns:
       - name: report_date
@@ -83,111 +83,7 @@ models:
       - name: ai_health
         description: "Qualitative AI feature health assessment"
 
-  - name: user_cohort_retention_monthly
-    description: "Monthly cohort retention analysis showing how activated users return over months"
-    columns:
-      - name: cohort_month
-        description: "Month when the cohort of users first activated"
-      - name: cohort_size
-        description: "Total number of users who activated in this cohort month"
-      - name: months_since_activation
-        description: "Number of months since the cohort activated (1 = first month after activation)"
-      - name: month_label
-        description: "Human-readable label for the month (e.g., 'Month 1', 'Month 3')"
-      - name: users_active
-        description: "Number of users from this cohort who were active in this month"
-      - name: retention_rate
-        description: "Percentage of cohort users who were active (0-100)"
-      - name: cohort_quarter
-        description: "Quarter of cohort activation for grouping"
-      - name: cohort_year
-        description: "Year of cohort activation for grouping"
-
-  - name: user_segmentation
-    description: "Customer segmentation model identifying 'Planners' (users who actively initiate planning) vs 'Passengers' (passive engagers). Critical for retention strategies."
-    columns:
-      - name: user_id
-        description: "Unique user identifier"
-      - name: email
-        description: "User email address"
-      - name: username
-        description: "User's display username"
-      - name: full_name
-        description: "User's full name"
-      - name: created_at
-        description: "Timestamp when user account was created"
-      - name: user_type
-        description: "Segmentation classification: 'Planner' (actively initiates planning) or 'Passenger' (passive engager)"
-      - name: planner_criteria_met
-        description: "Array of criteria that qualified user as Planner: ['prompt_and_swipe', 'created_deck', 'shared_content', 'created_multiplayer']"
-      - name: total_prompts
-        description: "Total number of Dextr AI prompts submitted by user"
-      - name: total_swipes
-        description: "Total number of card swipes (both left and right) across all sources"
-      - name: total_saves
-        description: "Total number of cards saved to boards"
-      - name: total_shares
-        description: "Total number of shares (decks or cards) across all sources"
-      - name: total_decks_created
-        description: "Total number of non-default boards/decks created by user"
-      - name: total_multiplayer_sessions_created
-        description: "Total number of multiplayer planning sessions initiated by user"
-      - name: total_multiplayer_sessions_participated
-        description: "Total number of multiplayer sessions user participated in (including as creator)"
-      - name: total_referrals_given
-        description: "Total number of referrals given by user (number of users who used this user's referral code)"
-      - name: total_conversions
-        description: "Total conversion actions: opened_website, book_with_deck, click_directions, click_phone"
-      - name: days_active
-        description: "Number of distinct days user had any activity"
-      - name: last_activity_date
-        description: "Date of user's most recent activity"
-      - name: days_since_signup
-        description: "Number of days since user account was created"
-      - name: days_since_last_activity
-        description: "Number of days since user's last activity (NULL if never active)"
-      - name: is_test_user
-        description: "Boolean flag indicating if user is a test account (should be 0, as test users are excluded)"
-      - name: prompts_per_active_day
-        description: "Average number of AI prompts per active day (total_prompts / days_active)"
-      - name: swipes_per_prompt
-        description: "Average number of swipes per AI prompt (total_swipes / total_prompts)"
-      - name: conversion_rate
-        description: "Percentage of swipes that led to conversion actions (total_conversions / total_swipes * 100)"
-
-  - name: user_segmentation_summary
-    description: "High-level summary of Planners vs Passengers segmentation with key metrics and comparisons"
-    columns:
-      - name: total_users
-        description: "Total number of users in the system (excluding test users)"
-      - name: total_planners
-        description: "Total number of users classified as Planners"
-      - name: total_passengers
-        description: "Total number of users classified as Passengers"
-      - name: planner_percentage
-        description: "Percentage of total users who are Planners"
-      - name: planner_activation_rate
-        description: "Percentage of Planners with at least 1 day of activity"
-      - name: passenger_activation_rate
-        description: "Percentage of Passengers with at least 1 day of activity"
-      - name: planner_avg_prompts_per_active_day
-        description: "Average AI prompts per active day for Planners"
-      - name: planner_avg_conversion_rate
-        description: "Average conversion rate for Planners"
-      - name: planners_via_prompt_swipe
-        description: "Number of Planners who qualified via prompt + swipe criteria"
-      - name: planners_via_deck
-        description: "Number of Planners who created at least one deck"
-      - name: planners_via_share
-        description: "Number of Planners who shared content"
-      - name: planners_via_multiplayer
-        description: "Number of Planners who created multiplayer sessions"
-      - name: planner_vs_passenger_prompt_ratio
-        description: "Ratio of Planner to Passenger average prompts per active day"
-      - name: report_generated_at
-        description: "Timestamp when this summary was generated"
-
-  - name: dextr_query_user_performance
+  - name: vis_dextr_query_user_performance
     description: "Dextr query performance analysis by user. One row per query showing all card-level interactions and performance metrics."
     columns:
       - name: date
@@ -639,9 +535,9 @@ models:
       - name: user_archetype
         description: "Post-activation archetype: one_and_done, browser, saver, planner, power_planner. NULL if not activated."
       - name: is_planner
-        description: "TRUE if user has >5 prompts AND (saved or shared at least once)"
+        description: "TRUE if user has saved AND shared at least once (lifetime)"
       - name: is_passenger
-        description: "TRUE if activated but NOT a planner"
+        description: "TRUE if activated but NOT a planner (has not both saved and shared)"
       - name: churn_risk
         description: "Churn risk level: high (14+ days inactive, <3 sessions), medium (7-14 days), low (active within 7 days)"
       - name: is_churned
@@ -706,6 +602,10 @@ models:
         description: "Running total of saves up to this week"
       - name: cumulative_shares
         description: "Running total of shares up to this week"
+      - name: cards_viewed
+        description: "Cards viewed (swipes + detail views) in this week"
+      - name: avg_cards_per_session
+        description: "Average cards interacted with per session"
 
   - name: fct_prompt_analysis
     description: "AI prompt-level performance analysis. One row per Dextr query. Tracks prompt sequencing, results quality, downstream outcomes, and user context. Answers: which prompts lead to 0 saves, re-prompting patterns, prompt refinement effects."
@@ -750,6 +650,12 @@ models:
         description: "How many prompts the user had made before this one"
       - name: user_retained_d30
         description: "TRUE if the user was retained at D30"
+      - name: prompt_intent
+        description: "Derived prompt intent category: date_night, group_outing, solo_explore, dining, drinks, culture, adventure, shopping, wellness, general"
+      - name: prompt_specificity
+        description: "Prompt specificity level: high (specific venue/area), medium (category + area), low (vague)"
+      - name: location_mentioned
+        description: "TRUE if a location was provided with the prompt"
 
   - name: fct_cohort_quality
     description: "Investor-ready cohort analysis. One row per activation week cohort. Shows retention rates, archetype distribution, first-session metrics, and leading indicators. Answers: which cohort had best D30 retention, churn patterns, referral vs organic quality."
@@ -795,6 +701,8 @@ models:
         description: "D30 retention for organic users (0-1)"
       - name: referral_retention_d30
         description: "D30 retention for referred users (0-1)"
+      - name: avg_first_session_swipes
+        description: "Average card swipes in the first session"
 
   - name: fct_place_performance
     description: "Place/card-level performance metrics. One row per place in the content catalog. Tracks impressions, swipes, saves, shares, conversions, and rates. Answers: best/worst performing cards, category comparison, featured vs AI content."
@@ -831,6 +739,14 @@ models:
         description: "Impressions in last 30 days"
       - name: saves_last_30d
         description: "Saves in last 30 days"
+      - name: place_id
+        description: "Resolved places.place_id integer from int_place_resolver. NULL for legacy cards."
+      - name: total_detail_views
+        description: "Total detail/place_detail views for this card"
+      - name: total_book_clicks
+        description: "Total book button clicks and book_with_deck actions"
+      - name: neighborhood
+        description: "First component of formatted_address (approximate neighborhood)"
 
   - name: fct_pack_performance
     description: "Dextr AI pack-level analytics. One row per pack. Tracks card generation, engagement, saves, and session outcomes. Answers: which prompts produce best packs, save rates by pack, shortlist completion."
@@ -857,6 +773,10 @@ models:
         description: "TRUE if the session had a save"
       - name: led_to_share
         description: "TRUE if the session had a share"
+      - name: share_rate
+        description: "Share events / shown cards ratio"
+      - name: prompt_intent_category
+        description: "Derived prompt intent: date_night, group_outing, solo_explore, dining, drinks, culture, adventure, general"
 
   - name: fct_conversion_signals
     description: "Booking intent and monetisation readiness signals. One row per conversion action (opened_website, book_with_deck, click_directions, click_phone). Answers: how many saves lead to clicks, which categories convert, prompt-initiated vs organic."
@@ -881,6 +801,8 @@ models:
         description: "Minutes between last save and conversion"
       - name: was_prompt_initiated
         description: "TRUE if conversion happened in a prompt session"
+      - name: prompt_text
+        description: "The Dextr query text if this conversion was in a prompt-initiated session"
 
   - name: fct_viral_loop
     description: "Social sharing and viral loop analytics. One row per share link. Tracks reach, viewer behavior, and signup conversions. Answers: what % of shares get opened, K-factor, share effectiveness by user type."
@@ -911,3 +833,9 @@ models:
         description: "Signups generated per share"
       - name: time_to_first_view_minutes
         description: "Minutes from share creation to first view"
+      - name: total_views
+        description: "Total view interactions on this share link"
+      - name: viewers_who_saved
+        description: "Viewers who performed a save action after viewing"
+      - name: time_to_first_signup_minutes
+        description: "Minutes from share creation to first signup"
