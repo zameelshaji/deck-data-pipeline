@@ -1,16 +1,16 @@
 {{ config(materialized='table') }}
 
 -- Place/Card Performance
--- Grain: one row per place (card_id from stg_cards)
+-- Grain: one row per place (card_id from stg_cards, with resolved_place_id from int_place_resolver)
 -- Answers: "Which packs have highest save rate?", "Which cards get shown but never saved?",
 --          "Are restaurants or bars performing better?", "Cards with viral potential?"
 --
--- Note: card_id in stg_unified_events joins to stg_cards.card_id
--- For post-Gemini data, card_id = deck_sku
+-- Uses int_place_resolver to map card_id → places.place_id for enriched metadata
 
 with card_events as (
     select
         e.card_id,
+        pr.resolved_place_id,
         e.user_id,
         e.event_type,
         e.event_category,
@@ -18,6 +18,7 @@ with card_events as (
         e.data_era
     from {{ ref('stg_unified_events') }} e
     inner join {{ ref('stg_users') }} u on e.user_id = u.user_id
+    left join {{ ref('int_place_resolver') }} pr on e.card_id = pr.original_card_id
     where e.card_id is not null
       and u.is_test_user = 0
 ),
@@ -25,6 +26,7 @@ with card_events as (
 card_aggregates as (
     select
         ce.card_id,
+        max(ce.resolved_place_id) as resolved_place_id,
 
         -- Counts
         count(*) filter (where ce.event_type in ('swipe_right', 'swipe_left')) as total_impressions,
@@ -32,6 +34,12 @@ card_aggregates as (
         count(*) filter (where ce.event_type = 'swipe_left') as total_left_swipes,
         count(*) filter (where ce.event_type in ('save', 'saved')) as total_saves,
         count(*) filter (where ce.event_category = 'Share') as total_shares,
+        count(*) filter (
+            where ce.event_type in ('place_detail_view_open', 'detail_view')
+        ) as total_detail_views,
+        count(*) filter (
+            where ce.event_type in ('book_button_click', 'book_with_deck')
+        ) as total_book_clicks,
         count(*) filter (where ce.event_category = 'Conversion') as total_conversions,
 
         -- Unique users
@@ -90,18 +98,34 @@ card_packs as (
     where e.card_id is not null
       and e.pack_id is not null
     group by e.card_id
+),
+
+-- Places metadata for enrichment via resolved_place_id
+places_meta as (
+    select
+        place_id,
+        name as place_name,
+        formatted_address,
+        split_part(formatted_address, ',', 1) as neighborhood,
+        rating as places_rating,
+        price_level as places_price_level,
+        source_type as places_source_type,
+        is_featured as places_is_featured
+    from {{ ref('src_places') }}
 )
 
 select
     c.card_id,
-    c.name as place_name,
+    ca.resolved_place_id as place_id,
+    coalesce(pm.place_name, c.name) as place_name,
     c.card_type,
     c.category,
-    c.price_level,
-    c.rating,
-    c.formatted_address,
-    c.source_type,
-    c.is_featured,
+    coalesce(pm.places_price_level, c.price_level) as price_level,
+    coalesce(pm.places_rating, c.rating) as rating,
+    pm.neighborhood,
+    coalesce(pm.formatted_address, c.formatted_address) as formatted_address,
+    coalesce(pm.places_source_type, c.source_type) as source_type,
+    coalesce(pm.places_is_featured, c.is_featured::boolean) as is_featured,
 
     -- Volume metrics
     coalesce(ca.total_impressions, 0) as total_impressions,
@@ -109,6 +133,8 @@ select
     coalesce(ca.total_left_swipes, 0) as total_left_swipes,
     coalesce(ca.total_saves, 0) as total_saves,
     coalesce(ca.total_shares, 0) as total_shares,
+    coalesce(ca.total_detail_views, 0) as total_detail_views,
+    coalesce(ca.total_book_clicks, 0) as total_book_clicks,
     coalesce(ca.total_conversions, 0) as total_conversions,
 
     -- Unique users
@@ -164,3 +190,4 @@ select
 from {{ ref('stg_cards') }} c
 left join card_aggregates ca on c.card_id = ca.card_id
 left join card_packs cp on c.card_id = cp.card_id
+left join places_meta pm on ca.resolved_place_id = pm.place_id

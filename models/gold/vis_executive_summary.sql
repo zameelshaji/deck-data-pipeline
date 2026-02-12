@@ -19,20 +19,20 @@ with current_period_metrics as (
         avg(avg_events_per_user) as avg_events_per_user,
         avg(multiplayer_active_users) as avg_multiplayer_users
         
-    from {{ ref('daily_active_users') }}
+    from {{ ref('vis_daily_active_users') }}
     where activity_date >= current_date - interval '30 days'
 ),
 
 previous_period_metrics as (
     -- Previous 30 days for comparison
-    select 
+    select
         'previous_30_days' as period,
         avg(daily_active_users) as avg_daily_users,
         avg(ai_adoption_rate) as avg_ai_adoption,
         avg(conversion_user_rate) as avg_conversion_rate,
         avg(avg_events_per_user) as avg_events_per_user
-        
-    from {{ ref('daily_active_users') }}
+
+    from {{ ref('vis_daily_active_users') }}
     where activity_date between current_date - interval '60 days' and current_date - interval '30 days'
 ),
 
@@ -44,7 +44,7 @@ acquisition_health as (
         avg(week_1_activation_rate) as avg_activation_rate,
         avg(signups_7day_total) as avg_weekly_signups
         
-    from {{ ref('user_acquisition_funnel') }}
+    from {{ ref('vis_user_acquisition_funnel') }}
     where signup_date >= current_date - interval '30 days'
 ),
 
@@ -57,7 +57,7 @@ ai_performance_health as (
         avg(avg_processing_time) as avg_response_time,
         avg(power_user_percentage) as ai_power_user_rate
         
-    from {{ ref('dextr_performance') }}
+    from {{ ref('vis_dextr_performance') }}
     where query_date >= current_date - interval '30 days'
 ),
 
@@ -72,7 +72,7 @@ content_health as (
         count(case when metric_type = 'individual_cards' and engagement_score >= 5 then 1 end) as high_performing_cards,
         count(case when metric_type = 'individual_cards' and like_rate >= 70 then 1 end) as well_liked_cards
         
-    from {{ ref('content_performance') }}
+    from {{ ref('vis_content_performance') }}
     where metric_type = 'individual_cards'
 ),
 

@@ -34,7 +34,7 @@ session_weekly as (
         ) as sessions_swipe_no_save,
         avg(s.session_duration_seconds) as avg_session_duration_seconds,
         avg(s.save_count) as avg_saves_per_session,
-        avg(s.save_count) filter (where s.save_count > 0) as avg_saves_per_saving_session,
+        avg(s.save_count + s.share_count) as avg_cards_per_session,
         avg(s.time_to_first_save_seconds) filter (
             where s.time_to_first_save_seconds is not null
         ) as avg_time_to_first_save_seconds
@@ -47,8 +47,11 @@ event_weekly as (
     select
         user_id,
         date_trunc('week', event_timestamp)::date as activity_week,
-        count(*) filter (where event_type = 'dextr_query') as prompts_count,
+        count(*) filter (where event_type = 'query') as prompts_count,
         count(*) filter (where event_type in ('swipe_left', 'swipe_right')) as swipes_count,
+        count(*) filter (
+            where event_type in ('swipe_left', 'swipe_right', 'place_detail_view_open', 'detail_view')
+        ) as cards_viewed,
         count(*) filter (
             where event_type in ('opened_website', 'book_with_deck', 'click_directions', 'click_phone')
         ) as conversions_count,
@@ -80,12 +83,14 @@ combined as (
         coalesce(ew.swipes_count, 0) as swipes_count,
         coalesce(sw.saves_count, 0) as saves_count,
         coalesce(sw.shares_count, 0) as shares_count,
+        coalesce(ew.cards_viewed, 0) as cards_viewed,
         coalesce(ew.conversions_count, 0) as conversions_count,
         coalesce(ew.unique_places_interacted, 0) as unique_places_interacted,
         coalesce(ew.days_active_in_week, 0) as days_active_in_week,
 
         -- Session quality
         sw.avg_session_duration_seconds,
+        sw.avg_cards_per_session,
         sw.avg_saves_per_session,
         sw.avg_time_to_first_save_seconds,
 

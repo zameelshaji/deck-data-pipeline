@@ -13,7 +13,7 @@ def load_executive_summary():
 
     query = """
     SELECT *
-    FROM analytics_prod_gold.executive_summary
+    FROM analytics_prod_gold.vis_executive_summary
     ORDER BY report_date DESC
     LIMIT 1
     """
@@ -32,14 +32,14 @@ def load_headline_metrics(days=None):
     if days:
         query = f"""
         SELECT *
-        FROM analytics_prod_gold.headline_metrics
+        FROM analytics_prod_gold.vis_headline_metrics
         WHERE metric_date >= current_date - interval '{days} days'
         ORDER BY metric_date DESC
         """
     else:
         query = """
         SELECT *
-        FROM analytics_prod_gold.headline_metrics
+        FROM analytics_prod_gold.vis_headline_metrics
         ORDER BY metric_date DESC
         """
 
@@ -56,7 +56,7 @@ def load_daily_active_users(days=90):
 
     query = f"""
     SELECT *
-    FROM analytics_prod_gold.daily_active_users
+    FROM analytics_prod_gold.vis_daily_active_users
     WHERE activity_date >= current_date - interval '{days} days'
     ORDER BY activity_date DESC
     """
@@ -74,7 +74,7 @@ def load_weekly_active_users(weeks=12):
 
     query = f"""
     SELECT *
-    FROM analytics_prod_gold.weekly_active_users
+    FROM analytics_prod_gold.vis_weekly_active_users
     WHERE activity_week >= current_date - interval '{weeks} weeks'
     ORDER BY activity_week DESC
     """
@@ -92,7 +92,7 @@ def load_monthly_active_users(months=12):
 
     query = f"""
     SELECT *
-    FROM analytics_prod_gold.monthly_active_users
+    FROM analytics_prod_gold.vis_monthly_active_users
     WHERE activity_month >= current_date - interval '{months} months'
     ORDER BY activity_month DESC
     """
@@ -110,7 +110,7 @@ def load_user_acquisition_funnel(days=90):
 
     query = f"""
     SELECT *
-    FROM analytics_prod_gold.user_acquisition_funnel
+    FROM analytics_prod_gold.vis_user_acquisition_funnel
     WHERE signup_date >= current_date - interval '{days} days'
     ORDER BY signup_date DESC
     """
@@ -128,7 +128,7 @@ def load_dextr_performance(days=90):
 
     query = f"""
     SELECT *
-    FROM analytics_prod_gold.dextr_performance
+    FROM analytics_prod_gold.vis_dextr_performance
     WHERE query_date >= current_date - interval '{days} days'
     ORDER BY query_date DESC
     """
@@ -146,7 +146,7 @@ def load_supplier_performance():
 
     query = """
     SELECT *
-    FROM analytics_prod_gold.supplier_performance
+    FROM analytics_prod_gold.vis_supplier_performance
     ORDER BY engagement_score DESC, total_impressions DESC
     """
 
@@ -163,7 +163,7 @@ def load_content_performance():
 
     query = """
     SELECT *
-    FROM analytics_prod_gold.content_performance
+    FROM analytics_prod_gold.vis_content_performance
     WHERE metric_type = 'individual_cards'
     ORDER BY engagement_score DESC
     LIMIT 100
@@ -184,7 +184,7 @@ def load_latest_mau():
     SELECT
         monthly_active_users,
         mom_growth_percent
-    FROM analytics_prod_gold.monthly_active_users
+    FROM analytics_prod_gold.vis_monthly_active_users
     ORDER BY activity_month DESC
     LIMIT 1
     """
@@ -208,7 +208,7 @@ def load_latest_wau():
         weekly_active_users,
         wow_growth_percent,
         growth_vs_4_weeks_ago_percent
-    FROM analytics_prod_gold.weekly_active_users
+    FROM analytics_prod_gold.vis_weekly_active_users
     ORDER BY activity_week DESC
     LIMIT 1
     """
@@ -321,7 +321,7 @@ def load_cohort_retention_monthly(months=12):
         month_label,
         users_active,
         retention_rate
-    FROM analytics_prod_gold.user_cohort_retention_monthly
+    FROM analytics_prod_gold.vis_user_cohort_retention_monthly
     WHERE cohort_month >= current_date - interval '{months} months'
         AND months_since_activation <= 12  -- Show up to 12 months of retention
     ORDER BY cohort_month DESC, months_since_activation ASC
@@ -700,7 +700,7 @@ def load_monthly_retention_summary_metrics():
             cohort_size,
             months_since_activation,
             retention_rate
-        FROM analytics_prod_gold.user_cohort_retention_monthly
+        FROM analytics_prod_gold.vis_user_cohort_retention_monthly
         WHERE cohort_month >= current_date - interval '6 months'
             AND cohort_month < current_date - interval '1 month'  -- Exclude current month
             AND months_since_activation IN (1, 2, 3, 6)  -- Month 1, 2, 3, and 6 retention
@@ -1069,7 +1069,7 @@ def load_homepage_totals():
 
     query = """
     SELECT *
-    FROM analytics_prod_gold.gold_homepage_totals
+    FROM analytics_prod_gold.vis_homepage_totals
     LIMIT 1
     """
 
@@ -1093,7 +1093,7 @@ def load_onboarding_funnel_summary():
 
     query = """
     SELECT *
-    FROM analytics_prod_gold.onboarding_daily_summary
+    FROM analytics_prod_gold.vis_onboarding_daily_summary
     ORDER BY onboarding_date DESC
     """
 

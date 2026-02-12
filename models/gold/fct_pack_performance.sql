@@ -115,8 +115,27 @@ select
         else null
     end as save_rate,
 
+    -- Share rate
+    case
+        when coalesce(pq.cards_shown, 0) > 0
+        then round(coalesce(ps.session_has_share::int, 0)::numeric / pq.cards_shown, 4)
+        else null
+    end as share_rate,
+
     -- Shortlist flag (saved >= 3 cards)
     coalesce(ps_c.cards_saved, 0) >= 3 as has_shortlist,
+
+    -- Prompt intent (keyword-based)
+    case
+        when lower(pq.query_text) ~* '(date night|romantic|couple)' then 'date_night'
+        when lower(pq.query_text) ~* '(group|friends|mates|gang|crew)' then 'group_outing'
+        when lower(pq.query_text) ~* '(solo|alone|myself)' then 'solo_explore'
+        when lower(pq.query_text) ~* '(restaurant|food|eat|dinner|lunch|brunch|breakfast)' then 'dining'
+        when lower(pq.query_text) ~* '(bar|drink|cocktail|pub|wine|beer)' then 'drinks'
+        when lower(pq.query_text) ~* '(museum|gallery|art|theatre|theater|culture)' then 'culture'
+        when lower(pq.query_text) ~* '(adventure|outdoor|hike|walk|park)' then 'adventure'
+        else 'general'
+    end as prompt_intent_category,
 
     -- Session-level outcomes
     ps.session_id,

@@ -23,6 +23,19 @@ models:
       - name: event_category
         description: "High-level category: AI, Swipe, Save, Share, Conversion, Other"
 
+  - name: int_place_resolver
+    description: "Universal place identity resolver. Maps any card_id format (integer, deck_sku, google_place_id, UUID) to places.place_id (integer). Use this to join event-level card_ids to canonical place metadata."
+    columns:
+      - name: original_card_id
+        description: "The raw card_id value from events (text)"
+        tests:
+          - not_null
+          - unique
+      - name: resolved_place_id
+        description: "Resolved places.place_id (integer). NULL if unresolved (e.g., legacy experience_cards with no places match)."
+      - name: resolution_method
+        description: "How the card_id was resolved: integer, deck_sku, google_place_id, uuid_board_place, or unresolved"
+
   - name: stg_unified_sessions
     description: "Unified sessions combining inferred sessions (5-min timeout) and native planning sessions."
     columns:
