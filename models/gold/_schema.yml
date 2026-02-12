@@ -587,3 +587,327 @@ models:
         description: "Days since last activity (NULL if never active post-signup)"
       - name: is_churned
         description: "TRUE if no activity in the last 30 days"
+
+  - name: fct_user_segments
+    description: "User-level archetypes and segmentation. One row per non-test user. Combines activation, retention, session quality, and preference data. Answers: who are your best users, what % are one-and-done, top users by saves, planner vs passenger classification."
+    columns:
+      - name: user_id
+        description: "Unique user identifier"
+        tests:
+          - not_null
+          - unique
+      - name: email
+        description: "User email address"
+      - name: username
+        description: "User display name"
+      - name: full_name
+        description: "User full name"
+      - name: signup_date
+        description: "Date user signed up"
+      - name: is_activated
+        description: "TRUE if user ever prompted, saved, or shared"
+      - name: activation_date
+        description: "Date of first prompt, save, or share"
+      - name: activation_week
+        description: "Monday of activation week (THE cohort key for all segmentation)"
+      - name: activation_trigger
+        description: "What action first activated the user: first_prompt, first_save, or first_share"
+      - name: days_since_signup
+        description: "Days since account creation"
+      - name: last_activity_date
+        description: "Most recent activity date"
+      - name: days_since_last_activity
+        description: "Days since last activity (NULL if never active)"
+      - name: total_sessions
+        description: "All-time session count"
+      - name: total_prompts
+        description: "All-time Dextr AI prompt count"
+      - name: total_swipes
+        description: "All-time swipe count (left + right)"
+      - name: total_saves
+        description: "All-time save count"
+      - name: total_shares
+        description: "All-time share count"
+      - name: total_boards_created
+        description: "Non-default boards/decks created"
+      - name: total_multiplayer_sessions
+        description: "Multiplayer sessions created"
+      - name: total_conversions
+        description: "Conversion actions (opened_website, book_with_deck, etc.)"
+      - name: total_referrals_given
+        description: "Referrals given to other users"
+      - name: user_archetype
+        description: "Post-activation archetype: one_and_done, browser, saver, planner, power_planner. NULL if not activated."
+      - name: is_planner
+        description: "TRUE if user has >5 prompts AND (saved or shared at least once)"
+      - name: is_passenger
+        description: "TRUE if activated but NOT a planner"
+      - name: churn_risk
+        description: "Churn risk level: high (14+ days inactive, <3 sessions), medium (7-14 days), low (active within 7 days)"
+      - name: is_churned
+        description: "TRUE if no activity in 30+ days"
+      - name: retained_d7
+        description: "TRUE if returned within 7 days of activation"
+      - name: retained_d30
+        description: "TRUE if returned within 30 days of activation"
+      - name: retained_d60
+        description: "TRUE if returned within 60 days of activation"
+      - name: referral_source
+        description: "How user was acquired: organic or referral"
+      - name: avg_saves_per_session
+        description: "Average saves per session"
+      - name: avg_session_duration_seconds
+        description: "Average session duration in seconds"
+      - name: prompt_to_save_rate
+        description: "Ratio of saves to prompts (saves/prompts)"
+      - name: swipe_to_save_rate
+        description: "Ratio of saves to swipes (saves/swipes)"
+      - name: sessions_with_save_pct
+        description: "Percentage of sessions that had at least one save"
+      - name: sessions_with_share_pct
+        description: "Percentage of sessions that had at least one share"
+
+  - name: fct_user_engagement_trajectory
+    description: "Weekly engagement trajectory per user. One row per user per activity week. Tracks prompts, swipes, saves, shares, session quality, and cumulative metrics over time. Answers: engagement trends by cohort, time-to-first-save trends, session duration trends."
+    columns:
+      - name: user_id
+        description: "Unique user identifier"
+      - name: activity_week
+        description: "Monday of the activity week"
+      - name: activation_week
+        description: "Monday of activation week (cohort key)"
+      - name: weeks_since_activation
+        description: "Weeks elapsed since activation"
+      - name: sessions_count
+        description: "Sessions in this week"
+      - name: prompts_count
+        description: "Dextr prompts in this week"
+      - name: swipes_count
+        description: "Card swipes in this week"
+      - name: saves_count
+        description: "Card saves in this week"
+      - name: shares_count
+        description: "Shares in this week"
+      - name: conversions_count
+        description: "Conversion actions in this week"
+      - name: avg_session_duration_seconds
+        description: "Average session duration in seconds for the week"
+      - name: avg_time_to_first_save_seconds
+        description: "Average seconds from session start to first save"
+      - name: pct_sessions_with_save
+        description: "% of sessions with at least one save"
+      - name: pct_sessions_zero_actions
+        description: "% of sessions with no saves and no shares (prompt and bounce)"
+      - name: swipe_to_save_rate
+        description: "Saves / swipes ratio for the week"
+      - name: cumulative_sessions
+        description: "Running total of sessions up to this week"
+      - name: cumulative_saves
+        description: "Running total of saves up to this week"
+      - name: cumulative_shares
+        description: "Running total of shares up to this week"
+
+  - name: fct_prompt_analysis
+    description: "AI prompt-level performance analysis. One row per Dextr query. Tracks prompt sequencing, results quality, downstream outcomes, and user context. Answers: which prompts lead to 0 saves, re-prompting patterns, prompt refinement effects."
+    columns:
+      - name: query_id
+        description: "Unique Dextr query identifier"
+        tests:
+          - not_null
+      - name: user_id
+        description: "User who submitted the prompt"
+      - name: query_text
+        description: "The actual prompt text submitted"
+      - name: query_date
+        description: "Date prompt was submitted"
+      - name: session_id
+        description: "Session this prompt belongs to"
+      - name: prompt_sequence_in_session
+        description: "Ordinal position of this prompt in the session (1st, 2nd, etc.)"
+      - name: is_refinement
+        description: "TRUE if this is a 2nd+ prompt in the same session"
+      - name: total_prompts_in_session
+        description: "Total number of prompts in the same session"
+      - name: cards_generated
+        description: "Number of cards generated for this prompt"
+      - name: cards_saved
+        description: "Number of cards saved from this prompt's pack"
+      - name: like_rate
+        description: "Liked cards / acted-upon cards ratio"
+      - name: save_rate
+        description: "Saved cards / shown cards ratio"
+      - name: zero_save_prompt
+        description: "TRUE if no cards were saved from this prompt"
+      - name: performance_category
+        description: "Processing speed: fast (<3s), normal (3-8s), slow (>8s)"
+      - name: led_to_save
+        description: "TRUE if the session had at least one save"
+      - name: led_to_share
+        description: "TRUE if the session had at least one share"
+      - name: user_activation_week
+        description: "User's activation week (cohort key)"
+      - name: user_total_prior_prompts
+        description: "How many prompts the user had made before this one"
+      - name: user_retained_d30
+        description: "TRUE if the user was retained at D30"
+
+  - name: fct_cohort_quality
+    description: "Investor-ready cohort analysis. One row per activation week cohort. Shows retention rates, archetype distribution, first-session metrics, and leading indicators. Answers: which cohort had best D30 retention, churn patterns, referral vs organic quality."
+    columns:
+      - name: activation_week
+        description: "Monday of activation week (cohort key)"
+        tests:
+          - not_null
+          - unique
+      - name: cohort_size
+        description: "Number of users activated this week"
+      - name: avg_days_signup_to_activation
+        description: "Average days from signup to activation for this cohort"
+      - name: one_and_done_count
+        description: "Users with only 1 session who never returned"
+      - name: one_and_done_pct
+        description: "% of cohort that was one-and-done"
+      - name: planner_count
+        description: "Users classified as planner or power_planner"
+      - name: planner_pct
+        description: "% of cohort that became planners"
+      - name: retention_rate_d7
+        description: "D7 retention rate (0-1) for mature users"
+      - name: retention_rate_d30
+        description: "D30 retention rate (0-1) for mature users"
+      - name: retention_rate_d60
+        description: "D60 retention rate (0-1) for mature users"
+      - name: avg_first_session_saves
+        description: "Average saves in the first session"
+      - name: pct_activated_in_first_session
+        description: "% who activated on their first day"
+      - name: pct_churned_with_zero_saves
+        description: "% of churned users who never saved"
+      - name: avg_sessions_first_week
+        description: "Average sessions in first 7 days post-activation"
+      - name: pct_multi_day_first_week
+        description: "% with activity on 2+ days in first week"
+      - name: organic_count
+        description: "Users acquired organically"
+      - name: referral_count
+        description: "Users acquired via referral"
+      - name: organic_retention_d30
+        description: "D30 retention for organic users (0-1)"
+      - name: referral_retention_d30
+        description: "D30 retention for referred users (0-1)"
+
+  - name: fct_place_performance
+    description: "Place/card-level performance metrics. One row per place in the content catalog. Tracks impressions, swipes, saves, shares, conversions, and rates. Answers: best/worst performing cards, category comparison, featured vs AI content."
+    columns:
+      - name: card_id
+        description: "Unique card identifier (deck_sku for post-Gemini, integer for legacy)"
+      - name: place_name
+        description: "Name of the place/card"
+      - name: category
+        description: "Place category (Dining, Drinks, etc.)"
+      - name: total_impressions
+        description: "Total swipes (left + right) on this card"
+      - name: total_saves
+        description: "Total saves of this card"
+      - name: total_shares
+        description: "Total shares of this card"
+      - name: right_swipe_rate
+        description: "Right swipes / total swipes (0-1)"
+      - name: save_rate
+        description: "Saves / impressions (0-1)"
+      - name: share_rate
+        description: "Shares / impressions (0-1)"
+      - name: conversion_rate
+        description: "Conversion actions / impressions (0-1)"
+      - name: viral_score
+        description: "Shares / saves ratio — higher means more viral"
+      - name: packs_appeared_in
+        description: "Number of distinct packs this card appeared in"
+      - name: impressions_last_7d
+        description: "Impressions in last 7 days"
+      - name: saves_last_7d
+        description: "Saves in last 7 days"
+      - name: impressions_last_30d
+        description: "Impressions in last 30 days"
+      - name: saves_last_30d
+        description: "Saves in last 30 days"
+
+  - name: fct_pack_performance
+    description: "Dextr AI pack-level analytics. One row per pack. Tracks card generation, engagement, saves, and session outcomes. Answers: which prompts produce best packs, save rates by pack, shortlist completion."
+    columns:
+      - name: pack_id
+        description: "Unique pack identifier"
+      - name: query_id
+        description: "Dextr query that generated this pack"
+      - name: query_text
+        description: "The prompt text that generated this pack"
+      - name: total_cards_generated
+        description: "Cards generated in this pack"
+      - name: cards_liked
+        description: "Cards swiped right"
+      - name: cards_saved
+        description: "Cards saved from this pack"
+      - name: like_rate
+        description: "Liked / acted-upon ratio (0-1)"
+      - name: save_rate
+        description: "Saved / shown ratio (0-1)"
+      - name: has_shortlist
+        description: "TRUE if 3+ cards were saved"
+      - name: led_to_save
+        description: "TRUE if the session had a save"
+      - name: led_to_share
+        description: "TRUE if the session had a share"
+
+  - name: fct_conversion_signals
+    description: "Booking intent and monetisation readiness signals. One row per conversion action (opened_website, book_with_deck, click_directions, click_phone). Answers: how many saves lead to clicks, which categories convert, prompt-initiated vs organic."
+    columns:
+      - name: action_id
+        description: "Sequential action identifier"
+      - name: user_id
+        description: "User who performed the conversion action"
+      - name: card_id
+        description: "Card/place the action was performed on"
+      - name: place_name
+        description: "Name of the place"
+      - name: place_category
+        description: "Category of the place"
+      - name: action_type
+        description: "Type of conversion: opened_website, book_with_deck, click_directions, click_phone"
+      - name: action_date
+        description: "Date of the conversion action"
+      - name: was_saved_first
+        description: "TRUE if user saved this card before converting"
+      - name: time_from_save_to_conversion_minutes
+        description: "Minutes between last save and conversion"
+      - name: was_prompt_initiated
+        description: "TRUE if conversion happened in a prompt session"
+
+  - name: fct_viral_loop
+    description: "Social sharing and viral loop analytics. One row per share link. Tracks reach, viewer behavior, and signup conversions. Answers: what % of shares get opened, K-factor, share effectiveness by user type."
+    columns:
+      - name: share_link_id
+        description: "Unique share link identifier"
+      - name: sharer_user_id
+        description: "User who created the share"
+      - name: sharer_archetype
+        description: "Archetype of the sharer (from fct_user_segments)"
+      - name: share_type
+        description: "Type of share: board, card, multiplayer"
+      - name: share_channel
+        description: "Channel used to share"
+      - name: shared_at
+        description: "Timestamp of share creation"
+      - name: unique_viewers
+        description: "Distinct viewers who opened the share"
+      - name: unique_authenticated_viewers
+        description: "Viewers with accounts"
+      - name: unique_anonymous_viewers
+        description: "Viewers without accounts"
+      - name: viewers_who_signed_up
+        description: "Viewers who created accounts after viewing"
+      - name: signup_conversion_rate
+        description: "Signups / viewers (0-1)"
+      - name: effective_k_factor
+        description: "Signups generated per share"
+      - name: time_to_first_view_minutes
+        description: "Minutes from share creation to first view"
