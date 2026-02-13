@@ -8,7 +8,7 @@
 --   1. Integer (e.g., "103")       → places.place_id or experience_cards.card_id
 --   2. Deck SKU (e.g., "DECKC38367CT") → places.deck_sku
 --   3. Google Place ID (e.g., "ChIJaer-OwAF...") → places.google_place_id
---   4. UUID (e.g., "060A0FC9-3540...") → board_places_v2.id → place_id
+--   4. UUID (e.g., "060A0FC9-3540...") → board_places_v2.id (UUID PK) → place_id
 
 with distinct_card_ids as (
     select distinct card_id
