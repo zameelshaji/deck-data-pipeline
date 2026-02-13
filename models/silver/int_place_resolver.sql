@@ -66,7 +66,7 @@ from distinct_card_ids ids
 -- Integer match: card_id is numeric and matches places.place_id
 left join places p_int
     on ids.card_id ~ '^\d+$'
-    and (case when ids.card_id ~ '^\d+$' then ids.card_id::integer end) = p_int.place_id
+    and (case when ids.card_id ~ '^\d+$' then ids.card_id::bigint end) = p_int.place_id
 -- Deck SKU match
 left join places p_sku
     on ids.card_id = p_sku.deck_sku
