@@ -1,6 +1,7 @@
-select 
-    board_id, 
-    place_id, 
+select
+    id,
+    board_id,
+    place_id,
     added_by,
     added_at,
     updated_at,
