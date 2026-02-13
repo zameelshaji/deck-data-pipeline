@@ -43,40 +43,42 @@ pack_sessions as (
 ),
 
 -- Count saves per pack from board_places_v2
--- Legacy packs: card_id in dextr_pack_cards
--- Current packs: place_deck_sku in dextr_places
+-- Legacy packs: card_id in dextr_pack_cards is a bigint place_id
 pack_saves_legacy as (
     select
         dpc.pack_id,
         count(distinct bp.place_id) as cards_saved
     from {{ ref('src_dextr_pack_cards') }} dpc
-    inner join {{ ref('src_board_places_v2') }} bp
-        on bp.place_id::text = dpc.card_id::text
-        and bp.added_by = (
-            select dq.user_id from {{ ref('src_dextr_queries') }} dq
-            where dq.response_pack_id = dpc.pack_id limit 1
-        )
+    inner join {{ ref('src_dextr_queries') }} dq
+        on dq.response_pack_id = dpc.pack_id
+    left join {{ ref('src_board_places_v2') }} bp
+        on bp.added_by = dq.user_id
+        and bp.place_id = dpc.card_id
     group by dpc.pack_id
 ),
 
+-- Current packs: place_id in dextr_places is integer, direct match
 pack_saves_current as (
     select
-        dp.pack_id,
+        dpl.pack_id,
         count(distinct bp.place_id) as cards_saved
-    from {{ ref('src_dextr_places') }} dp
-    inner join {{ ref('src_places') }} pl on dp.place_id = pl.place_id
-    inner join {{ ref('src_board_places_v2') }} bp
-        on bp.place_id::text = pl.place_id::text
+    from {{ ref('src_dextr_places') }} dpl
     inner join {{ ref('src_dextr_queries') }} dq
-        on dp.pack_id = dq.response_pack_id
+        on dpl.pack_id = dq.response_pack_id
+    left join {{ ref('src_board_places_v2') }} bp
+        on bp.place_id = dpl.place_id
         and bp.added_by = dq.user_id
-    group by dp.pack_id
+    group by dpl.pack_id
 ),
 
 pack_saves_combined as (
-    select pack_id, cards_saved from pack_saves_legacy
-    union all
-    select pack_id, cards_saved from pack_saves_current
+    select pack_id, sum(cards_saved) as cards_saved
+    from (
+        select pack_id, cards_saved from pack_saves_legacy
+        union all
+        select pack_id, cards_saved from pack_saves_current
+    ) sub
+    group by pack_id
 )
 
 select
@@ -92,7 +94,7 @@ select
 
     -- Pack content
     coalesce(pq.total_cards, 0) as total_cards_generated,
-    coalesce(pq.cards_shown, 0) as cards_shown,
+    coalesce(pq.cards_shown, pq.cards_acted_upon, 0) as cards_shown,
     coalesce(pq.cards_acted_upon, 0) as cards_swiped,
     coalesce(pq.cards_liked, 0) as cards_liked,
     coalesce(pq.cards_disliked, 0) as cards_disliked,

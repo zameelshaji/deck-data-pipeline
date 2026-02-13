@@ -46,20 +46,45 @@ query_sessions as (
         and q.query_timestamp between s.started_at and s.ended_at
 ),
 
--- Count saves attributed to each pack (from board_places_v2 + places matching)
-pack_saves as (
+-- Count saves attributed to each pack (from board_places_v2)
+-- Legacy path: card_id in dextr_pack_cards is a bigint place_id
+pack_saves_legacy as (
     select
         q.query_id,
         count(distinct bp.place_id) as cards_saved
     from queries q
-    inner join {{ ref('src_dextr_packs') }} dp on q.pack_id = dp.pack_id
-    left join {{ ref('src_dextr_pack_cards') }} dpc on dp.pack_id = dpc.pack_id
+    inner join {{ ref('src_dextr_pack_cards') }} dpc on q.pack_id = dpc.pack_id
     left join {{ ref('src_board_places_v2') }} bp
         on bp.added_by = q.user_id
-        and bp.place_id::text = dpc.card_id::text
+        and bp.place_id = dpc.card_id
         and bp.added_at >= q.query_timestamp
         and bp.added_at < q.query_timestamp + interval '1 hour'
     group by q.query_id
+),
+
+-- Current path: place_id in dextr_places is integer, direct match
+pack_saves_current as (
+    select
+        q.query_id,
+        count(distinct bp.place_id) as cards_saved
+    from queries q
+    inner join {{ ref('src_dextr_places') }} dpl on q.pack_id = dpl.pack_id
+    left join {{ ref('src_board_places_v2') }} bp
+        on bp.added_by = q.user_id
+        and bp.place_id = dpl.place_id
+        and bp.added_at >= q.query_timestamp
+        and bp.added_at < q.query_timestamp + interval '1 hour'
+    group by q.query_id
+),
+
+-- Combine both paths
+pack_saves as (
+    select
+        q.query_id,
+        coalesce(psc.cards_saved, 0) + coalesce(psl.cards_saved, 0) as cards_saved
+    from queries q
+    left join pack_saves_current psc on q.query_id = psc.query_id
+    left join pack_saves_legacy psl on q.query_id = psl.query_id
 ),
 
 -- Prompt sequencing within session

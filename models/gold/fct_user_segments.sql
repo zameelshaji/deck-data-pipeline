@@ -231,12 +231,11 @@ select
     -- User archetype (post-activation behavior)
     case
         when not is_activated then null
-        when total_sessions = 1 and days_active <= 1 then 'one_and_done'
-        when total_saves = 0 and total_shares = 0 then 'browser'
-        when total_saves > 0 and total_shares = 0 then 'saver'
         when total_saves > 0 and total_shares > 0 and retained_d7 then 'power_planner'
         when total_saves > 0 and total_shares > 0 then 'planner'
-        else 'browser'
+        when total_saves > 0 and total_shares = 0 then 'saver'
+        when total_sessions > 1 or days_active > 1 then 'browser'
+        else 'one_and_done'
     end as user_archetype,
 
     -- Planner = saved AND shared at least once (lifetime)
