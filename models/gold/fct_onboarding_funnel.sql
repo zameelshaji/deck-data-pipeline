@@ -91,6 +91,14 @@ select
     uoe.completion_viewed_at is not null as reached_completion,
     uoe.completed_at is not null as completed_onboarding,
 
+    -- Boolean flags for accepting each step (took the positive action)
+    uoe.welcome_continue_at is not null as accepted_welcome,
+    coalesce(uoe.referral_submitted, false) as accepted_referral,
+    coalesce(uoe.location_granted, false) as accepted_location,
+    coalesce(uoe.notification_granted, false) as accepted_notification,
+    coalesce(uoe.contacts_granted, false) as accepted_contacts,
+    uoe.feature_selected is not null as accepted_feature_router,
+
     -- Permission outcomes
     coalesce(uoe.location_granted, false) as location_granted,
     coalesce(uoe.notification_granted, false) as notification_granted,

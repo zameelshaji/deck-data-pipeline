@@ -1145,14 +1145,21 @@ def load_onboarding_funnel_current(start_date=None, end_date=None, app_version=N
         CASE WHEN COUNT(*) FILTER (WHERE reached_contacts) > 0
             THEN ROUND(100.0 * COUNT(*) FILTER (WHERE contacts_granted) / COUNT(*) FILTER (WHERE reached_contacts), 2)
             ELSE 0 END as contacts_grant_rate,
-        -- Step counts for funnel
+        -- Step counts for funnel (reached = viewed)
         COUNT(*) FILTER (WHERE reached_welcome) as reached_welcome,
         COUNT(*) FILTER (WHERE reached_referral) as reached_referral,
         COUNT(*) FILTER (WHERE reached_location) as reached_location,
         COUNT(*) FILTER (WHERE reached_notification) as reached_notification,
         COUNT(*) FILTER (WHERE reached_contacts) as reached_contacts,
         COUNT(*) FILTER (WHERE reached_feature_router) as reached_feature_router,
-        COUNT(*) FILTER (WHERE reached_completion) as reached_completion
+        COUNT(*) FILTER (WHERE reached_completion) as reached_completion,
+        -- Accepted counts for funnel (took positive action)
+        COUNT(*) FILTER (WHERE accepted_welcome) as accepted_welcome,
+        COUNT(*) FILTER (WHERE accepted_referral) as accepted_referral,
+        COUNT(*) FILTER (WHERE accepted_location) as accepted_location,
+        COUNT(*) FILTER (WHERE accepted_notification) as accepted_notification,
+        COUNT(*) FILTER (WHERE accepted_contacts) as accepted_contacts,
+        COUNT(*) FILTER (WHERE accepted_feature_router) as accepted_feature_router
     FROM analytics_prod_gold.fct_onboarding_funnel
     WHERE {where_clause}
     """
