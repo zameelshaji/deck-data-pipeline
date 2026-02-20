@@ -153,19 +153,18 @@ st.divider()
 # --- Section B: Onboarding Funnel ---
 st.subheader("📈 Onboarding Funnel")
 
-reached_welcome = int(row.get('reached_welcome', 0))
-reached_referral = int(row.get('reached_referral', 0))
-reached_location = int(row.get('reached_location', 0))
-reached_notification = int(row.get('reached_notification', 0))
-reached_contacts = int(row.get('reached_contacts', 0))
-reached_feature_router = int(row.get('reached_feature_router', 0))
-reached_completion = int(row.get('reached_completion', 0))
+accepted_welcome = int(row.get('accepted_welcome', 0))
+accepted_referral = int(row.get('accepted_referral', 0))
+accepted_location = int(row.get('accepted_location', 0))
+accepted_notification = int(row.get('accepted_notification', 0))
+accepted_contacts = int(row.get('accepted_contacts', 0))
+accepted_feature_router = int(row.get('accepted_feature_router', 0))
 
 funnel_steps = ['Welcome', 'Referral', 'Location', 'Notifications', 'Contacts', 'Feature Router', 'Completed']
-funnel_values = [reached_welcome, reached_referral, reached_location, reached_notification,
-                 reached_contacts, reached_feature_router, total_completed]
+funnel_values = [accepted_welcome, accepted_referral, accepted_location, accepted_notification,
+                 accepted_contacts, accepted_feature_router, total_completed]
 
-if reached_welcome > 0:
+if accepted_welcome > 0:
     fig = go.Figure(go.Funnel(
         y=funnel_steps,
         x=funnel_values,

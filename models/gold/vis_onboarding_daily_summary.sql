@@ -7,7 +7,7 @@ with daily_funnel as (
     select
         onboarding_date,
 
-        -- Step counts
+        -- Step counts (reached = viewed the step)
         count(*) as users_started,
         count(*) filter (where reached_welcome) as reached_welcome,
         count(*) filter (where reached_referral) as reached_referral,
@@ -17,6 +17,14 @@ with daily_funnel as (
         count(*) filter (where reached_feature_router) as reached_feature_router,
         count(*) filter (where reached_completion) as reached_completion,
         count(*) filter (where completed_onboarding) as completed,
+
+        -- Accepted counts (took the positive action at each step)
+        count(*) filter (where accepted_welcome) as accepted_welcome,
+        count(*) filter (where accepted_referral) as accepted_referral,
+        count(*) filter (where accepted_location) as accepted_location,
+        count(*) filter (where accepted_notification) as accepted_notification,
+        count(*) filter (where accepted_contacts) as accepted_contacts,
+        count(*) filter (where accepted_feature_router) as accepted_feature_router,
 
         -- Permission grant counts
         count(*) filter (where location_granted) as location_granted_count,
