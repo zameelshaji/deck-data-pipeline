@@ -183,27 +183,26 @@ with_all_features as (
             1.0
         ) as prompt_specificity_score,
         case
-            -- Mixed: matches 2+ categories
-            when (
-                (lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine|sushi|pizza|burger|pasta|steak|indian|chinese|thai|mexican|italian|japanese|korean|vietnamese|mediterranean|vegan|vegetarian|ramen|noodle|noodles|coffee|cafe|café|tea|cake|dessert|desserts|sweet|sweets|roast|hotpot|hot pot|bistro|diner|bakery|patisserie|dim sum|tapas|bbq|grill|seafood|chicken|wings|dumplings|pancakes|waffles|ice cream|gelato|chai|meal)')
-                AND lower(sp.query_text) ~ '(bar|pub|cocktail|cocktails|wine bar|beer|drinks|drinking|rooftop bar|speakeasy|happy hour|pint|nightlife|clubbing|club|clubs|boozy|shots|gin|rum|whisky|whiskey|brewery)')
-            ) OR (
-                (lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine|sushi|pizza|burger|pasta|steak|indian|chinese|thai|mexican|italian|japanese|korean|vietnamese|mediterranean|vegan|vegetarian|ramen|noodle|noodles|coffee|cafe|café|tea|cake|dessert|desserts|sweet|sweets|roast|hotpot|hot pot|bistro|diner|bakery|patisserie|dim sum|tapas|bbq|grill|seafood|chicken|wings|dumplings|pancakes|waffles|ice cream|gelato|chai|meal)')
-                AND lower(sp.query_text) ~ '(museum|gallery|theatre|theater|show|exhibition|concert|comedy|cinema|bowling|karaoke|escape room|adventure|hiking|climbing|spa|gym|yoga|wellness|park|garden|zoo|aquarium|pottery|painting|craft|crafts|go kart|go-kart|trampoline|axe throwing|mini golf|crazy golf|skating|ice skating|roller|arcade|laser|paintball|dance|dancing|bachata|salsa|class|classes|workshop|tour|market|markets|fireworks|christmas|carnival|festival|fair|event|events|activities|activity|fun things|things to do|day out|team building)')
-            ) OR (
-                (lower(sp.query_text) ~ '(bar|pub|cocktail|cocktails|wine bar|beer|drinks|drinking|rooftop bar|speakeasy|happy hour|pint|nightlife|clubbing|club|clubs|boozy|shots|gin|rum|whisky|whiskey|brewery)')
-                AND lower(sp.query_text) ~ '(museum|gallery|theatre|theater|show|exhibition|concert|comedy|cinema|bowling|karaoke|escape room|adventure|hiking|climbing|spa|gym|yoga|wellness|park|garden|zoo|aquarium|pottery|painting|craft|crafts|go kart|go-kart|trampoline|axe throwing|mini golf|crazy golf|skating|ice skating|roller|arcade|laser|paintball|dance|dancing|bachata|salsa|class|classes|workshop|tour|market|markets|fireworks|christmas|carnival|festival|fair|event|events|activities|activity|fun things|things to do|day out|team building)')
-            )
+            -- Mixed: matches 2+ categories (dining+drinks, dining+activity, or drinks+activity)
+            when
+                (lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine|sushi|pizza|burger|pasta|steak|indian|chinese|thai|mexican|italian|japanese|korean|vietnamese|mediterranean|vegan|vegetarian|ramen|noodle|noodles|coffee|cafe|café|tea|cake|dessert|desserts|sweet|sweets|roast|hotpot|hot pot|bistro|diner|bakery|patisserie|dim sum|tapas|bbq|grill|seafood|chicken|wings|dumplings|pancakes|waffles|ice cream|gelato|chai|meal)'
+                 and lower(sp.query_text) ~ '(bar|pub|cocktail|cocktails|wine bar|beer|drinks|drinking|rooftop bar|speakeasy|happy hour|pint|nightlife|clubbing|club|clubs|boozy|shots|gin|rum|whisky|whiskey|brewery)')
+                or
+                (lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine|sushi|pizza|burger|pasta|steak|indian|chinese|thai|mexican|italian|japanese|korean|vietnamese|mediterranean|vegan|vegetarian|ramen|noodle|noodles|coffee|cafe|café|tea|cake|dessert|desserts|sweet|sweets|roast|hotpot|hot pot|bistro|diner|bakery|patisserie|dim sum|tapas|bbq|grill|seafood|chicken|wings|dumplings|pancakes|waffles|ice cream|gelato|chai|meal)'
+                 and lower(sp.query_text) ~ '(museum|gallery|theatre|theater|show|exhibition|concert|comedy|cinema|bowling|karaoke|escape room|adventure|hiking|climbing|spa|gym|yoga|wellness|park|garden|zoo|aquarium|pottery|painting|craft|crafts|go kart|go-kart|trampoline|axe throwing|mini golf|crazy golf|skating|ice skating|roller|arcade|laser|paintball|dance|dancing|bachata|salsa|class|classes|workshop|tour|market|markets|fireworks|christmas|carnival|festival|fair|event|events|activities|activity|fun things|things to do|day out|team building)')
+                or
+                (lower(sp.query_text) ~ '(bar|pub|cocktail|cocktails|wine bar|beer|drinks|drinking|rooftop bar|speakeasy|happy hour|pint|nightlife|clubbing|club|clubs|boozy|shots|gin|rum|whisky|whiskey|brewery)'
+                 and lower(sp.query_text) ~ '(museum|gallery|theatre|theater|show|exhibition|concert|comedy|cinema|bowling|karaoke|escape room|adventure|hiking|climbing|spa|gym|yoga|wellness|park|garden|zoo|aquarium|pottery|painting|craft|crafts|go kart|go-kart|trampoline|axe throwing|mini golf|crazy golf|skating|ice skating|roller|arcade|laser|paintball|dance|dancing|bachata|salsa|class|classes|workshop|tour|market|markets|fireworks|christmas|carnival|festival|fair|event|events|activities|activity|fun things|things to do|day out|team building)')
             then 'mixed'
             -- Dining
             when lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine|sushi|pizza|burger|pasta|steak|indian|chinese|thai|mexican|italian|japanese|korean|vietnamese|mediterranean|vegan|vegetarian|ramen|noodle|noodles|coffee|cafe|café|tea|cake|dessert|desserts|sweet|sweets|roast|hotpot|hot pot|bistro|diner|bakery|patisserie|dim sum|tapas|bbq|grill|seafood|chicken|wings|dumplings|pancakes|waffles|ice cream|gelato|chai|meal)'
-                then 'dining'
+            then 'dining'
             -- Drinks
             when lower(sp.query_text) ~ '(bar|pub|cocktail|cocktails|wine bar|beer|drinks|drinking|rooftop bar|speakeasy|happy hour|pint|nightlife|clubbing|club|clubs|boozy|shots|gin|rum|whisky|whiskey|brewery)'
-                then 'drinks'
+            then 'drinks'
             -- Activity
             when lower(sp.query_text) ~ '(museum|gallery|theatre|theater|show|exhibition|concert|comedy|cinema|bowling|karaoke|escape room|adventure|hiking|climbing|spa|gym|yoga|wellness|park|garden|zoo|aquarium|pottery|painting|craft|crafts|go kart|go-kart|trampoline|axe throwing|mini golf|crazy golf|skating|ice skating|roller|arcade|laser|paintball|dance|dancing|bachata|salsa|class|classes|workshop|tour|market|markets|fireworks|christmas|carnival|festival|fair|event|events|activities|activity|fun things|things to do|day out|team building|nails|hair|beauty|massage)'
-                then 'activity'
+            then 'activity'
             else 'unknown'
         end as extracted_intent,
 
