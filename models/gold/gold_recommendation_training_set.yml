@@ -1,0 +1,107 @@
+version: 2
+
+models:
+  - name: gold_recommendation_training_set
+    description: >
+      Training dataset for Phase 3 ML recommendation system.
+      Each row is a (prompt_context, candidate_place, swipe_outcome) tuple
+      with ~28 engineered features across four groups: candidate, prompt,
+      session context, and interaction features.
+      Used to train LightGBM pointwise classifier and LambdaRank models.
+    config:
+      tags: ['ml', 'recommendation', 'phase3']
+    columns:
+      # === Identification & Metadata ===
+      - name: label
+        description: "Target variable: 1 = like, 0 = dislike"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1]
+      - name: pack_id
+        description: "Group ID for LambdaRank ranking groups"
+        tests:
+          - not_null
+      - name: user_id
+        description: "User ID for user-level holdout splits"
+        tests:
+          - not_null
+      - name: place_deck_sku
+        description: "Join key to places table via deck_sku"
+      - name: place_id
+        description: "FK to places.id. NULL for unresolved legacy experience cards"
+      - name: query_text
+        description: "Raw prompt text for NLP features"
+      - name: swipe_timestamp
+        description: "Timestamp for temporal holdout split (train on all except last 2 weeks)"
+        tests:
+          - not_null
+      - name: data_source
+        description: "'current' for dextr_places (2025-11-20+), 'legacy' for dextr_pack_cards (2025-09-05 to 2025-11-19)"
+        tests:
+          - accepted_values:
+              values: ['current', 'legacy']
+
+      # === Candidate Features ===
+      - name: rating
+        description: "Google rating. -1 sentinel for unknown"
+      - name: price_level
+        description: "Ordinal 1-4. -1 sentinel for unknown (~60% NULL rate)"
+      - name: user_ratings_total
+        description: "ln(user_ratings_total + 1) log-transformed review count. 0 for unknown"
+      - name: primary_category
+        description: "First element of DECK categories array. For downstream label encoding"
+      - name: num_categories
+        description: "Count of DECK categories. Proxy for venue versatility"
+      - name: primary_type
+        description: "First element of Google types array. For downstream one-hot encoding"
+      - name: num_types
+        description: "Count of Google types"
+      - name: is_reservable
+        description: "0/1 boolean. NULL treated as 0"
+      - name: is_dine_in
+        description: "0/1 boolean. NULL treated as 0"
+      - name: serves_brunch
+        description: "0/1 boolean. NULL treated as 0"
+      - name: serves_beer
+        description: "0/1 boolean. NULL treated as 0"
+      - name: serves_wine
+        description: "0/1 boolean. NULL treated as 0"
+      - name: latitude
+        description: "Raw latitude coordinate"
+      - name: longitude
+        description: "Raw longitude coordinate"
+      - name: historical_like_rate
+        description: "Global like rate for this place across all data, excluding current row to prevent leakage. 0.5 prior for unknown"
+
+      # === Prompt Context Features ===
+      - name: prompt_length
+        description: "Character length of query_text"
+      - name: prompt_word_count
+        description: "Approximate word count of query_text"
+      - name: prompt_specificity_score
+        description: "Heuristic: word_count / 5.0 capped at 1.0"
+      - name: extracted_intent
+        description: "Keyword-classified prompt intent: dining, drinks, activity, mixed, unknown"
+
+      # === Session Context Features ===
+      - name: likes_so_far
+        description: "Count of 'like' actions on cards BEFORE this card in the same pack"
+      - name: dislikes_so_far
+        description: "Count of 'dislike' actions on cards BEFORE this card in the same pack"
+      - name: like_ratio_so_far
+        description: "likes_so_far / total_so_far. 0.5 default when no prior swipes"
+      - name: cards_seen_count
+        description: "Total cards swiped BEFORE this card in the same pack"
+      - name: avg_liked_rating
+        description: "Mean rating of liked places so far in this pack. NULL if no prior likes"
+      - name: avg_liked_price
+        description: "Mean price_level of liked places so far in this pack. NULL if no prior likes"
+
+      # === Interaction Features ===
+      - name: category_overlap_with_likes
+        description: "1 if this place's primary_category matches any previously-liked place's primary_category in the pack, 0 otherwise"
+      - name: price_delta_from_like_avg
+        description: "abs(this_place.price_level - avg_liked_price). NULL if either is unknown"
+      - name: distance_from_like_centroid_km
+        description: "Haversine distance from this place to the mean lat/lng of liked places so far in the pack. NULL if no prior likes"
