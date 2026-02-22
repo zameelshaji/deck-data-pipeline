@@ -121,7 +121,15 @@ swipes_with_places as (
         coalesce(ln(p.user_ratings_total + 1), 0) as user_ratings_total,
         raw_p.categories[1] as primary_category,
         coalesce(array_length(raw_p.categories, 1), 0) as num_categories,
-        raw_p.types[1] as primary_type,
+        lower(
+            coalesce(
+                (select t from unnest(raw_p.types) as t
+                 where lower(t) not in ('point_of_interest', 'establishment', 'food',
+                                        'store', 'health', 'place_of_worship', 'place')
+                 limit 1),
+                raw_p.types[1]
+            )
+        ) as primary_type,
         coalesce(array_length(raw_p.types, 1), 0) as num_types,
         coalesce(p.reservable::int, 0) as is_reservable,
         coalesce(p.dine_in::int, 0) as is_dine_in,
@@ -175,14 +183,26 @@ with_all_features as (
             1.0
         ) as prompt_specificity_score,
         case
-            when lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine)'
-                 and lower(sp.query_text) ~ '(bar|pub|cocktail|drinks|museum|gallery|theatre|show)'
-                then 'mixed'
-            when lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine|sushi|pizza|burger|pasta|steak|indian|chinese|thai|mexican|italian|japanese|korean|vietnamese|mediterranean|vegan|vegetarian)'
+            -- Mixed: matches 2+ categories
+            when (
+                (lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine|sushi|pizza|burger|pasta|steak|indian|chinese|thai|mexican|italian|japanese|korean|vietnamese|mediterranean|vegan|vegetarian|ramen|noodle|noodles|coffee|cafe|café|tea|cake|dessert|desserts|sweet|sweets|roast|hotpot|hot pot|bistro|diner|bakery|patisserie|dim sum|tapas|bbq|grill|seafood|chicken|wings|dumplings|pancakes|waffles|ice cream|gelato|chai|meal)')
+                AND lower(sp.query_text) ~ '(bar|pub|cocktail|cocktails|wine bar|beer|drinks|drinking|rooftop bar|speakeasy|happy hour|pint|nightlife|clubbing|club|clubs|boozy|shots|gin|rum|whisky|whiskey|brewery)')
+            ) OR (
+                (lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine|sushi|pizza|burger|pasta|steak|indian|chinese|thai|mexican|italian|japanese|korean|vietnamese|mediterranean|vegan|vegetarian|ramen|noodle|noodles|coffee|cafe|café|tea|cake|dessert|desserts|sweet|sweets|roast|hotpot|hot pot|bistro|diner|bakery|patisserie|dim sum|tapas|bbq|grill|seafood|chicken|wings|dumplings|pancakes|waffles|ice cream|gelato|chai|meal)')
+                AND lower(sp.query_text) ~ '(museum|gallery|theatre|theater|show|exhibition|concert|comedy|cinema|bowling|karaoke|escape room|adventure|hiking|climbing|spa|gym|yoga|wellness|park|garden|zoo|aquarium|pottery|painting|craft|crafts|go kart|go-kart|trampoline|axe throwing|mini golf|crazy golf|skating|ice skating|roller|arcade|laser|paintball|dance|dancing|bachata|salsa|class|classes|workshop|tour|market|markets|fireworks|christmas|carnival|festival|fair|event|events|activities|activity|fun things|things to do|day out|team building)')
+            ) OR (
+                (lower(sp.query_text) ~ '(bar|pub|cocktail|cocktails|wine bar|beer|drinks|drinking|rooftop bar|speakeasy|happy hour|pint|nightlife|clubbing|club|clubs|boozy|shots|gin|rum|whisky|whiskey|brewery)')
+                AND lower(sp.query_text) ~ '(museum|gallery|theatre|theater|show|exhibition|concert|comedy|cinema|bowling|karaoke|escape room|adventure|hiking|climbing|spa|gym|yoga|wellness|park|garden|zoo|aquarium|pottery|painting|craft|crafts|go kart|go-kart|trampoline|axe throwing|mini golf|crazy golf|skating|ice skating|roller|arcade|laser|paintball|dance|dancing|bachata|salsa|class|classes|workshop|tour|market|markets|fireworks|christmas|carnival|festival|fair|event|events|activities|activity|fun things|things to do|day out|team building)')
+            )
+            then 'mixed'
+            -- Dining
+            when lower(sp.query_text) ~ '(restaurant|food|eat|dinner|lunch|breakfast|brunch|cuisine|sushi|pizza|burger|pasta|steak|indian|chinese|thai|mexican|italian|japanese|korean|vietnamese|mediterranean|vegan|vegetarian|ramen|noodle|noodles|coffee|cafe|café|tea|cake|dessert|desserts|sweet|sweets|roast|hotpot|hot pot|bistro|diner|bakery|patisserie|dim sum|tapas|bbq|grill|seafood|chicken|wings|dumplings|pancakes|waffles|ice cream|gelato|chai|meal)'
                 then 'dining'
-            when lower(sp.query_text) ~ '(bar|pub|cocktail|wine bar|beer|drinks|drinking|rooftop bar|speakeasy|happy hour)'
+            -- Drinks
+            when lower(sp.query_text) ~ '(bar|pub|cocktail|cocktails|wine bar|beer|drinks|drinking|rooftop bar|speakeasy|happy hour|pint|nightlife|clubbing|club|clubs|boozy|shots|gin|rum|whisky|whiskey|brewery)'
                 then 'drinks'
-            when lower(sp.query_text) ~ '(museum|gallery|theatre|theater|show|exhibition|concert|comedy|cinema|bowling|karaoke|escape room|adventure|hiking|climbing|spa|gym|yoga|wellness|park|garden)'
+            -- Activity
+            when lower(sp.query_text) ~ '(museum|gallery|theatre|theater|show|exhibition|concert|comedy|cinema|bowling|karaoke|escape room|adventure|hiking|climbing|spa|gym|yoga|wellness|park|garden|zoo|aquarium|pottery|painting|craft|crafts|go kart|go-kart|trampoline|axe throwing|mini golf|crazy golf|skating|ice skating|roller|arcade|laser|paintball|dance|dancing|bachata|salsa|class|classes|workshop|tour|market|markets|fireworks|christmas|carnival|festival|fair|event|events|activities|activity|fun things|things to do|day out|team building|nails|hair|beauty|massage)'
                 then 'activity'
             else 'unknown'
         end as extracted_intent,
@@ -220,8 +240,8 @@ with_all_features as (
             0
         ) as avg_liked_rating,
 
-        -- Running average price of liked places so far
-        sum(case when sp.user_action = 'like' and sp.raw_price_level is not null then sp.raw_price_level else 0 end)
+        -- Running average price of liked places so far (use numeric to avoid integer truncation)
+        sum(case when sp.user_action = 'like' and sp.raw_price_level is not null then sp.raw_price_level::numeric else 0.0 end)
             over (partition by sp.pack_id order by sp.swipe_timestamp
                   rows between unbounded preceding and 1 preceding)
         / nullif(
@@ -324,27 +344,34 @@ final_training_set as (
             else 0
         end as category_overlap_with_likes,
 
-        -- Price delta from average liked price
+        -- Price delta from average liked price (numeric for decimal precision)
         case
             when raw_price_level is not null and avg_liked_price is not null
-            then abs(raw_price_level - avg_liked_price)
+            then round(abs(raw_price_level::numeric - avg_liked_price), 2)
             else null
         end as price_delta_from_like_avg,
 
-        -- Distance from liked centroid (Haversine in km)
+        -- Distance from liked centroid (Haversine in km, capped at 50km)
         case
             when latitude is not null and centroid_lat is not null
-            then 6371 * acos(
-                least(1.0, greatest(-1.0,
-                    cos(radians(latitude)) * cos(radians(centroid_lat)) *
-                    cos(radians(centroid_lng) - radians(longitude)) +
-                    sin(radians(latitude)) * sin(radians(centroid_lat))
-                ))
+            then least(
+                6371 * acos(
+                    least(1.0, greatest(-1.0,
+                        cos(radians(latitude)) * cos(radians(centroid_lat)) *
+                        cos(radians(centroid_lng) - radians(longitude)) +
+                        sin(radians(latitude)) * sin(radians(centroid_lat))
+                    ))
+                ),
+                50.0
             )
             else null
-        end as distance_from_like_centroid_km
+        end as distance_from_like_centroid_km,
+
+        -- Per-user sample cap: keep first 50 swipes per user to prevent overfitting
+        row_number() over (partition by user_id order by swipe_timestamp) as user_row_num
 
     from with_all_features
 )
 
 select * from final_training_set
+where user_row_num <= 50
