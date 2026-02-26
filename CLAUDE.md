@@ -211,6 +211,17 @@ All source mirrors, 1:1 with Supabase tables.
   - `test_place_resolver_no_duplicate_card_ids` — uniqueness check on place resolver
   - `test_planner_definition_consistency` — validates planner/passenger segmentation logic
 
+### Development Rule: Every New Model Must Have Tests
+
+After building any new model (bronze, silver, or gold), you **must** create corresponding tests before considering the work complete:
+
+1. **Add schema tests** in the appropriate `_schema.yml` (or `sources.yml` for bronze) — at minimum `not_null` and `unique` on primary keys, plus `accepted_values` for any enum/category columns.
+2. **Add a singular test** in `tests/` if the model introduces business logic that could regress (e.g., user filtering, metric definitions, join integrity). The test SQL should return rows on failure.
+3. **Run `dbt test --select model_name`** to verify all new tests pass.
+4. **Commit the test files alongside the model** in the same commit or PR — never merge a model without its tests.
+
+This prevents regressions from going undetected. Existing tests (listed above) were created specifically because past issues slipped through without them.
+
 ## Source Table Status
 
 Sources defined in `models/bronze/sources.yml` include status metadata:
