@@ -1244,3 +1244,1125 @@ def load_onboarding_completion_rate_prior_7d(app_version=None):
     except Exception as e:
         st.error(f"Error loading prior period completion rate: {str(e)}")
         return pd.DataFrame()
+
+
+# ============================================================================
+# SQL Filter Helpers
+# ============================================================================
+
+def _build_date_clause(column, start_date, end_date):
+    """Build date range WHERE clause."""
+    parts = []
+    if start_date:
+        parts.append(f"{column} >= '{start_date}'")
+    if end_date:
+        parts.append(f"{column} <= '{end_date}'")
+    return " AND ".join(parts) if parts else "1=1"
+
+
+def _build_app_version_clause(column, app_version):
+    """Build app version WHERE clause."""
+    if app_version:
+        return f"{column} = '{app_version}'"
+    return "1=1"
+
+
+def _build_activation_week_clause(column, activation_week):
+    """Build activation cohort week WHERE clause."""
+    if activation_week:
+        return f"{column} = '{activation_week}'"
+    return "1=1"
+
+
+def _build_data_source_clause(data_source):
+    """Build data source WHERE clause for fct_north_star_daily."""
+    if data_source and data_source != 'all':
+        return f"data_source = '{data_source}'"
+    return "data_source = 'all'"
+
+
+def _build_session_type_clause(session_type):
+    """Build session type WHERE clause for fct_north_star_daily."""
+    if session_type and session_type != 'all':
+        return f"session_type = '{session_type}'"
+    return "session_type = 'all'"
+
+
+def _build_ns_app_version_clause(app_version):
+    """Build app version clause for fct_north_star_daily (uses 'all' default)."""
+    if app_version:
+        return f"app_version = '{app_version}'"
+    return "app_version = 'all'"
+
+
+# ============================================================================
+# Home Page — New Data Loaders
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_growth_snapshot():
+    """Load DAU/WAU/MAU with growth deltas for Home page."""
+    engine = get_database_connection()
+    query = """
+    SELECT 'dau' as metric,
+           total_active_users as value,
+           wow_growth_percent as delta
+    FROM analytics_prod_gold.vis_daily_active_users
+    ORDER BY activity_date DESC LIMIT 1
+    """
+    query_wau = """
+    SELECT 'wau' as metric,
+           weekly_active_users as value,
+           wow_growth_percent as delta
+    FROM analytics_prod_gold.vis_weekly_active_users
+    ORDER BY activity_week DESC LIMIT 1
+    """
+    query_mau = """
+    SELECT 'mau' as metric,
+           monthly_active_users as value,
+           mom_growth_percent as delta
+    FROM analytics_prod_gold.vis_monthly_active_users
+    ORDER BY activity_month DESC LIMIT 1
+    """
+    try:
+        with engine.connect() as conn:
+            dau = pd.read_sql(text(query), conn)
+            wau = pd.read_sql(text(query_wau), conn)
+            mau = pd.read_sql(text(query_mau), conn)
+        return pd.concat([dau, wau, mau], ignore_index=True)
+    except Exception as e:
+        st.error(f"Error loading growth snapshot: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_dau_sparkline(days=30):
+    """Load last N days of DAU for sparkline on Home page."""
+    engine = get_database_connection()
+    query = f"""
+    SELECT activity_date, total_active_users
+    FROM analytics_prod_gold.vis_daily_active_users
+    WHERE activity_date >= current_date - {days}
+    ORDER BY activity_date
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading DAU sparkline: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_weekly_health_comparison():
+    """Load this week vs last week PSR ladder metrics for Home page."""
+    engine = get_database_connection()
+    query = """
+    WITH this_week AS (
+        SELECT
+            SUM(total_sessions) as total_sessions,
+            SUM(sessions_with_save) as saves,
+            SUM(sessions_with_share) as shares,
+            SUM(sessions_with_psr_broad) as psr,
+            SUM(no_value_sessions) as nvr
+        FROM analytics_prod_gold.fct_north_star_daily
+        WHERE metric_date >= current_date - 7
+          AND data_source = 'all' AND session_type = 'all' AND app_version = 'all'
+    ),
+    last_week AS (
+        SELECT
+            SUM(total_sessions) as total_sessions,
+            SUM(sessions_with_save) as saves,
+            SUM(sessions_with_share) as shares,
+            SUM(sessions_with_psr_broad) as psr,
+            SUM(no_value_sessions) as nvr
+        FROM analytics_prod_gold.fct_north_star_daily
+        WHERE metric_date >= current_date - 14 AND metric_date < current_date - 7
+          AND data_source = 'all' AND session_type = 'all' AND app_version = 'all'
+    )
+    SELECT
+        tw.saves::numeric / NULLIF(tw.total_sessions, 0) as ssr_this_week,
+        lw.saves::numeric / NULLIF(lw.total_sessions, 0) as ssr_last_week,
+        tw.shares::numeric / NULLIF(tw.total_sessions, 0) as shr_this_week,
+        lw.shares::numeric / NULLIF(lw.total_sessions, 0) as shr_last_week,
+        tw.psr::numeric / NULLIF(tw.total_sessions, 0) as psr_this_week,
+        lw.psr::numeric / NULLIF(lw.total_sessions, 0) as psr_last_week,
+        tw.nvr::numeric / NULLIF(tw.total_sessions, 0) as nvr_this_week,
+        lw.nvr::numeric / NULLIF(lw.total_sessions, 0) as nvr_last_week
+    FROM this_week tw, last_week lw
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading weekly health comparison: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_top_places_this_week():
+    """Load top 5 places saved this week for Home page."""
+    engine = get_database_connection()
+    query = """
+    SELECT place_name, category, saves_last_7d,
+           ROUND(save_rate * 100, 1) as save_rate_pct
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE saves_last_7d > 0
+    ORDER BY saves_last_7d DESC
+    LIMIT 5
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading top places: {str(e)}")
+        return pd.DataFrame()
+
+
+# ============================================================================
+# Page 1: North Star — Session Diagnostics Loader
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_session_diagnostics(start_date=None, end_date=None, app_version=None):
+    """Load session diagnostics aggregated by week."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('session_date', start_date, end_date)
+    av_clause = _build_app_version_clause('effective_app_version', app_version)
+
+    query = f"""
+    SELECT
+        session_week,
+        COUNT(*) as total_sessions,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE is_no_value_session) / NULLIF(COUNT(*), 0), 1) as pct_zero_action,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE save_count = 0 AND NOT is_no_value_session) / NULLIF(COUNT(*), 0), 1) as pct_swipe_no_save,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE is_genuine_planning_attempt) / NULLIF(COUNT(*), 0), 1) as pct_genuine_planning,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY time_to_first_save_seconds)
+            FILTER (WHERE time_to_first_save_seconds IS NOT NULL AND time_to_first_save_seconds > 0) as median_ttfs,
+        AVG(session_duration_seconds) FILTER (WHERE session_duration_seconds > 0) as avg_duration
+    FROM analytics_prod_gold.fct_session_outcomes
+    WHERE {date_clause}
+      AND {av_clause}
+    GROUP BY session_week
+    ORDER BY session_week
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading session diagnostics: {str(e)}")
+        return pd.DataFrame()
+
+
+# ============================================================================
+# Page 2: Engagement — Data Loaders
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_engagement_trajectory_weekly(start_date=None, end_date=None, activation_week=None):
+    """Load weekly engagement trajectory aggregated across users."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('activity_week', start_date, end_date)
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        activity_week,
+        COUNT(DISTINCT user_id) as active_users,
+        ROUND(AVG(sessions_count), 2) as avg_sessions_per_user,
+        ROUND(AVG(prompts_count), 2) as avg_prompts_per_user,
+        ROUND(AVG(saves_count), 2) as avg_saves_per_user,
+        ROUND(AVG(shares_count), 2) as avg_shares_per_user
+    FROM analytics_prod_gold.fct_user_engagement_trajectory
+    WHERE {date_clause}
+      AND {aw_clause}
+    GROUP BY activity_week
+    ORDER BY activity_week
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading engagement trajectory: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_session_depth_weekly(start_date=None, end_date=None, activation_week=None):
+    """Load weekly session depth metrics."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('activity_week', start_date, end_date)
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        activity_week,
+        ROUND(AVG(swipes_count / NULLIF(sessions_count, 0)), 1) as avg_swipes_per_session,
+        ROUND(AVG(avg_session_duration_seconds), 0) as avg_session_duration,
+        ROUND(AVG(avg_time_to_first_save_seconds), 0) as avg_ttfs
+    FROM analytics_prod_gold.fct_user_engagement_trajectory
+    WHERE {date_clause}
+      AND {aw_clause}
+    GROUP BY activity_week
+    ORDER BY activity_week
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading session depth: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_engagement_quality_weekly(start_date=None, end_date=None, activation_week=None):
+    """Load session quality composition per week."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('activity_week', start_date, end_date)
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        activity_week,
+        ROUND(AVG(pct_sessions_zero_actions), 3) as avg_pct_zero_actions,
+        ROUND(AVG(pct_sessions_swipe_no_save), 3) as avg_pct_swipe_no_save,
+        ROUND(AVG(pct_sessions_with_save), 3) as avg_pct_with_save,
+        ROUND(AVG(pct_sessions_with_share), 3) as avg_pct_with_share
+    FROM analytics_prod_gold.fct_user_engagement_trajectory
+    WHERE {date_clause}
+      AND {aw_clause}
+    GROUP BY activity_week
+    ORDER BY activity_week
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading engagement quality: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_swipe_to_save_weekly(start_date=None, end_date=None, activation_week=None):
+    """Load swipe-to-save conversion rate by week."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('activity_week', start_date, end_date)
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        activity_week,
+        ROUND(AVG(swipe_to_save_rate), 4) as avg_swipe_to_save_rate
+    FROM analytics_prod_gold.fct_user_engagement_trajectory
+    WHERE {date_clause}
+      AND {aw_clause}
+      AND swipe_to_save_rate IS NOT NULL
+    GROUP BY activity_week
+    ORDER BY activity_week
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading swipe-to-save: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_engagement_cohort_heatmap():
+    """Load engagement by cohort heatmap data."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        activation_week,
+        weeks_since_activation,
+        ROUND(AVG(saves_count), 2) as avg_saves,
+        ROUND(AVG(sessions_count), 2) as avg_sessions,
+        COUNT(DISTINCT user_id) as user_count
+    FROM analytics_prod_gold.fct_user_engagement_trajectory
+    WHERE weeks_since_activation <= 12
+    GROUP BY activation_week, weeks_since_activation
+    ORDER BY activation_week, weeks_since_activation
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading engagement cohort heatmap: {str(e)}")
+        return pd.DataFrame()
+
+
+# ============================================================================
+# Page 3: Users & Cohorts — Data Loaders
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_archetype_distribution(activation_week=None):
+    """Load user archetype distribution."""
+    engine = get_database_connection()
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        user_archetype,
+        COUNT(*) as user_count,
+        ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 1) as pct
+    FROM analytics_prod_gold.fct_user_segments
+    WHERE is_activated = true
+      AND {aw_clause}
+    GROUP BY user_archetype
+    ORDER BY user_count DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading archetype distribution: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_top_users(sort_by='total_saves', activation_week=None, limit=15):
+    """Load top users by a specified metric."""
+    engine = get_database_connection()
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+    allowed_sorts = {'total_saves', 'total_sessions', 'total_shares'}
+    sort_col = sort_by if sort_by in allowed_sorts else 'total_saves'
+
+    query = f"""
+    SELECT username, total_saves, total_sessions, total_shares,
+           activation_date, user_archetype, last_activity_date, retained_d30
+    FROM analytics_prod_gold.fct_user_segments
+    WHERE is_activated = true
+      AND {aw_clause}
+    ORDER BY {sort_col} DESC
+    LIMIT {limit}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading top users: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_activation_summary(activation_week=None):
+    """Load activation analysis summary."""
+    engine = get_database_connection()
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        COUNT(*) as total_activated,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE activated_in_first_session) / NULLIF(COUNT(*), 0), 1) as pct_first_session,
+        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY days_to_activation)
+            FILTER (WHERE days_to_activation IS NOT NULL) as median_days_to_activation,
+        COUNT(*) FILTER (WHERE activation_trigger = 'save') as trigger_save,
+        COUNT(*) FILTER (WHERE activation_trigger = 'share') as trigger_share,
+        COUNT(*) FILTER (WHERE activation_trigger = 'prompt') as trigger_prompt
+    FROM analytics_prod_gold.fct_user_segments
+    WHERE is_activated = true
+      AND {aw_clause}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading activation summary: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_cohort_quality_table():
+    """Load full cohort quality table."""
+    engine = get_database_connection()
+    query = """
+    SELECT * FROM analytics_prod_gold.fct_cohort_quality
+    ORDER BY activation_week DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading cohort quality: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_retention_heatmap_data():
+    """Load retention data for heatmap."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        cohort_week,
+        cohort_size,
+        retention_rate_d7,
+        retention_rate_d30,
+        mature_d7,
+        mature_d30,
+        retained_d7,
+        retained_d30
+    FROM analytics_prod_gold.fct_retention_by_cohort_week
+    WHERE mature_d7 >= 3
+    ORDER BY cohort_week DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading retention heatmap: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_churn_analysis(activation_week=None):
+    """Load churn analysis metrics."""
+    engine = get_database_connection()
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        COUNT(*) as total_churned,
+        COUNT(*) FILTER (WHERE total_saves = 0) as churned_zero_saves,
+        COUNT(*) FILTER (WHERE total_saves > 0) as churned_with_saves,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE total_saves = 0) / NULLIF(COUNT(*), 0), 1) as pct_zero_saves
+    FROM analytics_prod_gold.fct_user_segments
+    WHERE is_churned = true
+      AND {aw_clause}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading churn analysis: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_churn_risk_distribution(activation_week=None):
+    """Load churn risk distribution."""
+    engine = get_database_connection()
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+
+    query = f"""
+    SELECT churn_risk, COUNT(*) as user_count
+    FROM analytics_prod_gold.fct_user_segments
+    WHERE is_activated = true AND {aw_clause}
+    GROUP BY churn_risk
+    ORDER BY CASE churn_risk WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading churn risk distribution: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_planner_vs_passenger(activation_week=None):
+    """Load planner vs passenger comparison."""
+    engine = get_database_connection()
+    aw_clause = _build_activation_week_clause('activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        CASE WHEN is_planner THEN 'Planner' ELSE 'Passenger' END as segment,
+        COUNT(*) as user_count,
+        ROUND(AVG(total_sessions), 1) as avg_sessions,
+        ROUND(AVG(total_saves), 1) as avg_saves,
+        ROUND(AVG(total_shares), 1) as avg_shares,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE retained_d30) / NULLIF(COUNT(*), 0), 1) as retention_d30_pct,
+        ROUND(AVG(avg_session_duration_seconds), 0) as avg_duration
+    FROM analytics_prod_gold.fct_user_segments
+    WHERE is_activated = true AND (is_planner OR is_passenger)
+      AND {aw_clause}
+    GROUP BY CASE WHEN is_planner THEN 'Planner' ELSE 'Passenger' END
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading planner vs passenger: {str(e)}")
+        return pd.DataFrame()
+
+
+# ============================================================================
+# Page 4: AI & Prompts — Data Loaders
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_prompt_headline_kpis(start_date=None, end_date=None, app_version=None, activation_week=None):
+    """Load prompt headline KPIs."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('query_date', start_date, end_date)
+    av_clause = _build_app_version_clause('app_version', app_version)
+    aw_clause = _build_activation_week_clause('user_activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        COUNT(DISTINCT query_id) as total_prompts,
+        ROUND(100.0 * COUNT(DISTINCT query_id) FILTER (WHERE zero_save_prompt) / NULLIF(COUNT(DISTINCT query_id), 0), 1) as zero_save_pct,
+        ROUND(AVG(save_rate), 4) as avg_save_rate,
+        ROUND(AVG(cards_generated), 1) as avg_cards_generated,
+        COUNT(DISTINCT query_id) FILTER (WHERE led_to_save) as prompts_leading_to_save,
+        COUNT(DISTINCT query_id) FILTER (WHERE led_to_share) as prompts_leading_to_share
+    FROM analytics_prod_gold.fct_prompt_analysis
+    WHERE {date_clause}
+      AND {av_clause}
+      AND {aw_clause}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading prompt KPIs: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_prompt_action_funnel(start_date=None, end_date=None, app_version=None, activation_week=None):
+    """Load prompt-to-action funnel."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('query_date', start_date, end_date)
+    av_clause = _build_app_version_clause('app_version', app_version)
+    aw_clause = _build_activation_week_clause('user_activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        COUNT(DISTINCT query_id) as total_prompts,
+        COALESCE(SUM(cards_generated), 0) as total_cards_generated,
+        COALESCE(SUM(cards_shown), 0) as total_cards_shown,
+        COALESCE(SUM(cards_saved), 0) as total_cards_saved,
+        COUNT(DISTINCT query_id) FILTER (WHERE led_to_share) as led_to_share
+    FROM analytics_prod_gold.fct_prompt_analysis
+    WHERE {date_clause}
+      AND {av_clause}
+      AND {aw_clause}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading prompt funnel: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_prompt_intent_performance(start_date=None, end_date=None, app_version=None, activation_week=None):
+    """Load prompt performance by intent."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('query_date', start_date, end_date)
+    av_clause = _build_app_version_clause('app_version', app_version)
+    aw_clause = _build_activation_week_clause('user_activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        COALESCE(prompt_intent, 'unknown') as prompt_intent,
+        COUNT(DISTINCT query_id) as prompt_count,
+        ROUND(AVG(save_rate), 4) as avg_save_rate,
+        ROUND(AVG(cards_generated), 1) as avg_cards_generated,
+        ROUND(100.0 * COUNT(DISTINCT query_id) FILTER (WHERE zero_save_prompt) / NULLIF(COUNT(DISTINCT query_id), 0), 1) as zero_save_pct,
+        COUNT(DISTINCT query_id) FILTER (WHERE led_to_share) as led_to_share_count
+    FROM analytics_prod_gold.fct_prompt_analysis
+    WHERE {date_clause}
+      AND {av_clause}
+      AND {aw_clause}
+    GROUP BY COALESCE(prompt_intent, 'unknown')
+    ORDER BY prompt_count DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading prompt intent performance: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_prompt_specificity(start_date=None, end_date=None, app_version=None, activation_week=None):
+    """Load prompt specificity analysis."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('query_date', start_date, end_date)
+    av_clause = _build_app_version_clause('app_version', app_version)
+    aw_clause = _build_activation_week_clause('user_activation_week', activation_week)
+
+    query = f"""
+    SELECT
+        prompt_specificity,
+        COUNT(DISTINCT query_id) as count,
+        ROUND(AVG(save_rate), 4) as avg_save_rate,
+        ROUND(AVG(cards_generated), 1) as avg_cards_generated,
+        ROUND(100.0 * COUNT(DISTINCT query_id) FILTER (WHERE zero_save_prompt) / NULLIF(COUNT(DISTINCT query_id), 0), 1) as zero_save_pct
+    FROM analytics_prod_gold.fct_prompt_analysis
+    WHERE prompt_specificity IS NOT NULL
+      AND {date_clause}
+      AND {av_clause}
+      AND {aw_clause}
+    GROUP BY prompt_specificity
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading prompt specificity: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_zero_save_trend(start_date=None, end_date=None, app_version=None):
+    """Load zero-save prompt trend by week."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('query_date', start_date, end_date)
+    av_clause = _build_app_version_clause('app_version', app_version)
+
+    query = f"""
+    SELECT
+        DATE_TRUNC('week', query_date)::date as prompt_week,
+        COUNT(DISTINCT query_id) as total_prompts,
+        COUNT(DISTINCT query_id) FILTER (WHERE zero_save_prompt) as zero_save_count,
+        ROUND(100.0 * COUNT(DISTINCT query_id) FILTER (WHERE zero_save_prompt) / NULLIF(COUNT(DISTINCT query_id), 0), 1) as zero_save_pct
+    FROM analytics_prod_gold.fct_prompt_analysis
+    WHERE {date_clause}
+      AND {av_clause}
+    GROUP BY DATE_TRUNC('week', query_date)::date
+    ORDER BY prompt_week
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading zero-save trend: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_zero_save_prompts_detail(start_date=None, end_date=None, app_version=None, limit=20):
+    """Load most common zero-save prompts."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('query_date', start_date, end_date)
+    av_clause = _build_app_version_clause('app_version', app_version)
+
+    query = f"""
+    SELECT
+        query_text,
+        COUNT(*) as occurrences,
+        ROUND(AVG(cards_generated), 1) as avg_cards_gen,
+        ROUND(AVG(cards_shown), 1) as avg_cards_shown
+    FROM analytics_prod_gold.fct_prompt_analysis
+    WHERE zero_save_prompt = true
+      AND {date_clause}
+      AND {av_clause}
+    GROUP BY query_text
+    ORDER BY occurrences DESC
+    LIMIT {limit}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading zero-save prompts: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_reprompting_analysis(start_date=None, end_date=None, app_version=None):
+    """Load re-prompting analysis."""
+    engine = get_database_connection()
+    date_clause = _build_date_clause('query_date', start_date, end_date)
+    av_clause = _build_app_version_clause('app_version', app_version)
+
+    query = f"""
+    SELECT
+        CASE WHEN total_prompts_in_session > 1 THEN '2+ prompts' ELSE '1 prompt' END as session_type,
+        COUNT(DISTINCT session_id) as session_count,
+        ROUND(AVG(save_rate), 4) as avg_save_rate,
+        ROUND(100.0 * COUNT(DISTINCT query_id) FILTER (WHERE led_to_save) / NULLIF(COUNT(DISTINCT query_id), 0), 1) as pct_led_to_save
+    FROM analytics_prod_gold.fct_prompt_analysis
+    WHERE session_id IS NOT NULL
+      AND {date_clause}
+      AND {av_clause}
+    GROUP BY CASE WHEN total_prompts_in_session > 1 THEN '2+ prompts' ELSE '1 prompt' END
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading re-prompting analysis: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_pack_performance_top_bottom():
+    """Load top and bottom packs by save rate."""
+    engine = get_database_connection()
+    query = """
+    SELECT * FROM analytics_prod_gold.fct_pack_performance
+    WHERE total_cards_generated >= 3
+    ORDER BY save_rate DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading pack performance: {str(e)}")
+        return pd.DataFrame()
+
+
+# ============================================================================
+# Page 5: Content & Places — Data Loaders
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_distinct_categories():
+    """Get distinct categories from fct_place_performance."""
+    engine = get_database_connection()
+    query = """
+    SELECT DISTINCT category
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE category IS NOT NULL
+    ORDER BY category
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df['category'].tolist()
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=300)
+def load_content_overview_kpis(categories=None):
+    """Load content overview KPIs."""
+    engine = get_database_connection()
+    cat_filter = f"AND category = ANY(ARRAY{categories})" if categories else ""
+
+    query = f"""
+    SELECT
+        COUNT(*) as total_places,
+        COUNT(*) FILTER (WHERE total_impressions > 0) as places_with_impressions,
+        ROUND(AVG(save_rate) FILTER (WHERE total_impressions >= 5), 4) as avg_save_rate,
+        ROUND(AVG(right_swipe_rate) FILTER (WHERE total_impressions >= 5), 4) as avg_right_swipe_rate,
+        ROUND(AVG(total_impressions), 1) as avg_impressions
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE 1=1 {cat_filter}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading content KPIs: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_top_places(categories=None, min_impressions=5, limit=20, sort_by='save_rate', sort_order='DESC'):
+    """Load top performing places."""
+    engine = get_database_connection()
+    cat_filter = f"AND category = ANY(ARRAY{categories})" if categories else ""
+    allowed_sorts = {'save_rate', 'total_impressions', 'total_saves', 'right_swipe_rate'}
+    sort_col = sort_by if sort_by in allowed_sorts else 'save_rate'
+
+    query = f"""
+    SELECT place_name, category, neighborhood, total_impressions,
+           ROUND(save_rate * 100, 1) as save_rate_pct,
+           ROUND(right_swipe_rate * 100, 1) as swipe_rate_pct,
+           total_saves, viral_score, rating
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE total_impressions >= {min_impressions}
+      {cat_filter}
+    ORDER BY {sort_col} {sort_order}
+    LIMIT {limit}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading top places: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_bad_recommendations(categories=None):
+    """Load places with high impressions but low saves."""
+    engine = get_database_connection()
+    cat_filter = f"AND category = ANY(ARRAY{categories})" if categories else ""
+
+    query = f"""
+    SELECT place_name, category, neighborhood, total_impressions,
+           ROUND(save_rate * 100, 1) as save_rate_pct, total_saves, total_left_swipes
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE total_impressions >= 10 AND save_rate < 0.05
+      {cat_filter}
+    ORDER BY total_impressions DESC
+    LIMIT 20
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading bad recommendations: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_category_performance():
+    """Load category-level performance."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        category,
+        COUNT(*) as place_count,
+        SUM(total_impressions) as total_impressions,
+        SUM(total_saves) as total_saves,
+        ROUND(100.0 * SUM(total_saves) / NULLIF(SUM(total_impressions), 0), 1) as save_rate_pct,
+        ROUND(100.0 * SUM(total_right_swipes) / NULLIF(SUM(total_impressions), 0), 1) as swipe_rate_pct,
+        SUM(total_shares) as total_shares
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE total_impressions >= 1 AND category IS NOT NULL
+    GROUP BY category
+    ORDER BY total_impressions DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading category performance: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_neighborhood_performance():
+    """Load neighborhood-level performance."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        neighborhood,
+        COUNT(*) as place_count,
+        SUM(total_impressions) as total_impressions,
+        SUM(total_saves) as total_saves,
+        ROUND(100.0 * SUM(total_saves) / NULLIF(SUM(total_impressions), 0), 1) as save_rate_pct,
+        ROUND(100.0 * SUM(total_right_swipes) / NULLIF(SUM(total_impressions), 0), 1) as swipe_rate_pct,
+        SUM(total_shares) as total_shares
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE total_impressions >= 1 AND neighborhood IS NOT NULL
+    GROUP BY neighborhood
+    HAVING SUM(total_impressions) >= 10
+    ORDER BY total_impressions DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading neighborhood performance: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_price_level_performance():
+    """Load price level performance."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        price_level,
+        COUNT(*) as place_count,
+        ROUND(100.0 * SUM(total_saves) / NULLIF(SUM(total_impressions), 0), 1) as save_rate_pct,
+        SUM(total_impressions) as total_impressions,
+        SUM(total_saves) as total_saves
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE price_level IS NOT NULL AND total_impressions >= 1
+    GROUP BY price_level
+    ORDER BY price_level
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading price level performance: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_viral_content():
+    """Load top viral content."""
+    engine = get_database_connection()
+    query = """
+    SELECT place_name, category, viral_score, total_saves, total_shares,
+           ROUND(save_rate * 100, 1) as save_rate_pct
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE viral_score > 0
+    ORDER BY viral_score DESC
+    LIMIT 10
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading viral content: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_scatter_data(categories=None):
+    """Load data for impressions vs saves scatter plot."""
+    engine = get_database_connection()
+    cat_filter = f"AND category = ANY(ARRAY{categories})" if categories else ""
+
+    query = f"""
+    SELECT place_name, category, neighborhood, rating,
+           total_impressions, save_rate, total_saves
+    FROM analytics_prod_gold.fct_place_performance
+    WHERE total_impressions >= 3
+      {cat_filter}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading scatter data: {str(e)}")
+        return pd.DataFrame()
+
+
+# ============================================================================
+# Page 6: Conversion & Viral — Data Loaders
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_conversion_overview():
+    """Load conversion signals overview."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        COUNT(*) as total_conversions,
+        COUNT(*) FILTER (WHERE action_type = 'opened_website') as opened_website,
+        COUNT(*) FILTER (WHERE action_type = 'book_with_deck') as book_with_deck,
+        COUNT(*) FILTER (WHERE action_type = 'click_directions') as click_directions,
+        COUNT(*) FILTER (WHERE action_type = 'click_phone') as click_phone
+    FROM analytics_prod_gold.fct_conversion_signals
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading conversion overview: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_conversion_context():
+    """Load conversion context metrics."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        COUNT(*) as total,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE was_saved_first) / NULLIF(COUNT(*), 0), 1) as pct_saved_first,
+        ROUND(AVG(time_from_save_to_conversion_minutes) FILTER (WHERE time_from_save_to_conversion_minutes IS NOT NULL), 1) as avg_minutes_to_convert,
+        ROUND(100.0 * COUNT(*) FILTER (WHERE was_prompt_initiated) / NULLIF(COUNT(*), 0), 1) as pct_prompt_initiated
+    FROM analytics_prod_gold.fct_conversion_signals
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading conversion context: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_conversion_by_category():
+    """Load conversions by place category."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        COALESCE(place_category, 'Unknown') as place_category,
+        COUNT(*) as conversion_count
+    FROM analytics_prod_gold.fct_conversion_signals
+    GROUP BY COALESCE(place_category, 'Unknown')
+    ORDER BY conversion_count DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading conversion by category: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_viral_loop_summary():
+    """Load viral loop summary metrics."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        COUNT(*) as total_shares,
+        ROUND(AVG(unique_viewers), 1) as avg_viewers,
+        ROUND(AVG(signup_conversion_rate), 4) as avg_signup_rate,
+        ROUND(AVG(effective_k_factor), 4) as avg_k_factor,
+        SUM(viewers_who_signed_up) as total_signups_from_shares
+    FROM analytics_prod_gold.fct_viral_loop
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading viral loop summary: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_viral_loop_detail():
+    """Load viral loop detail table."""
+    engine = get_database_connection()
+    query = """
+    SELECT share_link_id, share_type, sharer_archetype,
+           unique_viewers, viewers_who_signed_up,
+           ROUND(signup_conversion_rate * 100, 1) as signup_rate_pct,
+           ROUND(effective_k_factor, 3) as k_factor
+    FROM analytics_prod_gold.fct_viral_loop
+    ORDER BY unique_viewers DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading viral loop detail: {str(e)}")
+        return pd.DataFrame()
