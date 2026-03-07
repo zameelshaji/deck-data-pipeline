@@ -18,7 +18,15 @@ This is the **deck_analytics** dbt project — the data pipeline for DECK, a soc
   - `stg_unified_sessions` — unified sessions (inferred + native)
   - `int_place_resolver` — maps any card_id format to places.place_id
   - `stg_users` — user master table with test user flag
-- **Gold** (`models/gold/`): Analytics-ready fact and visualization tables. Prefixes: `fct_` (fact tables), `vis_` (dashboard visualization tables). Several legacy models are disabled in `dbt_project.yml`.
+- **Gold** (`models/gold/`): Analytics-ready fact and visualization tables. Prefixes: `fct_` (fact tables), `vis_` (dashboard visualization tables), plus `gold_recommendation_training_set` (ML feature store). Several legacy models are disabled in `dbt_project.yml`. Key model groups:
+  - **North Star**: `fct_north_star_daily`, `fct_north_star_weekly` — PSR metrics with WoW tracking
+  - **Sessions**: `fct_session_outcomes`, `fct_session_explorer` — session-level PSR ladder and diagnostic JSONB details
+  - **Users**: `fct_user_segments`, `fct_user_engagement_trajectory`, `fct_user_activation`, `fct_user_retention`
+  - **Funnels**: `fct_onboarding_funnel`, `fct_signup_to_activation_funnel`, `fct_activation_funnel`
+  - **Content**: `fct_place_performance`, `fct_pack_performance`, `fct_prompt_analysis`
+  - **Growth**: `fct_viral_loop`, `fct_conversion_signals`, `fct_cohort_quality`, `fct_active_planners`, `fct_retention_by_cohort_week`, `fct_retention_activated`
+  - **ML**: `gold_recommendation_training_set` — 28 engineered features for LightGBM/LambdaRank place recommendation models
+  - **Visualization**: 12 `vis_*` tables powering Streamlit dashboard widgets (includes `vis_onboarding_daily_summary`)
 
 ### Data Eras
 
@@ -87,11 +95,17 @@ models/
     _schema.yml     # Column-level docs for gold models
 seeds/              # Static reference data (test_accounts.csv, app_version_releases.csv, suppliers.csv)
 tests/              # Custom data tests (singular tests)
-analyses/           # Ad-hoc SQL analyses and data dictionaries
+analyses/           # Ad-hoc SQL analyses, data dictionaries, and Python inspection scripts
 macros/             # (empty — no custom macros)
 snapshots/          # (empty — no snapshots configured)
 dashboard/          # Streamlit dashboard app
+  Home.py           # Landing page
   pages/            # Multi-page Streamlit pages
+    2_North_Star_Metrics.py
+    3_Activation_Retention.py
+    5_Monthly_Summary.py
+    6_Onboarding.py
+    7_Power_User_Deep_Dive.py
   utils/            # DB connection, data loading, styling, visualizations
 ```
 
@@ -102,7 +116,8 @@ dashboard/          # Streamlit dashboard app
 - **Silver intermediate**: `int_<descriptive_name>` (e.g., `int_place_resolver`, `int_session_app_versions`)
 - **Gold facts**: `fct_<metric_domain>` (e.g., `fct_session_outcomes`, `fct_north_star_daily`)
 - **Gold visualizations**: `vis_<dashboard_widget>` (e.g., `vis_headline_metrics`, `vis_daily_active_users`)
-- **Schema files**: `_schema.yml` for model documentation, `sources.yml` for source definitions
+- **Gold ML models**: `gold_<purpose>` (e.g., `gold_recommendation_training_set`)
+- **Schema files**: `_schema.yml` for model documentation, `sources.yml` for source definitions. `gold_recommendation_training_set.yml` has its own dedicated schema file.
 
 ## SQL Style
 
@@ -124,6 +139,7 @@ dashboard/          # Streamlit dashboard app
   - `test_cohort_key_is_activation_week` — ensures cohort keys are Mondays
   - `test_place_resolver_no_duplicate_card_ids` — uniqueness check on place resolver
   - `test_planner_definition_consistency` — validates planner/passenger segmentation logic
+- **ML data quality tests** (in `gold_recommendation_training_set.yml`): Schema-level tests including `test_no_future_leakage_training_set` to prevent temporal data leakage in ML features
 
 ## Disabling Models
 
@@ -135,4 +151,6 @@ Models are disabled in `dbt_project.yml` under the `models:` config block using 
 - Dashboard secrets are in `dashboard/.streamlit/secrets.toml` (gitignored). Use `secrets.toml.template` as reference.
 - The `packages.txt` lists system dependencies (`libpq-dev`) for the Postgres adapter.
 - Gold layer output tables use schema `analytics_prod_gold` in the database.
-- Several Python utility scripts exist at the repo root (`check_tables.py`, `test_tables.py`, `show_summary.py`, etc.) for ad-hoc database inspection.
+- Python utility scripts for ad-hoc database inspection are in `analyses/` (`check_tables.py`, `test_tables.py`, `show_summary.py`, etc.).
+- `analyses/` also contains gold layer reference docs: `gold_layer_data_dictionary.md`, `gold_layer_example_queries.sql`, `gold_layer_cleanup.sql`.
+- `gold_recommendation_training_set` is an ML feature store with 28 engineered features across 4 groups (candidate, prompt context, session context, interaction) for place recommendation ranking. It has its own dedicated `.yml` schema file.

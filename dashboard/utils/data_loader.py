@@ -141,19 +141,12 @@ def load_dextr_performance(days=90):
 
 @st.cache_data(ttl=300)
 def load_supplier_performance():
-    """Load supplier performance data"""
-    engine = get_database_connection()
+    """Load supplier performance data.
 
-    query = """
-    SELECT *
-    FROM analytics_prod_gold.vis_supplier_performance
-    ORDER BY engagement_score DESC, total_impressions DESC
+    NOTE: vis_supplier_performance is disabled in dbt_project.yml.
+    This function will error if called. Kept as stub for reference.
     """
-
-    with engine.connect() as conn:
-        df = pd.read_sql(text(query), conn)
-
-    return df
+    return pd.DataFrame()
 
 
 @st.cache_data(ttl=300)
@@ -224,12 +217,13 @@ def load_latest_wau():
 
 @st.cache_data(ttl=300)
 def load_total_multiplayer_sessions():
-    """Load total multiplayer sessions to date"""
+    """Load total multiplayer sessions to date from gold layer."""
     engine = get_database_connection()
 
     query = """
-    SELECT COUNT(*) as total_multiplayer_sessions
-    FROM analytics_prod_silver.stg_multiplayer 
+    SELECT total_multiplayer_sessions
+    FROM analytics_prod_gold.vis_homepage_totals
+    LIMIT 1
     """
 
     try:
@@ -263,13 +257,13 @@ def load_total_decks_created():
 
 @st.cache_data(ttl=300)
 def load_referral_metrics():
-    """Load referral metrics for Home page"""
+    """Load referral metrics for Home page from gold layer."""
     engine = get_database_connection()
 
     query = """
     SELECT
-        COALESCE(COUNT(DISTINCT referred_user_id), 0) as total_referrals_made
-    FROM analytics_prod_silver.stg_referral_relationships
+        COALESCE(SUM(referrals_used), 0) as total_referrals_made
+    FROM analytics_prod_gold.vis_referral_analytics
     """
 
     try:
@@ -302,38 +296,13 @@ def load_giveaway_metrics():
 
 @st.cache_data(ttl=300)
 def load_cohort_retention_monthly(months=12):
+    """Load monthly user cohort retention data.
+
+    NOTE: vis_user_cohort_retention_monthly (user_cohort_retention_monthly) is
+    disabled in dbt_project.yml. This function will return empty. Use
+    fct_retention_by_cohort_week for weekly cohort retention instead.
     """
-    Load monthly user cohort retention data
-
-    Args:
-        months: Number of months to look back for cohorts (default 12)
-
-    Returns:
-        DataFrame with monthly cohort retention rates
-    """
-    engine = get_database_connection()
-
-    query = f"""
-    SELECT
-        cohort_month,
-        cohort_size,
-        months_since_activation,
-        month_label,
-        users_active,
-        retention_rate
-    FROM analytics_prod_gold.vis_user_cohort_retention_monthly
-    WHERE cohort_month >= current_date - interval '{months} months'
-        AND months_since_activation <= 12  -- Show up to 12 months of retention
-    ORDER BY cohort_month DESC, months_since_activation ASC
-    """
-
-    try:
-        with engine.begin() as conn:
-            df = pd.read_sql(text(query), conn)
-        return df
-    except Exception as e:
-        st.error(f"Error loading monthly cohort retention: {str(e)}")
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 
 @st.cache_data(ttl=300)
@@ -689,62 +658,13 @@ def load_app_versions_with_dates():
 
 @st.cache_data(ttl=300)
 def load_monthly_retention_summary_metrics():
-    """Load summary metrics for monthly retention performance"""
-    engine = get_database_connection()
+    """Load summary metrics for monthly retention performance.
 
-    query = """
-    WITH recent_cohorts AS (
-        -- Get cohorts from last 6 months with sufficient data
-        SELECT
-            cohort_month,
-            cohort_size,
-            months_since_activation,
-            retention_rate
-        FROM analytics_prod_gold.vis_user_cohort_retention_monthly
-        WHERE cohort_month >= current_date - interval '6 months'
-            AND cohort_month < current_date - interval '1 month'  -- Exclude current month
-            AND months_since_activation IN (1, 2, 3, 6)  -- Month 1, 2, 3, and 6 retention
-    )
-
-    SELECT
-        -- Average retention rates
-        AVG(CASE WHEN months_since_activation = 1 THEN retention_rate END) as avg_month1_retention,
-        AVG(CASE WHEN months_since_activation = 2 THEN retention_rate END) as avg_month2_retention,
-        AVG(CASE WHEN months_since_activation = 3 THEN retention_rate END) as avg_month3_retention,
-        AVG(CASE WHEN months_since_activation = 6 THEN retention_rate END) as avg_month6_retention,
-
-        -- Best performing cohort
-        MAX(CASE WHEN months_since_activation = 1 THEN retention_rate END) as best_month1_retention,
-        MAX(CASE WHEN months_since_activation = 3 THEN retention_rate END) as best_month3_retention,
-
-        -- Cohort sizes
-        AVG(cohort_size) as avg_cohort_size,
-        SUM(CASE WHEN months_since_activation = 1 THEN cohort_size END) as total_users_analyzed,
-
-        -- Retention trend (comparing early vs later cohorts)
-        AVG(CASE
-            WHEN months_since_activation = 1
-                AND cohort_month >= current_date - interval '3 months'
-            THEN retention_rate
-        END) as recent_month1_retention,
-
-        AVG(CASE
-            WHEN months_since_activation = 1
-                AND cohort_month < current_date - interval '3 months'
-                AND cohort_month >= current_date - interval '6 months'
-            THEN retention_rate
-        END) as older_month1_retention
-
-    FROM recent_cohorts
+    NOTE: vis_user_cohort_retention_monthly (user_cohort_retention_monthly) is
+    disabled in dbt_project.yml. This function will return empty. Use
+    fct_retention_by_cohort_week for weekly cohort retention instead.
     """
-
-    try:
-        with engine.begin() as conn:
-            df = pd.read_sql(text(query), conn)
-        return df
-    except Exception as e:
-        st.error(f"Error loading monthly retention summary: {str(e)}")
-        return pd.DataFrame()
+    return pd.DataFrame()
 
 
 # ============================================================================

@@ -236,7 +236,7 @@ def load_user_conversions(user_id: str):
         session_id,
         was_prompt_initiated,
         prompt_text
-    FROM analytics_prod_gold.fct_conversions
+    FROM analytics_prod_gold.fct_conversion_signals
     WHERE user_id = :uid
     ORDER BY action_timestamp DESC
     """
