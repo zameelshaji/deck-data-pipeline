@@ -121,17 +121,19 @@ st.subheader("PSR Ladder Funnel")
 if not ladder_df.empty:
     row = ladder_df.iloc[0]
     total_s = int(row.get('total_sessions', 0))
+    prompt_s = int(row.get('sessions_with_prompt', 0))
     saves_s = int(row.get('sessions_with_save', 0))
     shares_s = int(row.get('sessions_with_share', 0))
     psr_b = int(row.get('sessions_with_psr_broad', 0))
 
     if total_s > 0:
         fig = go.Figure(go.Funnel(
-            y=['Total Sessions', 'Sessions with Save (SSR)', 'Sessions with Share (SHR)', 'PSR Broad (Save+Share)'],
-            x=[total_s, saves_s, shares_s, psr_b],
+            y=['Total Sessions', 'Sessions with Prompt', 'Sessions with Save (SSR)', 'Sessions with Share (SHR)', 'PSR Broad (Save+Share)'],
+            x=[total_s, prompt_s, saves_s, shares_s, psr_b],
             textinfo="value+percent initial",
             marker=dict(color=[
                 BRAND_COLORS['info'],
+                BRAND_COLORS['primary'],
                 BRAND_COLORS['accent'],
                 '#E91E8C',
                 BRAND_COLORS['success'],

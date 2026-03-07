@@ -191,3 +191,4 @@ from {{ ref('stg_cards') }} c
 left join card_aggregates ca on c.card_id = ca.card_id
 left join card_packs cp on c.card_id = cp.card_id
 left join places_meta pm on ca.resolved_place_id = pm.place_id
+where c.card_type = 'post-gemini'

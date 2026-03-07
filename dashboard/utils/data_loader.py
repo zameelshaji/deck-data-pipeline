@@ -462,9 +462,31 @@ def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_
       AND {date_filter}
     """
 
+    # Get prompt session count based on session_type filter
+    if session_type == 'prompt':
+        prompt_query = None  # prompt count = total_sessions
+    elif session_type == 'non_prompt':
+        prompt_query = None  # prompt count = 0
+    else:
+        prompt_query = f"""
+        SELECT COALESCE(SUM(total_sessions), 0) as sessions_with_prompt
+        FROM analytics_prod_gold.fct_north_star_daily
+        WHERE data_source = '{data_source}'
+          AND session_type = 'prompt'
+          AND app_version = {av_filter}
+          AND {date_filter}
+        """
+
     try:
         with engine.connect() as conn:
             df = pd.read_sql(text(query), conn)
+            if session_type == 'prompt':
+                df['sessions_with_prompt'] = df['total_sessions']
+            elif session_type == 'non_prompt':
+                df['sessions_with_prompt'] = 0
+            else:
+                prompt_df = pd.read_sql(text(prompt_query), conn)
+                df['sessions_with_prompt'] = int(prompt_df.iloc[0]['sessions_with_prompt']) if not prompt_df.empty else 0
         return df
     except Exception as e:
         st.error(f"Error loading PSR ladder: {str(e)}")
@@ -554,6 +576,39 @@ def load_activation_funnel_data(data_source='all', session_type='all', start_dat
         return df
     except Exception as e:
         st.error(f"Error loading activation funnel: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_signup_to_activation_funnel(start_date=None, end_date=None):
+    """Load signup-to-activation funnel from fct_signup_to_activation_funnel."""
+    engine = get_database_connection()
+
+    date_filter = "1=1"
+    if start_date and end_date:
+        date_filter = f"signup_week >= '{start_date}' AND signup_week <= '{end_date}'"
+    elif start_date:
+        date_filter = f"signup_week >= '{start_date}'"
+    elif end_date:
+        date_filter = f"signup_week <= '{end_date}'"
+
+    query = f"""
+    SELECT
+        COALESCE(SUM(total_signups), 0) as total_signups,
+        COALESCE(SUM(had_app_open_7d), 0) as had_app_open_7d,
+        COALESCE(SUM(had_planning_initiated_7d), 0) as had_planning_initiated_7d,
+        COALESCE(SUM(had_content_engagement_7d), 0) as had_content_engagement_7d,
+        COALESCE(SUM(had_activation_7d), 0) as had_activation_7d
+    FROM analytics_prod_gold.fct_signup_to_activation_funnel
+    WHERE {date_filter}
+    """
+
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading signup-to-activation funnel: {str(e)}")
         return pd.DataFrame()
 
 
@@ -1640,7 +1695,8 @@ def load_top_users(sort_by='total_saves', activation_week=None, limit=15):
     sort_col = sort_by if sort_by in allowed_sorts else 'total_saves'
 
     query = f"""
-    SELECT username, total_saves, total_sessions, total_shares,
+    SELECT COALESCE(username, email) as display_name,
+           total_saves, total_sessions, total_shares,
            activation_date, user_archetype, last_activity_date, retained_d30
     FROM analytics_prod_gold.fct_user_segments
     WHERE is_activated = true

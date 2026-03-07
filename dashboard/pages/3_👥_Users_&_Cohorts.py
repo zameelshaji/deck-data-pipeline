@@ -13,6 +13,7 @@ from utils.data_loader import (
     load_archetype_distribution,
     load_top_users,
     load_activation_summary,
+    load_signup_to_activation_funnel,
     load_cohort_quality_table,
     load_retention_heatmap_data,
     load_churn_analysis,
@@ -233,6 +234,68 @@ else:
             showlegend=False,
         )
         st.plotly_chart(fig_triggers, use_container_width=True)
+
+st.divider()
+
+# =============================================================================
+# Section C2: Signup-to-Activation Funnel
+# =============================================================================
+st.subheader("Signup to Activation Funnel")
+
+try:
+    s2a_df = load_signup_to_activation_funnel(
+        start_date=filters.get('start_date'),
+        end_date=filters.get('end_date'),
+    )
+except Exception:
+    s2a_df = pd.DataFrame()
+
+if s2a_df.empty:
+    st.info("No signup-to-activation funnel data available. Run `dbt run --select fct_signup_to_activation_funnel` first.")
+else:
+    s2a = s2a_df.iloc[0]
+    signups = int(s2a.get('total_signups', 0))
+    app_open = int(s2a.get('had_app_open_7d', 0))
+    planning = int(s2a.get('had_planning_initiated_7d', 0))
+    content = int(s2a.get('had_content_engagement_7d', 0))
+    activated = int(s2a.get('had_activation_7d', 0))
+
+    if signups > 0:
+        fig_s2a = go.Figure(go.Funnel(
+            y=['Signups', 'App Open (7d)', 'Planning Initiated (7d)', 'Content Engagement (7d)', 'Activated (7d)'],
+            x=[signups, app_open, planning, content, activated],
+            textinfo="value+percent initial",
+            marker=dict(color=[
+                BRAND_COLORS['info'],
+                BRAND_COLORS['primary'],
+                BRAND_COLORS['accent'],
+                '#E91E8C',
+                BRAND_COLORS['success'],
+            ]),
+        ))
+        fig_s2a.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            font=dict(family="Inter, system-ui, sans-serif", size=13),
+            plot_bgcolor='white', paper_bgcolor='white',
+        )
+        st.plotly_chart(fig_s2a, use_container_width=True)
+
+        # Step conversion rates
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            rate = (app_open / signups * 100) if signups > 0 else 0
+            st.metric("Signup → App Open", f"{rate:.1f}%")
+        with col2:
+            rate = (planning / app_open * 100) if app_open > 0 else 0
+            st.metric("App Open → Planning", f"{rate:.1f}%")
+        with col3:
+            rate = (content / planning * 100) if planning > 0 else 0
+            st.metric("Planning → Content", f"{rate:.1f}%")
+        with col4:
+            rate = (activated / content * 100) if content > 0 else 0
+            st.metric("Content → Activated", f"{rate:.1f}%")
+    else:
+        st.info("No signups found in the selected date range.")
 
 st.divider()
 
