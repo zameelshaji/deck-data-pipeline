@@ -234,7 +234,7 @@ if not weekly_df.empty:
 
     if not weekly_ap.empty:
         fig.add_trace(
-            go.Bar(x=weekly_ap['period_start'], y=weekly_ap['planner_count'],
+            go.Bar(x=weekly_ap['period_start'], y=weekly_ap['active_planners'],
                    name='Weekly Active Planners', marker_color='rgba(99, 102, 241, 0.3)'),
             secondary_y=True
         )
@@ -269,12 +269,12 @@ try:
         fig = go.Figure()
         if not weekly_ap.empty:
             fig.add_trace(go.Scatter(
-                x=weekly_ap['period_start'], y=weekly_ap['planner_count'],
+                x=weekly_ap['period_start'], y=weekly_ap['active_planners'],
                 name='WAP', line=dict(color='#E91E8C', width=2),
             ))
         if not monthly_ap.empty:
             fig.add_trace(go.Scatter(
-                x=monthly_ap['period_start'], y=monthly_ap['planner_count'],
+                x=monthly_ap['period_start'], y=monthly_ap['active_planners'],
                 name='MAP', line=dict(color=BRAND_COLORS['accent'], width=2),
             ))
         fig.update_layout(
