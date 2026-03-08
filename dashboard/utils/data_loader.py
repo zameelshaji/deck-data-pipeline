@@ -449,6 +449,7 @@ def load_psr_ladder_current(data_source='all', session_type='all', days=30, app_
     query = f"""
     SELECT
         COALESCE(SUM(total_sessions), 0) as total_sessions,
+        COALESCE(SUM(sessions_with_3plus_swipes), 0) as sessions_with_3plus_swipes,
         COALESCE(SUM(sessions_with_save), 0) as sessions_with_save,
         COALESCE(SUM(sessions_with_share), 0) as sessions_with_share,
         COALESCE(SUM(sessions_with_psr_broad), 0) as sessions_with_psr_broad,

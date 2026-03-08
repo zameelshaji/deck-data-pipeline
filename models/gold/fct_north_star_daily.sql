@@ -6,6 +6,7 @@ with daily_metrics as (
         coalesce(effective_app_version, 'unknown') as av,
 
         count(*) as total_sessions,
+        count(*) filter (where has_3plus_swipes) as sessions_with_3plus_swipes,
         count(*) filter (where has_save) as sessions_with_save,
         count(*) filter (where has_share) as sessions_with_share,
         count(*) filter (where meets_psr_broad) as sessions_with_psr_broad,
@@ -38,7 +39,7 @@ expanded as (
     -- All app versions, per ds × st
     select
         metric_date, ds, st, 'all' as av,
-        sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
+        sum(total_sessions), sum(sessions_with_3plus_swipes), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
@@ -52,7 +53,7 @@ expanded as (
     -- All data sources, per st × av
     select
         metric_date, 'all' as ds, st, av,
-        sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
+        sum(total_sessions), sum(sessions_with_3plus_swipes), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
@@ -66,7 +67,7 @@ expanded as (
     -- All session types, per ds × av
     select
         metric_date, ds, 'all' as st, av,
-        sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
+        sum(total_sessions), sum(sessions_with_3plus_swipes), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
@@ -80,7 +81,7 @@ expanded as (
     -- All ds + all st, per av
     select
         metric_date, 'all' as ds, 'all' as st, av,
-        sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
+        sum(total_sessions), sum(sessions_with_3plus_swipes), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
@@ -94,7 +95,7 @@ expanded as (
     -- All ds + all av, per st
     select
         metric_date, 'all' as ds, st, 'all' as av,
-        sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
+        sum(total_sessions), sum(sessions_with_3plus_swipes), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
@@ -108,7 +109,7 @@ expanded as (
     -- All st + all av, per ds
     select
         metric_date, ds, 'all' as st, 'all' as av,
-        sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
+        sum(total_sessions), sum(sessions_with_3plus_swipes), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
@@ -122,7 +123,7 @@ expanded as (
     -- All combined
     select
         metric_date, 'all' as ds, 'all' as st, 'all' as av,
-        sum(total_sessions), sum(sessions_with_save), sum(sessions_with_share),
+        sum(total_sessions), sum(sessions_with_3plus_swipes), sum(sessions_with_save), sum(sessions_with_share),
         sum(sessions_with_psr_broad), sum(sessions_with_psr_strict),
         sum(no_value_sessions), sum(sessions_with_pir), sum(sessions_with_attribution),
         sum(genuine_planning_sessions),
@@ -139,6 +140,7 @@ with_rates as (
         st as session_type,
         av as app_version,
         total_sessions,
+        sessions_with_3plus_swipes,
         sessions_with_save,
         sessions_with_share,
         sessions_with_psr_broad,

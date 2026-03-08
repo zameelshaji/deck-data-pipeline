@@ -18,7 +18,8 @@ with sessions_base as (
         save_count as inline_save_count,
         share_count as inline_share_count,
         unique_cards_interacted as inline_unique_cards_interacted,
-        query_count as inline_query_count
+        query_count as inline_query_count,
+        swipe_count as inline_swipe_count
     from {{ ref('stg_unified_sessions') }}
 ),
 
@@ -85,8 +86,10 @@ outcomes as (
         coalesce(psi.interaction_count, 0) > 0 as has_post_share_interaction,
         coalesce(sv.save_count, s.inline_save_count, 0) as save_count,
         coalesce(sh.share_count, s.inline_share_count, 0) as share_count,
+        coalesce(s.inline_swipe_count, 0) as swipe_count,
 
         -- PSR ladder flags
+        coalesce(s.inline_swipe_count, 0) >= 3 as has_3plus_swipes,
         coalesce(sv.save_count, s.inline_save_count, 0) > 0 as meets_ssr,
         coalesce(sh.share_count, s.inline_share_count, 0) > 0 as meets_shr,
         (coalesce(sv.save_count, s.inline_save_count, 0) > 0 and coalesce(sh.share_count, s.inline_share_count, 0) > 0) as meets_psr_broad,
