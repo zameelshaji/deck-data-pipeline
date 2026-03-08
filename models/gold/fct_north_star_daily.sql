@@ -170,6 +170,7 @@ with_rolling as (
         avg(ssr) over (partition by data_source, session_type, app_version order by metric_date rows between 6 preceding and current row) as ssr_7d_avg,
         avg(shr) over (partition by data_source, session_type, app_version order by metric_date rows between 6 preceding and current row) as shr_7d_avg,
         avg(psr_broad) over (partition by data_source, session_type, app_version order by metric_date rows between 6 preceding and current row) as psr_broad_7d_avg,
+        avg(nvr) over (partition by data_source, session_type, app_version order by metric_date rows between 6 preceding and current row) as nvr_7d_avg,
 
         ssr - lag(ssr, 7) over (partition by data_source, session_type, app_version order by metric_date) as ssr_wow_change,
         psr_broad - lag(psr_broad, 7) over (partition by data_source, session_type, app_version order by metric_date) as psr_broad_wow_change

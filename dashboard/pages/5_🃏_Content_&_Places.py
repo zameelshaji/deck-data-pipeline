@@ -54,21 +54,24 @@ try:
                 help="Total number of unique places that have been shown to users"
             )
         with c2:
+            avg_save = row.get('avg_save_rate')
             st.metric(
                 "Overall Save Rate",
-                f"{row.get('avg_save_rate', 0) * 100:.1f}%",
+                f"{float(avg_save) * 100:.1f}%" if pd.notna(avg_save) else "N/A",
                 help="Average save rate across all places (saves / impressions)"
             )
         with c3:
+            avg_swipe = row.get('avg_right_swipe_rate')
             st.metric(
                 "Overall Swipe Rate",
-                f"{row.get('avg_right_swipe_rate', 0) * 100:.1f}%",
+                f"{float(avg_swipe) * 100:.1f}%" if pd.notna(avg_swipe) else "N/A",
                 help="Average right-swipe rate across all places"
             )
         with c4:
+            avg_imp = row.get('avg_impressions')
             st.metric(
                 "Avg Impressions per Place",
-                f"{row.get('avg_impressions', 0):.1f}",
+                f"{float(avg_imp):.1f}" if pd.notna(avg_imp) else "N/A",
                 help="Average number of times each place has been shown"
             )
 except Exception as e:
