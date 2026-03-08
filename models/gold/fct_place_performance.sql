@@ -172,6 +172,14 @@ select
         else 0
     end as viral_score,
 
+    -- Category flags
+    c.is_adventure,
+    c.is_culture,
+    c.is_dining,
+    c.is_entertainment,
+    c.is_health,
+    c.is_drinks,
+
     -- Pack context
     coalesce(cp.packs_appeared_in, 0) as packs_appeared_in,
 

@@ -2124,8 +2124,8 @@ def load_content_overview_kpis(categories=None):
     SELECT
         COUNT(*) as total_places,
         COUNT(*) FILTER (WHERE total_impressions > 0) as places_with_impressions,
-        ROUND(AVG(save_rate) FILTER (WHERE total_impressions >= 5), 4) as avg_save_rate,
-        ROUND(AVG(right_swipe_rate) FILTER (WHERE total_impressions >= 5), 4) as avg_right_swipe_rate,
+        ROUND(AVG(save_rate) FILTER (WHERE total_impressions >= 1), 4) as avg_save_rate,
+        ROUND(AVG(right_swipe_rate) FILTER (WHERE total_impressions >= 1), 4) as avg_right_swipe_rate,
         ROUND(AVG(total_impressions), 1) as avg_impressions
     FROM analytics_prod_gold.fct_place_performance
     WHERE 1=1 {cat_filter}
@@ -2140,7 +2140,7 @@ def load_content_overview_kpis(categories=None):
 
 
 @st.cache_data(ttl=300)
-def load_top_places(categories=None, min_impressions=5, limit=20, sort_by='save_rate', sort_order='DESC'):
+def load_top_places(categories=None, min_impressions=1, limit=20, sort_by='save_rate', sort_order='DESC'):
     """Load top performing places."""
     engine = get_database_connection()
     cat_filter = f"AND category = ANY(ARRAY{categories})" if categories else ""
@@ -2177,7 +2177,7 @@ def load_bad_recommendations(categories=None):
     SELECT place_name, category, neighborhood, total_impressions,
            ROUND(save_rate * 100, 1) as save_rate_pct, total_saves, total_left_swipes
     FROM analytics_prod_gold.fct_place_performance
-    WHERE total_impressions >= 10 AND save_rate < 0.05
+    WHERE total_impressions >= 3 AND save_rate < 0.05
       {cat_filter}
     ORDER BY total_impressions DESC
     LIMIT 20

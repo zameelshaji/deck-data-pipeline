@@ -84,7 +84,7 @@ with
         'post-gemini' as card_type,  -- ✅ Added 'as'
         is_featured,
         name,  -- text
-        null::character varying as category,  -- match experience_cards type
+        categories[1]::character varying as category,  -- primary category from array
         rating,  -- numeric(3,2) → compatible with numeric
         price_level,  -- integer
         location_lat,  -- numeric (already cast in src_places)

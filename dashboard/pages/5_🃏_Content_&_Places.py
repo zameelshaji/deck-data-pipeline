@@ -85,7 +85,7 @@ st.divider()
 st.subheader("Top Performing Places")
 
 try:
-    top_places_df = load_top_places(selected_categories, min_impressions=5, limit=20)
+    top_places_df = load_top_places(selected_categories, min_impressions=1, limit=20)
 
     if top_places_df.empty:
         st.info("No data available for the selected filters.")
