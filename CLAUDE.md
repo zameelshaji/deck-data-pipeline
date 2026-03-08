@@ -23,7 +23,7 @@ This is the **deck_analytics** dbt project — the data pipeline for DECK, a soc
   - **Sessions**: `fct_session_outcomes`, `fct_session_explorer` — session-level PSR ladder and diagnostic JSONB details
   - **Users**: `fct_user_segments`, `fct_user_engagement_trajectory`, `fct_user_activation`, `fct_user_retention`
   - **Funnels**: `fct_onboarding_funnel`, `fct_signup_to_activation_funnel`, `fct_activation_funnel`
-  - **Content**: `fct_place_performance`, `fct_pack_performance`, `fct_prompt_analysis`
+  - **Content**: `fct_place_performance` (post-gemini places only), `fct_pack_performance`, `fct_prompt_analysis`
   - **Growth**: `fct_viral_loop`, `fct_conversion_signals`, `fct_cohort_quality`, `fct_active_planners`, `fct_retention_by_cohort_week`, `fct_retention_activated`
   - **ML**: `gold_recommendation_training_set` — 28 engineered features for LightGBM/LambdaRank place recommendation models
   - **Visualization**: 12 `vis_*` tables powering Streamlit dashboard widgets (includes `vis_onboarding_daily_summary`)
@@ -100,13 +100,16 @@ macros/             # (empty — no custom macros)
 snapshots/          # (empty — no snapshots configured)
 dashboard/          # Streamlit dashboard app
   Home.py           # Landing page
-  pages/            # Multi-page Streamlit pages
-    2_North_Star_Metrics.py
-    3_Activation_Retention.py
-    5_Monthly_Summary.py
-    6_Onboarding.py
-    7_Power_User_Deep_Dive.py
-  utils/            # DB connection, data loading, styling, visualizations
+  pages/            # Multi-page Streamlit pages (8-page architecture)
+    1_🎯_North_Star.py         # PSR ladder funnel, metrics over time, active planners
+    2_📈_Engagement.py         # Session trends, engagement metrics
+    3_👥_Users_&_Cohorts.py    # Archetypes, leaderboard, activation/signup funnel, retention, churn
+    4_🤖_AI_&_Prompts.py       # Prompt analysis, AI performance
+    5_🃏_Content_&_Places.py   # Place/card performance (post-gemini only)
+    6_🔄_Conversion_&_Viral.py # Conversion signals, viral loop
+    7_🚀_Onboarding.py         # Onboarding funnel
+    8_🔍_Power_User_Deep_Dive.py # Power user diagnostics
+  utils/            # DB connection, data loading, styling, filters
 ```
 
 ## Naming Conventions
@@ -144,6 +147,15 @@ dashboard/          # Streamlit dashboard app
 ## Disabling Models
 
 Models are disabled in `dbt_project.yml` under the `models:` config block using `+enabled: false`. Comments explain the reason (broken dependencies, replaced by newer models, etc.). Do not delete disabled model files — they serve as reference.
+
+## Dashboard–Model Column Mapping
+
+When referencing gold model columns in dashboard code, use the actual column names from the SQL models — not assumed names. Key columns that have caused bugs:
+
+- `fct_active_planners`: uses `active_planners` (not `planner_count`)
+- `fct_north_star_daily`: rolling averages are `ssr_7d_avg`, `shr_7d_avg`, `psr_broad_7d_avg`, `nvr_7d_avg`
+- `fct_user_segments`: has both `username` and `email`; dashboard uses `COALESCE(username, email) as display_name`
+- `fct_place_performance`: filtered to `card_type = 'post-gemini'` only; aggregate KPIs (`avg_save_rate`, `avg_right_swipe_rate`) can be NULL — always guard with `pd.notna()` checks
 
 ## Important Notes
 
