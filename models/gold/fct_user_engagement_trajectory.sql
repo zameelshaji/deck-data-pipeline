@@ -42,25 +42,27 @@ session_weekly as (
     group by s.user_id, s.session_week
 ),
 
--- Weekly event-level aggregates per user
+-- Weekly event-level aggregates per user (exclude test users)
 event_weekly as (
     select
-        user_id,
-        date_trunc('week', event_timestamp)::date as activity_week,
-        count(*) filter (where event_type = 'query') as prompts_count,
-        count(*) filter (where event_type in ('swipe_left', 'swipe_right')) as swipes_count,
+        e.user_id,
+        date_trunc('week', e.event_timestamp)::date as activity_week,
+        count(*) filter (where e.event_type = 'query') as prompts_count,
+        count(*) filter (where e.event_type in ('swipe_left', 'swipe_right')) as swipes_count,
         count(*) filter (
-            where event_type in ('swipe_left', 'swipe_right', 'place_detail_view_open', 'detail_view')
+            where e.event_type in ('swipe_left', 'swipe_right', 'place_detail_view_open', 'detail_view')
         ) as cards_viewed,
         count(*) filter (
-            where event_type in ('opened_website', 'book_with_deck', 'click_directions', 'click_phone')
+            where e.event_type in ('opened_website', 'book_with_deck', 'click_directions', 'click_phone')
         ) as conversions_count,
-        count(distinct card_id) filter (
-            where card_id is not null
+        count(distinct e.card_id) filter (
+            where e.card_id is not null
         ) as unique_places_interacted,
-        count(distinct date(event_timestamp)) as days_active_in_week
-    from {{ ref('stg_unified_events') }}
-    group by user_id, date_trunc('week', event_timestamp)::date
+        count(distinct date(e.event_timestamp)) as days_active_in_week
+    from {{ ref('stg_unified_events') }} e
+    inner join {{ ref('stg_users') }} u on e.user_id = u.user_id
+    where u.is_test_user = 0
+    group by e.user_id, date_trunc('week', e.event_timestamp)::date
 ),
 
 -- Cumulative metrics via window functions

@@ -29,9 +29,9 @@ with queries as (
     where u.is_test_user = 0
 ),
 
--- Map queries to sessions via timestamp overlap
+-- Map queries to sessions via timestamp overlap (pick shortest session to avoid overlapping session fan-out)
 query_sessions as (
-    select
+    select distinct on (q.query_id)
         q.query_id,
         s.session_id,
         s.session_date,
@@ -44,6 +44,7 @@ query_sessions as (
     inner join {{ ref('fct_session_outcomes') }} s
         on q.user_id = s.user_id
         and q.query_timestamp between s.started_at and s.ended_at
+    order by q.query_id, (s.ended_at - s.started_at)
 ),
 
 -- Count saves attributed to each pack (from board_places_v2)

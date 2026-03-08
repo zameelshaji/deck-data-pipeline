@@ -28,9 +28,9 @@ with pack_queries as (
       and di.pack_id is not null
 ),
 
--- Map packs to sessions
+-- Map packs to sessions (pick shortest session to avoid overlapping session fan-out)
 pack_sessions as (
-    select
+    select distinct on (pq.pack_id)
         pq.pack_id,
         s.session_id,
         s.has_save as session_has_save,
@@ -40,6 +40,7 @@ pack_sessions as (
     inner join {{ ref('fct_session_outcomes') }} s
         on pq.user_id = s.user_id
         and pq.query_timestamp between s.started_at and s.ended_at
+    order by pq.pack_id, (s.ended_at - s.started_at)
 ),
 
 -- Count saves per pack from board_places_v2

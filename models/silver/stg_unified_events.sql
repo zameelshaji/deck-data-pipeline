@@ -117,7 +117,7 @@ clicks_from_entity_tables as (
     select
         user_id,
         timestamp as event_timestamp,
-        'conversion' as event_type,
+        action_type as event_type,
         card_id::text as card_id,
         source_id::text as pack_id,
         'core_card_actions' as source_table,
@@ -174,6 +174,10 @@ telemetry_events as (
             when event_name = 'deck_shared' then 'deck_share'
             when event_name = 'swipe_right' then 'swipe_right'
             when event_name = 'swipe_left' then 'swipe_left'
+            when event_name = 'place_opened_website' then 'opened_website'
+            when event_name = 'place_book_with_deck' then 'book_with_deck'
+            when event_name = 'place_click_directions' then 'click_directions'
+            when event_name = 'place_click_phone' then 'click_phone'
             else event_name
         end as event_type,
         card_id::text as card_id,

@@ -17,8 +17,8 @@ with card_engagement as (
         count(case when e.event_category = 'Conversion' then 1 end) as conversions,
         count(case when e.event_category = 'Share' then 1 end) as shares,
         count(case when e.event_type = 'save' then 1 end) as saves,
-        count(case when e.event_type = 'conversion' and e.source_table = 'core_card_actions' then 1 end) as bookings,
-        count(case when e.event_type = 'conversion' then 1 end) as website_visits,
+        count(case when e.event_type = 'book_with_deck' then 1 end) as bookings,
+        count(case when e.event_type = 'opened_website' then 1 end) as website_visits,
 
         count(distinct e.user_id) as unique_users_engaged,
         count(distinct date(e.event_timestamp)) as days_with_activity,
