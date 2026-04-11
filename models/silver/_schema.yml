@@ -183,3 +183,158 @@ models:
         description: "Data era of the session"
       - name: is_genuine_planning_attempt
         description: "TRUE if session had at least one prompt, save, or share"
+
+  - name: stg_session_swipes
+    description: "Per-session swipe aggregate (telemetry era) with per-origin_surface pivots. Grain: one row per (session_id, user_id). Downstream: fct_session_outcomes, fct_surface_performance."
+    columns:
+      - name: session_id
+        description: "Native session_id"
+        tests:
+          - not_null
+      - name: user_id
+        description: "User who swiped"
+        tests:
+          - not_null
+      - name: total_swipe_count
+        description: "All swipes in the session (right + left)"
+      - name: right_swipe_count
+        description: "Right swipes (likes)"
+      - name: left_swipe_count
+        description: "Left swipes (dislikes)"
+      - name: unique_cards_swiped
+        description: "Distinct cards swiped"
+      - name: first_swipe_at
+        description: "Timestamp of first swipe"
+      - name: last_swipe_at
+        description: "Timestamp of last swipe"
+
+  - name: stg_session_saves_by_surface
+    description: "Per-session save aggregate pivoted by origin_surface and save_method. Grain: one row per (session_id, user_id). Conservation invariant enforced by test_session_save_surface_conservation: save_count = sum(all pivots). Downstream: fct_session_outcomes, fct_surface_performance."
+    columns:
+      - name: session_id
+        description: "Native session_id"
+        tests:
+          - not_null
+      - name: user_id
+        description: "User who saved"
+        tests:
+          - not_null
+      - name: save_count
+        description: "Total saves in session"
+      - name: primary_save_surface
+        description: "Surface with the most saves in this session (ties broken alphabetically)"
+
+  - name: stg_session_multiplayer
+    description: "Per-session multiplayer engagement counts (created/joined/voted). Grain: one row per (session_id, user_id). Feeds fct_multiplayer_engagement and fct_session_outcomes."
+    columns:
+      - name: session_id
+        description: "Native session_id"
+        tests:
+          - not_null
+      - name: user_id
+        description: "User"
+        tests:
+          - not_null
+      - name: mp_sessions_created
+        description: "Multiplayer sessions the user created in this planning session"
+      - name: mp_sessions_joined
+        description: "Multiplayer sessions the user joined"
+      - name: mp_votes_cast
+        description: "Votes cast in multiplayer sessions"
+      - name: distinct_multiplayer_ids
+        description: "Unique multiplayer sessions touched"
+
+  - name: stg_session_dextr
+    description: "Per-session Dextr query → result funnel (telemetry era). Grain: one row per (session_id, user_id). Captures the query_submitted → results_viewed step that was previously invisible. Feeds fct_dextr_funnel."
+    columns:
+      - name: session_id
+        description: "Native session_id"
+        tests:
+          - not_null
+      - name: user_id
+        description: "User"
+        tests:
+          - not_null
+      - name: queries_submitted
+        description: "Dextr queries submitted in this session"
+      - name: results_views
+        description: "Dextr result pages viewed in this session"
+      - name: fast_path_queries
+        description: "Queries launched from the suggestion pill shortcut"
+      - name: first_query_to_result_seconds
+        description: "Heuristic query→result latency (first query to first result view within the same session)"
+
+  - name: stg_session_navigation
+    description: "Per-session navigation / browsing aggregate: card views, board views, place detail opens, whats_next taps. Grain: one row per (session_id, user_id). Downstream: fct_session_outcomes, fct_session_explorer."
+    columns:
+      - name: session_id
+        description: "Native session_id"
+        tests:
+          - not_null
+      - name: user_id
+        description: "User"
+        tests:
+          - not_null
+      - name: card_view_count
+        description: "card_viewed events in session"
+      - name: board_view_count
+        description: "board_viewed events in session"
+      - name: place_detail_view_count
+        description: "place_detail_view_open events in session"
+      - name: whats_next_tap_count
+        description: "whats_next_tapped events in session"
+
+  - name: stg_social_graph_events
+    description: "Event-grain social graph edges: user_followed/unfollowed and deck_liked/unliked. Not session-grain because social actions are cross-session. Normalized into (actor_user_id, target_kind, target_id, edge_action). Feeds fct_social_graph and fct_viral_loop."
+    columns:
+      - name: event_id
+        description: "Unique event id from app_events"
+        tests:
+          - not_null
+      - name: event_name
+        description: "Raw event_name"
+      - name: occurred_at
+        description: "Event timestamp"
+      - name: actor_user_id
+        description: "User who performed the action"
+      - name: target_kind
+        description: "Target type: 'user' or 'board'"
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['user', 'board']
+      - name: target_id
+        description: "ID of the target user or board"
+      - name: edge_action
+        description: "'add' (follow/like) or 'remove' (unfollow/unlike)"
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['add', 'remove']
+
+  - name: stg_permission_events
+    description: "User-grain permission funnel state for deferred_location_* and post_spin_notification_* events. One row per (user_id, permission_type). Feeds fct_permission_funnel."
+    columns:
+      - name: user_id
+        description: "User"
+        tests:
+          - not_null
+      - name: permission_type
+        description: "'location' or 'notification'"
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['location', 'notification']
+      - name: prompts_shown
+        description: "Number of times the user saw the permission prompt"
+      - name: grants
+        description: "Number of times the user granted the permission"
+      - name: denials
+        description: "Number of times the user denied the permission"
+      - name: latest_state
+        description: "Latest known state: granted > denied > prompt_shown"
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['granted', 'denied', 'prompt_shown']
