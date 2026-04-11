@@ -176,6 +176,141 @@ models:
         description: "Confidence in share attribution: 'high' (native), 'medium' (card share with pack_id), 'low' (share_link time-window match)"
       - name: is_genuine_planning_attempt
         description: "TRUE if session had at least one prompt (dextr_query), save, or share. Filters out sessions with only browsing/impression activity."
+      # ------------------------------------------------------------
+      # Phase D.1: per-surface breakdown + new domain flags
+      # ------------------------------------------------------------
+      - name: saves_dextr
+        description: "Saves in this session where origin_surface = dextr (telemetry era). NULL for inferred/legacy sessions."
+      - name: saves_featured
+        description: "Saves where origin_surface = featured"
+      - name: saves_search
+        description: "Saves where origin_surface = search"
+      - name: saves_mydecks
+        description: "Saves where origin_surface = mydecks"
+      - name: saves_shared_link
+        description: "Saves where origin_surface = shared_link"
+      - name: saves_multiplayer
+        description: "Saves where origin_surface = multiplayer"
+      - name: saves_whats_next
+        description: "Saves where origin_surface = whats_next"
+      - name: saves_place_detail
+        description: "Saves from the place detail view"
+      - name: saves_import
+        description: "Saves from the import flow"
+      - name: saves_unknown_surface
+        description: "Saves where origin_surface is NULL (iOS call site didn't attach a surface)"
+      - name: saves_other_surface
+        description: "Saves with a surface not yet pivoted (catch-all for review/server/unknown/other canonical values)"
+      - name: saves_button_tap
+        description: "Saves triggered by the button tap save method"
+      - name: saves_long_press
+        description: "Saves triggered by long press"
+      - name: saves_swipe_up
+        description: "Saves triggered by swipe-up gesture"
+      - name: saves_board_selector
+        description: "Saves triggered via the board selector"
+      - name: saves_auto_save
+        description: "Auto-saves"
+      - name: primary_save_surface
+        description: "Surface with the most saves in this session (alphabetical tie-break). NULL for sessions without saves."
+      - name: native_swipe_count
+        description: "Swipes via app_events (telemetry era). Separate from swipe_count which includes legacy dextr_places swipes."
+      - name: right_swipes_dextr
+        description: "Right swipes from dextr origin surface"
+      - name: right_swipes_featured
+        description: "Right swipes from featured surface"
+      - name: right_swipes_search
+        description: "Right swipes from search surface"
+      - name: right_swipes_mydecks
+        description: "Right swipes from mydecks surface"
+      - name: right_swipes_multiplayer
+        description: "Right swipes from multiplayer surface"
+      - name: right_swipes_shared_link
+        description: "Right swipes from shared_link"
+      - name: right_swipes_import
+        description: "Right swipes from import (onboarding swipe tutorial)"
+      - name: right_swipes_unknown
+        description: "Right swipes with NULL origin_surface"
+      - name: right_swipes_other_surface
+        description: "Right swipes with a surface outside the explicit pivot list"
+      - name: has_multiplayer
+        description: "TRUE if session had any multiplayer activity (created/joined/voted)"
+      - name: mp_sessions_created
+        description: "Multiplayer sessions this user created in this planning session"
+      - name: mp_sessions_joined
+        description: "Multiplayer sessions this user joined"
+      - name: mp_votes_cast
+        description: "Votes cast by this user in multiplayer sessions"
+      - name: has_dextr_result_view
+        description: "TRUE if session had at least one dextr_results_viewed event (user actually saw returned pack)"
+      - name: query_count_native
+        description: "Dextr queries submitted via app_events in this session"
+      - name: results_view_count
+        description: "Dextr result views in this session"
+      - name: has_whats_next_tap
+        description: "TRUE if session had a whats_next_tapped event (user routed via What's Next)"
+      - name: card_view_count
+        description: "card_viewed events in session"
+      - name: place_detail_view_count
+        description: "place_detail_view_open events in session"
+      - name: board_view_count
+        description: "board_viewed events in session"
+      - name: whats_next_tap_count
+        description: "whats_next_tapped events in session"
+
+  - name: fct_surface_performance
+    description: "Per-surface North Star metrics sliced by metric_date × origin_surface. Answers which parts of the app drive saves/shares/PSR. Telemetry era only (>= 2026-01-30)."
+    columns:
+      - name: metric_date
+        description: "Calendar date"
+        tests:
+          - not_null
+      - name: origin_surface
+        description: "Canonical surface"
+        tests:
+          - not_null
+      - name: total_events
+        description: "All events for this (date, surface) slice"
+      - name: distinct_users
+        description: "Unique users on this surface this day"
+      - name: distinct_sessions
+        description: "Unique sessions that contained events on this surface this day"
+      - name: saves
+        description: "Event-level saves on this surface"
+      - name: shares
+        description: "Event-level shares on this surface"
+      - name: swipes
+        description: "Event-level swipes on this surface"
+      - name: swipe_rights
+        description: "Right swipes (likes) on this surface"
+      - name: views
+        description: "Card / place detail views on this surface"
+      - name: initiated_sessions
+        description: "Sessions whose initiation_surface equals origin_surface. Denominator for initiated-session PSR metrics."
+      - name: initiated_sessions_with_save
+        description: "Initiated sessions that had at least one save"
+      - name: initiated_sessions_with_share
+        description: "Initiated sessions that had at least one share"
+      - name: initiated_sessions_with_psr_broad
+        description: "Initiated sessions meeting PSR_broad (save AND share)"
+      - name: initiated_sessions_with_psr_strict
+        description: "Initiated sessions meeting PSR_strict (save AND share AND post-share interaction)"
+      - name: initiated_sessions_with_3plus_swipes
+        description: "Initiated sessions with 3+ swipes"
+      - name: sessions_touching_surface
+        description: "Sessions that contained at least one event from this surface (may be initiated elsewhere)"
+      - name: ssr_initiated
+        description: "Save rate of initiated sessions (save_sessions / total_initiated_sessions)"
+      - name: shr_initiated
+        description: "Share rate of initiated sessions"
+      - name: psr_broad_initiated
+        description: "PSR_broad rate of initiated sessions"
+      - name: psr_strict_initiated
+        description: "PSR_strict rate of initiated sessions"
+      - name: right_swipe_rate
+        description: "swipe_rights / swipes for this surface"
+      - name: save_per_view_rate
+        description: "saves / views for this surface — engagement depth signal"
 
   - name: fct_north_star_daily
     description: "Daily aggregate North Star metrics with rates, rolling averages, and WoW changes"
