@@ -35,6 +35,58 @@ native_shares as (
     from {{ ref('stg_session_shares') }}
 ),
 
+-- Phase D.1: per-surface save pivots (stg_session_saves_by_surface)
+surface_saves as (
+    select
+        session_id,
+        user_id,
+        saves_dextr, saves_featured, saves_search, saves_mydecks,
+        saves_shared_link, saves_multiplayer, saves_whats_next,
+        saves_place_detail, saves_import, saves_unknown_surface, saves_other_surface,
+        saves_button_tap, saves_long_press, saves_swipe_up,
+        saves_board_selector, saves_auto_save,
+        primary_save_surface
+    from {{ ref('stg_session_saves_by_surface') }}
+),
+
+-- Phase D.1: per-session swipe aggregates (telemetry era)
+session_swipes as (
+    select
+        session_id,
+        user_id,
+        total_swipe_count as native_swipe_count,
+        right_swipe_count as native_right_swipe_count,
+        left_swipe_count as native_left_swipe_count,
+        right_swipes_dextr, right_swipes_featured, right_swipes_search,
+        right_swipes_mydecks, right_swipes_multiplayer, right_swipes_import,
+        right_swipes_shared_link, right_swipes_unknown, right_swipes_other_surface
+    from {{ ref('stg_session_swipes') }}
+),
+
+-- Phase D.1: session-level multiplayer, dextr, navigation flags
+session_mp as (
+    select session_id, user_id,
+        (mp_sessions_created + mp_sessions_joined + mp_votes_cast) > 0 as has_multiplayer,
+        mp_sessions_created, mp_sessions_joined, mp_votes_cast
+    from {{ ref('stg_session_multiplayer') }}
+),
+session_dextr as (
+    select session_id, user_id,
+        results_views > 0 as has_dextr_result_view,
+        queries_submitted as query_count_native,
+        results_views as results_view_count
+    from {{ ref('stg_session_dextr') }}
+),
+session_nav as (
+    select session_id, user_id,
+        whats_next_tap_count > 0 as has_whats_next_tap,
+        card_view_count,
+        place_detail_view_count,
+        board_view_count,
+        whats_next_tap_count
+    from {{ ref('stg_session_navigation') }}
+),
+
 -- Post-share interactions per session (within 24h, non-sharer)
 post_share_interactions as (
     select
@@ -124,7 +176,61 @@ outcomes as (
             (ps.session_id is not null or s.initiation_surface = 'dextr'
              or coalesce(sv.save_count, s.inline_save_count, 0) > 0
              or coalesce(sh.share_count, s.inline_share_count, 0) > 0)
-        ) as is_genuine_planning_attempt
+        ) as is_genuine_planning_attempt,
+
+        -- ------------------------------------------------------------
+        -- Phase D.1: per-surface save/swipe breakdown + new domain flags
+        -- ------------------------------------------------------------
+        -- Save breakdowns (NULL for inferred/legacy sessions, 0+ for telemetry natives)
+        ss.saves_dextr,
+        ss.saves_featured,
+        ss.saves_search,
+        ss.saves_mydecks,
+        ss.saves_shared_link,
+        ss.saves_multiplayer,
+        ss.saves_whats_next,
+        ss.saves_place_detail,
+        ss.saves_import,
+        ss.saves_unknown_surface,
+        ss.saves_other_surface,
+
+        -- Save-method breakdown — how the user physically triggered saves
+        ss.saves_button_tap,
+        ss.saves_long_press,
+        ss.saves_swipe_up,
+        ss.saves_board_selector,
+        ss.saves_auto_save,
+
+        -- Primary save surface (the surface with the most saves in the session)
+        ss.primary_save_surface,
+
+        -- Swipe-by-surface breakdown (telemetry era only; NULL for legacy/inferred)
+        ssw.native_swipe_count,
+        ssw.right_swipes_dextr,
+        ssw.right_swipes_featured,
+        ssw.right_swipes_search,
+        ssw.right_swipes_mydecks,
+        ssw.right_swipes_multiplayer,
+        ssw.right_swipes_shared_link,
+        ssw.right_swipes_import,
+        ssw.right_swipes_unknown,
+        ssw.right_swipes_other_surface,
+
+        -- New domain flags (FALSE for sessions without these signals)
+        coalesce(smp.has_multiplayer, false) as has_multiplayer,
+        coalesce(smp.mp_sessions_created, 0) as mp_sessions_created,
+        coalesce(smp.mp_sessions_joined, 0) as mp_sessions_joined,
+        coalesce(smp.mp_votes_cast, 0) as mp_votes_cast,
+
+        coalesce(sd.has_dextr_result_view, false) as has_dextr_result_view,
+        coalesce(sd.query_count_native, 0) as query_count_native,
+        coalesce(sd.results_view_count, 0) as results_view_count,
+
+        coalesce(sn.has_whats_next_tap, false) as has_whats_next_tap,
+        coalesce(sn.card_view_count, 0) as card_view_count,
+        coalesce(sn.place_detail_view_count, 0) as place_detail_view_count,
+        coalesce(sn.board_view_count, 0) as board_view_count,
+        coalesce(sn.whats_next_tap_count, 0) as whats_next_tap_count
 
     from sessions_base s
     inner join {{ ref('stg_users') }} u on s.user_id = u.user_id
@@ -133,6 +239,11 @@ outcomes as (
     left join post_share_interactions psi on s.session_id = psi.session_id
     left join prompt_sessions ps on s.session_id = ps.session_id
     left join version_lookup vl on s.session_date between vl.release_date and vl.release_date_end
+    left join surface_saves ss on s.session_id = ss.session_id
+    left join session_swipes ssw on s.session_id = ssw.session_id
+    left join session_mp smp on s.session_id = smp.session_id
+    left join session_dextr sd on s.session_id = sd.session_id
+    left join session_nav sn on s.session_id = sn.session_id
     -- CRITICAL: Exclude test users
     where u.is_test_user = 0
 )
