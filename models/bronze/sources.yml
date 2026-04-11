@@ -39,10 +39,6 @@ sources:
         description: "Categories for featured content"
         meta:
           status: current
-      - name: featured_cards_category_mapping
-        description: "Mapping between featured cards and categories"
-        meta:
-          status: current
 
       # AI/Dextr System
       - name: dextr_queries
@@ -103,13 +99,8 @@ sources:
         description: "User-created boards/wishlists"
         meta:
           status: current
-      - name: board_places
-        description: "Places saved to user boards. Deprecated Jan 2 2026."
-        meta:
-          status: historical
-          deprecated_date: "2026-01-02"
       - name: board_places_v2
-        description: "Current board-place relationships. Replaced board_places from Jan 2 2026."
+        description: "Current board-place relationships."
         meta:
           status: current
 
