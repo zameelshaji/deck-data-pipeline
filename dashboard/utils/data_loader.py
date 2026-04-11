@@ -1361,8 +1361,8 @@ def load_growth_snapshot():
     engine = get_database_connection()
     query = """
     SELECT 'dau' as metric,
-           total_active_users as value,
-           wow_growth_percent as delta
+           daily_active_users as value,
+           dau_wow_growth_percent as delta
     FROM analytics_prod_gold.vis_daily_active_users
     ORDER BY activity_date DESC LIMIT 1
     """
@@ -1396,7 +1396,7 @@ def load_dau_sparkline(days=30):
     """Load last N days of DAU for sparkline on Home page."""
     engine = get_database_connection()
     query = f"""
-    SELECT activity_date, total_active_users
+    SELECT activity_date, daily_active_users
     FROM analytics_prod_gold.vis_daily_active_users
     WHERE activity_date >= current_date - {days}
     ORDER BY activity_date
@@ -2496,56 +2496,6 @@ def load_daily_topline_kpis(report_date):
         return df.iloc[0].to_dict()
     except Exception as e:
         st.error(f"Error loading daily topline KPIs: {str(e)}")
-        return {}
-
-
-@st.cache_data(ttl=300)
-def load_daily_alltime_topline(report_date):
-    """Cumulative totals as-of the end of report_date.
-
-    Returns dict with: total_signups, total_activations, total_prompters, total_prompts
-    """
-    engine = get_database_connection()
-    query = f"""
-    WITH signups AS (
-        SELECT COUNT(*)::bigint AS total_signups
-        FROM analytics_prod_silver.stg_users
-        WHERE is_test_user = 0
-          AND DATE(created_at) <= DATE '{report_date}'
-    ),
-    activations AS (
-        SELECT COUNT(*)::bigint AS total_activations
-        FROM analytics_prod_gold.fct_user_activation fua
-        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
-        WHERE u.is_test_user = 0
-          AND fua.is_activated = true
-          AND fua.activation_date <= DATE '{report_date}'
-    ),
-    prompts AS (
-        SELECT
-            COUNT(*)::bigint AS total_prompts,
-            COUNT(DISTINCT e.user_id)::bigint AS total_prompters
-        FROM analytics_prod_silver.stg_unified_events e
-        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
-        WHERE u.is_test_user = 0
-          AND e.event_type = 'query'
-          AND DATE(e.event_timestamp) <= DATE '{report_date}'
-    )
-    SELECT
-        s.total_signups,
-        a.total_activations,
-        p.total_prompters,
-        p.total_prompts
-    FROM signups s CROSS JOIN activations a CROSS JOIN prompts p
-    """
-    try:
-        with engine.connect() as conn:
-            df = pd.read_sql(text(query), conn)
-        if df.empty:
-            return {}
-        return df.iloc[0].to_dict()
-    except Exception as e:
-        st.error(f"Error loading all-time topline: {str(e)}")
         return {}
 
 

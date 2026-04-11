@@ -12,7 +12,6 @@ from datetime import date, timedelta
 from utils.styling import apply_deck_branding, add_deck_footer, BRAND_COLORS
 from utils.data_loader import (
     load_daily_topline_kpis,
-    load_daily_alltime_topline,
     load_daily_7day_trend,
     load_daily_activation_checklist,
     load_daily_new_signups_status,
@@ -32,7 +31,6 @@ st.set_page_config(
 apply_deck_branding()
 
 st.title("Daily Report")
-st.caption("The CEO's daily snapshot — pick any date to time-travel the numbers.")
 
 # ----------------------------------------------------------------------------
 # Date picker — default to yesterday
@@ -101,29 +99,7 @@ with c4:
 st.divider()
 
 # ============================================================================
-# Section B: All-time topline (cumulative as of report_date)
-# ============================================================================
-st.subheader("All-time Topline")
-st.caption(f"Cumulative through {report_date.strftime('%b %d, %Y')}")
-
-alltime = load_daily_alltime_topline(report_date_str)
-
-c1, c2, c3, c4 = st.columns(4)
-with c1:
-    st.metric("Total Signups", _fmt_int(alltime.get('total_signups', 0)))
-with c2:
-    st.metric("Activations", _fmt_int(alltime.get('total_activations', 0)),
-              help="Users who have prompted, saved, or shared at least once")
-with c3:
-    st.metric("Prompters", _fmt_int(alltime.get('total_prompters', 0)),
-              help="Distinct users who have submitted a Dextr query")
-with c4:
-    st.metric("Total Prompts", _fmt_int(alltime.get('total_prompts', 0)))
-
-st.divider()
-
-# ============================================================================
-# Section C: 7-Day Trend
+# Section B: 7-Day Trend
 # ============================================================================
 st.subheader("7-Day Trend")
 st.caption(f"Rolling 7 days ending {report_date.strftime('%b %d')}")
@@ -181,7 +157,7 @@ else:
 st.divider()
 
 # ============================================================================
-# Section D: Activation Checklist Funnel — New Signups
+# Section C: Activation Checklist Funnel — New Signups
 # ============================================================================
 st.subheader("Activation Checklist Funnel — New Signups")
 
@@ -235,7 +211,7 @@ else:
 st.divider()
 
 # ============================================================================
-# Section E: New Signups — Onboarding & Checklist Status table
+# Section D: New Signups — Onboarding & Checklist Status table
 # ============================================================================
 st.subheader("New Signups — Onboarding & Checklist Status")
 
@@ -269,7 +245,7 @@ else:
 st.divider()
 
 # ============================================================================
-# Section F: Category Popularity
+# Section E: Category Popularity
 # ============================================================================
 st.subheader("Category Popularity")
 
@@ -287,7 +263,7 @@ else:
 st.divider()
 
 # ============================================================================
-# Section G: Places Flagged for Removal
+# Section F: Places Flagged for Removal
 # ============================================================================
 st.subheader("Places Flagged for Removal (Candidates to Review)")
 st.caption(
@@ -309,7 +285,7 @@ else:
 st.divider()
 
 # ============================================================================
-# Section H: Top Liked Places
+# Section G: Top Liked Places
 # ============================================================================
 st.subheader("Top Liked Places")
 
@@ -325,7 +301,7 @@ else:
 st.divider()
 
 # ============================================================================
-# Section I: Weekly Engagement Intensity — Per Active Activated User
+# Section H: Weekly Engagement Intensity — Per Active Activated User
 # ============================================================================
 st.subheader("Weekly Engagement Intensity — Per Active Activated User")
 st.caption(
@@ -378,7 +354,7 @@ else:
 st.divider()
 
 # ============================================================================
-# Section J: User Activity — Report Date
+# Section I: User Activity — Report Date
 # ============================================================================
 st.subheader(f"User Activity — {report_date.strftime('%b %d')}")
 

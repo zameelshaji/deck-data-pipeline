@@ -196,7 +196,7 @@ try:
     if not sparkline_df.empty:
         fig = go.Figure(go.Scatter(
             x=sparkline_df['activity_date'],
-            y=sparkline_df['total_active_users'],
+            y=sparkline_df['daily_active_users'],
             mode='lines',
             line=dict(color='#E91E8C', width=2),
             fill='tozeroy',
