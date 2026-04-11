@@ -20,9 +20,12 @@ enriched as (
         e.card_id,
         e.pack_id,
         e.board_id,
+        e.multiplayer_id,
         e.share_link_id,
         e.properties,
         e.client_event_id,
+        e.device_type as event_device_type,
+        e.app_version as event_app_version,
 
         -- Session context from planning_sessions (if native)
         ps.initiation_surface,

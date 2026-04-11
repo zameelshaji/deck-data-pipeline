@@ -1027,3 +1027,157 @@ models:
         description: "Viewers who performed a save action after viewing"
       - name: time_to_first_signup_minutes
         description: "Minutes from share creation to first signup"
+      - name: board_active_likes
+        description: "Current active like count on the shared board (deck shares only) — additional virality signal beyond views/signups"
+
+  - name: fct_multiplayer_engagement
+    description: "Per-multiplayer_id adoption + funnel. Creator → joined → voted. Telemetry era only."
+    columns:
+      - name: multiplayer_id
+        description: "UUID of the multiplayer session"
+        tests:
+          - not_null
+          - unique
+      - name: creator_user_id
+        description: "User who created the multiplayer session"
+      - name: distinct_joiners
+        description: "Unique users who joined (excluding creator)"
+      - name: distinct_voters
+        description: "Unique users who cast at least one vote"
+      - name: total_votes
+        description: "Total vote events across all participants"
+      - name: was_joined
+        description: "TRUE if at least one user joined (beyond creator)"
+      - name: was_voted_on
+        description: "TRUE if at least one vote was cast"
+      - name: share_count
+        description: "Number of share_links created for this multiplayer session"
+      - name: minutes_to_first_join
+        description: "Minutes from creation to first external joiner"
+
+  - name: fct_dextr_funnel
+    description: "Dextr query → results-view → save conversion funnel per (metric_date, app_version). Telemetry era only."
+    columns:
+      - name: metric_date
+        description: "Calendar date"
+        tests:
+          - not_null
+      - name: queries_submitted
+        description: "Total dextr_query_submitted events"
+      - name: queries_with_results_view
+        description: "Queries that had a matching dextr_results_viewed in the same session"
+      - name: fast_path_queries
+        description: "Queries launched from the suggestion pill shortcut"
+      - name: results_view_rate
+        description: "queries_with_results_view / queries_submitted — the big funnel gap we're now measuring"
+      - name: query_to_save_rate
+        description: "Fraction of queries whose session produced at least one save"
+      - name: median_query_to_results_seconds
+        description: "Median latency from query submit to first results view"
+      - name: p90_query_to_results_seconds
+        description: "P90 latency from query submit to first results view"
+
+  - name: fct_board_lifecycle
+    description: "Per-board lifecycle + engagement fact. Covers views (7d/30d), likes, shares, saves, unsaves."
+    columns:
+      - name: board_id
+        description: "Board UUID"
+        tests:
+          - not_null
+          - unique
+      - name: creator_user_id
+        description: "User who created the board"
+      - name: created_at
+        description: "Board creation timestamp (from src_boards)"
+      - name: total_views
+        description: "Lifetime board_viewed events"
+      - name: views_7d
+        description: "Views in last 7 days"
+      - name: views_30d
+        description: "Views in last 30 days"
+      - name: total_likes
+        description: "deck_liked events (lifetime)"
+      - name: net_likes
+        description: "total_likes - total_unlikes"
+      - name: total_shares
+        description: "share_links with share_type=deck for this board"
+      - name: net_saves
+        description: "total_saves - total_unsaves"
+      - name: hours_created_to_first_share
+        description: "Hours from board creation to first share"
+
+  - name: fct_social_graph
+    description: "Current edge state of the social graph (follow/unfollow, like/unlike). Grain: one row per (actor, target_kind, target_id). is_active reflects the latest event."
+    columns:
+      - name: actor_user_id
+        description: "User who initiated the edge"
+        tests:
+          - not_null
+      - name: target_kind
+        description: "'user' for follows, 'board' for deck likes"
+        tests:
+          - accepted_values:
+              arguments:
+                values: ['user', 'board']
+      - name: target_id
+        description: "Target user_id or board_id"
+      - name: is_active
+        description: "TRUE if the latest action on this edge was 'add'"
+
+  - name: fct_user_social_stats
+    description: "Per-user roll-up of social graph state — followers, following, likes given, likes received. Only includes users with at least one social edge."
+    columns:
+      - name: user_id
+        description: "User"
+        tests:
+          - not_null
+      - name: following_count
+        description: "Number of users this user actively follows"
+      - name: follower_count
+        description: "Number of users actively following this user"
+      - name: decks_liked_count
+        description: "Decks this user has actively liked"
+      - name: likes_received_count
+        description: "Active likes received on decks this user owns"
+
+  - name: fct_permission_funnel
+    description: "Permission-prompt grant rate per permission_type. Feeds the Onboarding dashboard page."
+    columns:
+      - name: permission_type
+        description: "'location' or 'notification'"
+        tests:
+          - not_null
+          - unique
+      - name: users_prompted
+        description: "Unique users who saw the permission prompt"
+      - name: users_granted
+        description: "Users whose latest state is granted"
+      - name: users_denied
+        description: "Users whose latest state is denied"
+      - name: grant_rate
+        description: "users_granted / users_prompted"
+      - name: denial_rate
+        description: "users_denied / users_prompted"
+
+  - name: fct_first_session_experience
+    description: "Per-user first-session UX funnel: checklist → task_completed → all_completed → spin_unlocked → spin_won → notif_prompt_shown → granted/denied."
+    columns:
+      - name: user_id
+        description: "User who entered the first-session experience"
+        tests:
+          - not_null
+          - unique
+      - name: checklist_viewed_at
+        description: "First time user saw the checklist"
+      - name: tasks_completed_count
+        description: "Number of checklist tasks completed"
+      - name: tasks_completed_list
+        description: "Ordered array of task_names completed"
+      - name: checklist_all_completed_at
+        description: "When all checklist tasks were completed"
+      - name: spin_unlocked_at
+        description: "When spin wheel became available"
+      - name: spin_won_at
+        description: "When user won the (rigged) spin"
+      - name: granted_notif
+        description: "TRUE if user granted notification permission after the spin"

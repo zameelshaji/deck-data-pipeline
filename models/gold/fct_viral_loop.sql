@@ -70,6 +70,19 @@ sharer_info as (
         user_id,
         user_archetype as sharer_archetype
     from {{ ref('fct_user_segments') }}
+),
+
+-- Phase E.3: deck likes on the shared board (virality signal).
+-- A deck that gets liked after being shared is a stronger virality signal
+-- than a view that doesn't convert. Joined per-board since multiple shares
+-- of the same board count the same likes.
+board_like_counts as (
+    select
+        target_id as board_id,
+        count(*) filter (where is_active) as active_likes
+    from {{ ref('fct_social_graph') }}
+    where target_kind = 'board'
+    group by target_id
 )
 
 select
@@ -113,10 +126,14 @@ select
         when vs.first_signup_at is not null
         then round(extract(epoch from (vs.first_signup_at - s.shared_at)) / 60.0, 1)
         else null
-    end as time_to_first_signup_minutes
+    end as time_to_first_signup_minutes,
+
+    -- Phase E.3: deck like count on the shared board (for deck shares only)
+    coalesce(blc.active_likes, 0) as board_active_likes
 
 from shares s
 left join share_viewers sv on s.share_link_id = sv.share_link_id
 left join viewer_signups vs on s.share_link_id = vs.share_link_id
 left join viewer_saves vsv on s.share_link_id = vsv.share_link_id
 left join sharer_info si on s.sharer_user_id = si.user_id
+left join board_like_counts blc on s.board_id::text = blc.board_id
