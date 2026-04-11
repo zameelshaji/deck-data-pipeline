@@ -43,7 +43,9 @@ swipes_legacy as (
       and dpc.created_at is not null
 ),
 
--- CTE 3: Swipes from dextr_places (places system + telemetry era, Nov 20 2025+)
+-- CTE 3: Swipes from dextr_places (places_system era only: Nov 20 2025 – Jan 29 2026)
+-- Telemetry-era swipes (Jan 30 2026+) come through the telemetry_events CTE below,
+-- sourced from app_events.card_swiped_{right,left}. See Phase A fix.
 swipes_current as (
     select
         dq.user_id,
@@ -56,15 +58,13 @@ swipes_current as (
         dp.place_deck_sku as card_id,
         dp.pack_id::text as pack_id,
         'dextr_places' as source_table,
-        case
-            when dp.created_at < '2026-01-30'::timestamptz then 'places_system'
-            else 'telemetry'
-        end as data_era,
+        'places_system' as data_era,
         dq.app_version
     from {{ ref('src_dextr_places') }} dp
     inner join {{ ref('src_dextr_queries') }} dq
         on dp.pack_id = dq.response_pack_id
     where dp.created_at >= '2025-11-20'::timestamptz
+      and dp.created_at < '2026-01-30'::timestamptz
       and dp.user_action in ('like', 'dislike')
       and dq.user_id is not null
       and dp.created_at is not null
@@ -172,8 +172,9 @@ telemetry_events as (
             when event_name = 'card_saved' then 'save'
             when event_name = 'card_shared' then 'card_share'
             when event_name = 'deck_shared' then 'deck_share'
-            when event_name = 'swipe_right' then 'swipe_right'
-            when event_name = 'swipe_left' then 'swipe_left'
+            -- iOS TelemetryManager emits card_swiped_{right,left}; normalize to canonical swipe_* types
+            when event_name in ('card_swiped_right', 'swipe_right') then 'swipe_right'
+            when event_name in ('card_swiped_left', 'swipe_left') then 'swipe_left'
             when event_name = 'place_opened_website' then 'opened_website'
             when event_name = 'place_book_with_deck' then 'book_with_deck'
             when event_name = 'place_click_directions' then 'click_directions'
