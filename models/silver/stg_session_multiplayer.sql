@@ -17,7 +17,7 @@ with mp_events as (
         user_id,
         event_name,
         event_timestamp as mp_at,
-        multiplayer_id_prop as multiplayer_id,
+        multiplayer_id,
         places_count,
         source_board_id
     from {{ ref('stg_app_events_enriched') }}

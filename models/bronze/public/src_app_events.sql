@@ -7,7 +7,10 @@ select
     card_id,
     pack_id,
     board_id,
+    multiplayer_id,
     share_link_id,
     properties,
-    client_event_id
+    client_event_id,
+    device_type,
+    app_version
 from {{ source('public', 'app_events') }}
