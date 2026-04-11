@@ -814,7 +814,7 @@ models:
                 values: ['date_night', 'group_outing', 'solo_explore', 'dining', 'drinks', 'culture', 'adventure', 'general']
 
   - name: fct_conversion_signals
-    description: "Booking intent and monetisation readiness signals. One row per conversion action (opened_website, book_with_deck, click_directions, click_phone). Answers: how many saves lead to clicks, which categories convert, prompt-initiated vs organic."
+    description: "Booking intent and monetisation readiness signals. One row per conversion action. Phase B.5 (Apr 2026) expanded the action_type set to include book_button_click, copy_address, and deal_card_tap from the iOS telemetry event catalog."
     columns:
       - name: action_id
         description: "Sequential action identifier"
@@ -830,12 +830,19 @@ models:
       - name: place_category
         description: "Category of the place"
       - name: action_type
-        description: "Type of conversion: opened_website, book_with_deck, click_directions, click_phone"
+        description: "Type of conversion action"
         tests:
           - not_null
           - accepted_values:
               arguments:
-                values: ['opened_website', 'book_with_deck', 'click_directions', 'click_phone']
+                values:
+                  - opened_website
+                  - book_with_deck
+                  - click_directions
+                  - click_phone
+                  - book_button_click
+                  - copy_address
+                  - deal_card_tap
       - name: action_date
         description: "Date of the conversion action"
       - name: was_saved_first

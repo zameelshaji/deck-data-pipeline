@@ -2,14 +2,14 @@ version: 2
 
 models:
   - name: stg_unified_events
-    description: "Unified event stream combining all data eras (card system, places system, telemetry) into a single consistent format."
+    description: "Unified event stream combining all data eras (card system, places system, telemetry) into a single consistent format. As of Phase B.5 (Apr 2026), also carries normalized origin_surface for surface-based segmentation."
     columns:
       - name: user_id
         description: "User who performed the event"
       - name: event_timestamp
         description: "When the event occurred"
       - name: event_type
-        description: "Normalized event type (query, swipe_right, swipe_left, save, card_share, deck_share, share, conversion, etc.)"
+        description: "Normalized event type. Telemetry-era mappings cover every event the iOS TelemetryManager emits — see the CASE statement in stg_unified_events.sql telemetry_events CTE for the full list."
       - name: card_id
         description: "Card identifier (always TEXT)"
       - name: pack_id
@@ -20,8 +20,118 @@ models:
         description: "Data era: card_system, places_system, or telemetry"
       - name: app_version
         description: "App version if available"
+      - name: origin_surface_raw
+        description: "Raw origin surface as emitted by iOS (e.g. featured_carousel, search_tab, chat_recommendations). Preserved for debugging; most consumers should use origin_surface instead."
+      - name: origin_surface
+        description: "Canonical origin surface — which part of the app triggered this event. Normalized from origin_surface_raw by collapsing sub-variants (featured_carousel/featured_spotlight/featured_category → featured, search_tab/search_view/deck_search → search, chat_recommendations → dextr, etc.). NULL for events that legitimately have no surface (onboarding, multiplayer lifecycle, board lifecycle, social graph, checklist, permission prompts)."
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - dextr
+                  - featured
+                  - search
+                  - mydecks
+                  - shared_link
+                  - multiplayer
+                  - place_detail
+                  - review
+                  - whats_next
+                  - import
+                  - server
+                  - unknown
+                  - other
+              config:
+                where: "origin_surface is not null"
+      - name: origin_source_id
+        description: "Context ID paired with origin_surface (e.g. pack_id when surface=dextr, board_id when surface=mydecks)."
       - name: event_category
-        description: "High-level category: AI, Swipe, Save, Share, Conversion, Other"
+        description: "High-level bucket for dashboard aggregation: AI, Swipe, Save, Share, Conversion, View, Session, Board, Social, Multiplayer, Navigation, FirstSession, Permission, Onboarding, Other."
+
+  - name: stg_app_events_enriched
+    description: "Dedup'd app_events joined to native + inferred session context, with Tier 1 property fields (origin_surface, action_type, share_channel, fast_path, etc.) extracted to typed columns. Primary source for surface-based analytics."
+    columns:
+      - name: id
+        description: "Raw app_events.id (server-generated)"
+      - name: client_event_id
+        description: "Client-generated dedup key (preferred over id for dedup)"
+      - name: event_name
+        description: "Raw event_name from app_events"
+      - name: event_timestamp
+        description: "Event timestamp"
+      - name: user_id
+        description: "User who performed the event"
+      - name: effective_session_id
+        description: "Native session_id if present, else inferred session_id from stg_unified_sessions"
+      - name: origin_surface_raw
+        description: "Raw surface as emitted by iOS (preserved for debugging)"
+      - name: origin_surface
+        description: "Canonical normalized surface (same semantics as stg_unified_events.origin_surface)"
+        tests:
+          - accepted_values:
+              arguments:
+                values:
+                  - dextr
+                  - featured
+                  - search
+                  - mydecks
+                  - shared_link
+                  - multiplayer
+                  - place_detail
+                  - review
+                  - whats_next
+                  - import
+                  - server
+                  - unknown
+                  - other
+              config:
+                where: "origin_surface is not null"
+      - name: origin_source_id
+        description: "Context ID paired with origin_surface"
+      - name: action_type
+        description: "Sub-type for events that carry one (e.g. whats_next_tapped, place card actions)"
+      - name: share_channel
+        description: "Which share sheet button was used (native_share_sheet, copy_link, etc.)"
+      - name: fast_path
+        description: "Non-null for dextr queries from the suggestion pill fast path"
+      - name: is_private
+        description: "Board privacy at time of action (for board_created / board_viewed)"
+      - name: places_count
+        description: "Number of places in the context (multiplayer_created, board_viewed, etc.)"
+      - name: save_method
+        description: "How a place was saved: button_tap, long_press, swipe_up, board_selector, auto_save"
+      - name: task_name
+        description: "Which checklist task was completed (for checklist_task_completed events)"
+
+  - name: stg_app_events_properties
+    description: "Per-event typed property extraction — Tier 2 of Phase B.5. One row per dedup'd app_events row (same grain as stg_app_events_enriched). Carries every typed field we know how to extract for each event_name."
+    columns:
+      - name: id
+        description: "app_events.id (server-generated)"
+        tests:
+          - not_null
+      - name: event_name
+        description: "Raw event_name"
+      - name: origin_surface
+        description: "Canonical surface (inherited from stg_app_events_enriched)"
+      - name: place_name
+        description: "Place name from card_saved / place_saved"
+      - name: place_category
+        description: "Place category from card_saved / place_saved"
+      - name: save_method
+        description: "How the save was initiated"
+      - name: already_saved
+        description: "True if the card was already saved to the destination board"
+      - name: query_text
+        description: "Dextr query text (dextr_query_submitted)"
+      - name: results_count
+        description: "Number of results returned (dextr_results_viewed)"
+      - name: vote_type
+        description: "Multiplayer vote type (multiplayer_voted)"
+      - name: mp_session_title
+        description: "Multiplayer session title (multiplayer_created)"
+      - name: followed_user_id
+        description: "The user who was followed (user_followed)"
 
   - name: int_place_resolver
     description: "Universal place identity resolver. Maps any card_id format (integer, deck_sku, google_place_id, UUID) to places.place_id (integer). Use this to join event-level card_ids to canonical place metadata."
