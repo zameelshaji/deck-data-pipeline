@@ -14,6 +14,7 @@ from utils.data_loader import (
     load_zero_save_prompts_detail,
     load_reprompting_analysis,
     load_pack_performance_top_bottom,
+    load_dextr_funnel,
 )
 
 st.set_page_config(
@@ -139,6 +140,71 @@ try:
             st.info("No data available for the selected filters.")
 except Exception as e:
     st.error(f"Error loading prompt funnel: {str(e)}")
+
+st.divider()
+
+# ============================================================================
+# Section B2: Query → Results View Funnel (NEW — Phase E, PR #51)
+# ============================================================================
+st.subheader("Query → Results View Funnel")
+st.caption(
+    "Dextr telemetry-era only (2026-01-30+). Measures the query → displayed results → save chain "
+    "— the step between 'user submitted a query' and 'user actually saw results'."
+)
+
+try:
+    dextr_df = load_dextr_funnel(start_date=start_date, end_date=end_date, app_version=app_version)
+except Exception as e:
+    st.warning(f"Could not load Dextr funnel: {str(e)}")
+    dextr_df = pd.DataFrame()
+
+if dextr_df.empty or int(dextr_df.iloc[0].get('queries_submitted', 0) or 0) == 0:
+    st.info("No Dextr funnel data for the selected period.")
+else:
+    row = dextr_df.iloc[0]
+    q_submitted = int(row.get('queries_submitted', 0) or 0)
+    q_results = int(row.get('queries_with_results_view', 0) or 0)
+    q_saves = int(row.get('queries_leading_to_save', 0) or 0)
+    results_rate = float(row.get('results_view_rate') or 0)
+    save_rate = float(row.get('query_to_save_rate') or 0)
+    median_latency = row.get('median_query_to_results_seconds')
+    p90_latency = row.get('p90_query_to_results_seconds')
+    fast_path_q = int(row.get('fast_path_queries', 0) or 0)
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.metric("Query → Results View", f"{results_rate * 100:.1f}%",
+                  help=f"{q_results:,} of {q_submitted:,} queries produced a results view")
+    with c2:
+        st.metric("Query → Save", f"{save_rate * 100:.1f}%",
+                  help=f"{q_saves:,} queries led to a session with at least one save")
+    with c3:
+        ml = f"{float(median_latency):.1f}s" if median_latency is not None and pd.notna(median_latency) else "N/A"
+        st.metric("Median Query → Results Latency", ml)
+    with c4:
+        pl = f"{float(p90_latency):.1f}s" if p90_latency is not None and pd.notna(p90_latency) else "N/A"
+        st.metric("p90 Query → Results Latency", pl)
+
+    if q_submitted > 0:
+        fig = go.Figure(go.Funnel(
+            y=['Queries Submitted', 'Queries with Results View', 'Queries → Save'],
+            x=[q_submitted, q_results, q_saves],
+            textinfo="value+percent initial+percent previous",
+            marker=dict(color=[
+                BRAND_COLORS['info'],
+                BRAND_COLORS['accent'],
+                BRAND_COLORS['success'],
+            ])
+        ))
+        fig.update_layout(
+            margin=dict(l=20, r=20, t=20, b=20),
+            font=dict(family="Inter, system-ui, sans-serif", size=13),
+            plot_bgcolor='white', paper_bgcolor='white',
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    if fast_path_q > 0:
+        st.caption(f"Of these, **{fast_path_q:,}** were suggestion-pill fast-path queries.")
 
 st.divider()
 

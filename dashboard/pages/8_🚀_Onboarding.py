@@ -14,6 +14,7 @@ from utils.data_loader import (
     load_onboarding_time_distribution,
     load_onboarding_completion_rate_prior_7d,
     load_app_versions_with_dates,
+    load_first_session_experience,
 )
 
 st.set_page_config(
@@ -342,7 +343,82 @@ except Exception as e:
 
 st.divider()
 
-# --- Section G: User Journey Table ---
+# --- Section G: First-Session Experience (NEW — Phase E, PR #51) ---
+st.subheader("🎰 First-Session Experience")
+st.caption(
+    "The post-onboarding checklist → spin wheel → notification prompt funnel. "
+    "Tracks the first-session UX from `fct_first_session_experience`."
+)
+
+try:
+    fse_df = load_first_session_experience()
+except Exception as e:
+    st.warning(f"Could not load first-session experience: {str(e)}")
+    fse_df = pd.DataFrame()
+
+if fse_df.empty or int(fse_df.iloc[0].get('entered', 0) or 0) == 0:
+    st.info("No first-session experience data available yet.")
+else:
+    row = fse_df.iloc[0]
+    entered = int(row.get('entered', 0) or 0)
+    saw = int(row.get('saw_checklist', 0) or 0)
+    any_task = int(row.get('completed_any_task', 0) or 0)
+    completed = int(row.get('completed_checklist', 0) or 0)
+    unlocked = int(row.get('unlocked_spin', 0) or 0)
+    won = int(row.get('won_spin', 0) or 0)
+    saw_notif = int(row.get('saw_notif_prompt', 0) or 0)
+    granted_notif = int(row.get('granted_notif', 0) or 0)
+    median_min = row.get('median_minutes_to_complete')
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        spin_rate = (unlocked / entered * 100) if entered else 0
+        st.metric("Spin Unlock Rate", f"{spin_rate:.1f}%",
+                  help=f"{unlocked:,} of {entered:,} users entered the first-session experience and unlocked the spin wheel")
+    with c2:
+        notif_rate = (granted_notif / saw_notif * 100) if saw_notif else 0
+        st.metric("Notif Grant Rate (post-spin)", f"{notif_rate:.1f}%",
+                  help=f"{granted_notif:,} of {saw_notif:,} users who saw the post-spin notification prompt granted it")
+    with c3:
+        st.metric("Spin Win Rate", f"{(won / unlocked * 100) if unlocked else 0:.1f}%",
+                  help=f"{won:,} of {unlocked:,} users who unlocked the spin wheel won")
+    with c4:
+        mm_str = f"{float(median_min):.1f} min" if median_min is not None and pd.notna(median_min) else "N/A"
+        st.metric("Median Time to Complete Checklist", mm_str)
+
+    # Funnel chart
+    fig = go.Figure(go.Funnel(
+        y=[
+            'Checklist Viewed',
+            'Any Task Completed',
+            'All Tasks Completed',
+            'Spin Unlocked',
+            'Spin Won',
+            'Notif Prompt Shown',
+            'Notif Granted',
+        ],
+        x=[saw, any_task, completed, unlocked, won, saw_notif, granted_notif],
+        textinfo="value+percent initial",
+        marker=dict(color=[
+            BRAND_COLORS['info'],
+            '#6B7280',
+            BRAND_COLORS['accent'],
+            '#F59E0B',
+            '#E91E8C',
+            BRAND_COLORS['warning'],
+            BRAND_COLORS['success'],
+        ]),
+    ))
+    fig.update_layout(
+        margin=dict(l=20, r=20, t=20, b=20),
+        font=dict(family="Inter", size=13),
+        plot_bgcolor='white', paper_bgcolor='white',
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+st.divider()
+
+# --- Section H: User Journey Table ---
 with st.expander("🔍 Individual User Journeys"):
     try:
         journeys_df = load_onboarding_user_journeys(limit=100)

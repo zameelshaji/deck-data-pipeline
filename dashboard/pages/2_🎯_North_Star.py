@@ -12,6 +12,7 @@ from utils.data_loader import (
     load_psr_ladder_current,
     load_active_planners_trend,
     load_session_diagnostics,
+    load_surface_performance,
 )
 
 st.set_page_config(
@@ -300,7 +301,106 @@ except Exception:
 st.divider()
 
 # ============================================================================
-# Section F: Session Diagnostics
+# Section F: Surface Attribution (NEW — Phase D, PR #50)
+# ============================================================================
+st.subheader("Surface Attribution")
+st.caption(
+    "Which parts of the app drive the North Star? "
+    "Sessions are attributed to their initiation surface. Telemetry era only (2026-01-30+)."
+)
+
+try:
+    surface_df = load_surface_performance(start_date=start_date, end_date=end_date)
+except Exception as e:
+    st.warning(f"Could not load surface performance: {str(e)}")
+    surface_df = pd.DataFrame()
+
+if surface_df.empty:
+    st.info("No surface attribution data for the selected period.")
+else:
+    # PSR by surface — horizontal bar, descending
+    sdf = surface_df[surface_df['initiated_sessions'] > 0].copy()
+    sdf = sdf.sort_values('psr_broad_initiated', ascending=True, na_position='first')
+
+    fig = go.Figure(go.Bar(
+        x=(sdf['psr_broad_initiated'].astype(float) * 100),
+        y=sdf['origin_surface'],
+        orientation='h',
+        text=[f"{float(v) * 100:.1f}%" if pd.notna(v) else "—"
+              for v in sdf['psr_broad_initiated']],
+        textposition='outside',
+        marker_color=BRAND_COLORS['info'],
+        hovertemplate="<b>%{y}</b><br>PSR Broad: %{x:.1f}%<br>"
+                      "Initiated sessions: %{customdata:,}<extra></extra>",
+        customdata=sdf['initiated_sessions'],
+    ))
+    fig.update_layout(
+        xaxis_title="PSR Broad (%) — initiated sessions",
+        font=dict(family="Inter, system-ui, sans-serif", size=13),
+        plot_bgcolor='white', paper_bgcolor='white',
+        margin=dict(l=40, r=60, t=20, b=40),
+        xaxis=dict(showgrid=True, gridcolor=BRAND_COLORS['border']),
+        yaxis=dict(showgrid=False),
+        showlegend=False,
+        height=max(300, 40 * len(sdf) + 100),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # Save-rate × volume bubble — which surfaces convert well AND have volume?
+    st.markdown("**Save Rate vs Volume** — bubble size = total saves")
+    bdf = surface_df[surface_df['views'] > 0].copy()
+    if not bdf.empty:
+        fig2 = go.Figure(go.Scatter(
+            x=bdf['views'].astype(float),
+            y=(bdf['save_per_view_rate'].astype(float) * 100),
+            mode='markers+text',
+            marker=dict(
+                size=(bdf['saves'].astype(float).clip(lower=1) ** 0.5) * 3 + 8,
+                color=BRAND_COLORS['accent'],
+                opacity=0.6,
+                line=dict(color=BRAND_COLORS['primary'], width=1),
+            ),
+            text=bdf['origin_surface'],
+            textposition='top center',
+            hovertemplate="<b>%{text}</b><br>"
+                          "Views: %{x:,}<br>"
+                          "Save-per-view: %{y:.1f}%<br>"
+                          "Total saves: %{marker.size}<extra></extra>",
+        ))
+        fig2.update_layout(
+            xaxis_title="Views (log)",
+            yaxis_title="Save per view (%)",
+            xaxis=dict(type='log', showgrid=True, gridcolor=BRAND_COLORS['border']),
+            yaxis=dict(showgrid=True, gridcolor=BRAND_COLORS['border']),
+            font=dict(family="Inter, system-ui, sans-serif", size=13),
+            plot_bgcolor='white', paper_bgcolor='white',
+            margin=dict(l=40, r=20, t=20, b=40),
+            showlegend=False,
+        )
+        st.plotly_chart(fig2, use_container_width=True)
+
+    # Full table
+    with st.expander("Surface attribution — full table"):
+        table_df = surface_df.copy()
+        table_df['SSR'] = (table_df['ssr_initiated'].astype(float) * 100).round(1).astype(str) + '%'
+        table_df['SHR'] = (table_df['shr_initiated'].astype(float) * 100).round(1).astype(str) + '%'
+        table_df['PSR Broad'] = (table_df['psr_broad_initiated'].astype(float) * 100).round(1).astype(str) + '%'
+        table_df['Save/View'] = (table_df['save_per_view_rate'].astype(float) * 100).round(1).astype(str) + '%'
+        show_cols = ['origin_surface', 'total_events', 'initiated_sessions',
+                     'saves', 'shares', 'SSR', 'SHR', 'PSR Broad', 'Save/View']
+        display = table_df[show_cols].rename(columns={
+            'origin_surface': 'Surface',
+            'total_events': 'Events',
+            'initiated_sessions': 'Init Sessions',
+            'saves': 'Saves',
+            'shares': 'Shares',
+        })
+        st.dataframe(display, use_container_width=True, hide_index=True)
+
+st.divider()
+
+# ============================================================================
+# Section G: Session Diagnostics
 # ============================================================================
 st.subheader("Session Diagnostics")
 

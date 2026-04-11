@@ -100,15 +100,16 @@ macros/             # (empty — no custom macros)
 snapshots/          # (empty — no snapshots configured)
 dashboard/          # Streamlit dashboard app
   Home.py           # Landing page
-  pages/            # Multi-page Streamlit pages (8-page architecture)
-    1_🎯_North_Star.py         # PSR ladder funnel, metrics over time, active planners
-    2_📈_Engagement.py         # Session trends, engagement metrics
-    3_👥_Users_&_Cohorts.py    # Archetypes, leaderboard, activation/signup funnel, retention, churn
-    4_🤖_AI_&_Prompts.py       # Prompt analysis, AI performance
-    5_🃏_Content_&_Places.py   # Place/card performance (post-gemini only)
-    6_🔄_Conversion_&_Viral.py # Conversion signals, viral loop
-    7_🚀_Onboarding.py         # Onboarding funnel
-    8_🔍_Power_User_Deep_Dive.py # Power user diagnostics
+  pages/            # Multi-page Streamlit pages (9-page architecture)
+    1_📅_Daily.py              # CEO daily report — single-date picker, top-line KPIs, activation checklist, category/place breakdowns, per-user activity
+    2_🎯_North_Star.py         # PSR ladder funnel, metrics over time, surface attribution, active planners
+    3_📈_Engagement.py         # Session trends, engagement metrics
+    4_👥_Users_&_Cohorts.py    # Archetypes, leaderboard, activation/signup funnel, retention, churn
+    5_🤖_AI_&_Prompts.py       # Prompt analysis, AI performance, Dextr query → results funnel
+    6_🃏_Content_&_Places.py   # Place/card performance (post-gemini only)
+    7_🔄_Conversion_&_Viral.py # Conversion signals, viral loop
+    8_🚀_Onboarding.py         # Onboarding funnel + first-session experience (checklist → spin wheel)
+    9_🔍_Power_User_Deep_Dive.py # Power user diagnostics
   utils/            # DB connection, data loading, styling, filters
 ```
 
