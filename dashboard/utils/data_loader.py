@@ -2945,6 +2945,844 @@ def load_daily_user_activity(report_date):
 
 
 # ============================================================================
+# Weekly Report loaders
+# ============================================================================
+# Each mirrors a daily loader but aggregates over a Mon–Sun week.
+# week_start is a date string for the Monday of the target week.
+
+
+@st.cache_data(ttl=300)
+def load_weekly_topline_kpis(week_start):
+    """Top-line KPIs aggregated over a Mon–Sun week. Returns dict with WAU instead of DAU."""
+    engine = get_database_connection()
+    query = f"""
+    WITH signups AS (
+        SELECT COUNT(*)::bigint AS new_signups
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND DATE(created_at) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+    ),
+    event_tallies AS (
+        SELECT
+            COUNT(DISTINCT e.user_id)::bigint AS wau,
+            COUNT(*) FILTER (WHERE e.event_type IN ('swipe_right', 'swipe_left'))::bigint AS total_swipes,
+            COUNT(*) FILTER (WHERE e.event_type = 'swipe_right')::bigint AS total_right_swipes,
+            COUNT(*) FILTER (WHERE e.event_type IN ('save', 'saved'))::bigint AS saves,
+            COUNT(*) FILTER (WHERE e.event_type = 'query')::bigint AS prompts,
+            COUNT(*)::bigint AS total_events
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        WHERE u.is_test_user = 0
+          AND DATE(e.event_timestamp) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+    ),
+    onboarding AS (
+        SELECT COUNT(*)::bigint AS onboarding_completed
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND onboarding_completed = true
+          AND DATE(created_at) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+    )
+    SELECT
+        s.new_signups,
+        COALESCE(e.wau, 0) AS wau,
+        COALESCE(e.total_swipes, 0) AS total_swipes,
+        COALESCE(e.total_right_swipes, 0) AS total_right_swipes,
+        CASE WHEN COALESCE(e.total_swipes, 0) > 0
+             THEN e.total_right_swipes::numeric / e.total_swipes
+             ELSE NULL END AS like_rate,
+        COALESCE(e.saves, 0) AS saves,
+        COALESCE(e.prompts, 0) AS prompts,
+        COALESCE(o.onboarding_completed, 0) AS onboarding_completed,
+        COALESCE(e.total_events, 0) AS total_events
+    FROM signups s
+    CROSS JOIN event_tallies e
+    CROSS JOIN onboarding o
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        if df.empty:
+            return {}
+        return df.iloc[0].to_dict()
+    except Exception as e:
+        st.error(f"Error loading weekly topline KPIs: {str(e)}")
+        return {}
+
+
+@st.cache_data(ttl=300)
+def load_weekly_multiweek_trend(week_start, num_weeks=8):
+    """Return num_weeks weeks ending on week_start's week with WAU, new_signups, etc."""
+    engine = get_database_connection()
+    query = f"""
+    WITH weeks AS (
+        SELECT generate_series(
+            DATE '{week_start}' - ({int(num_weeks) - 1} * 7),
+            DATE '{week_start}',
+            INTERVAL '1 week'
+        )::date AS week_start
+    ),
+    signups AS (
+        SELECT
+            date_trunc('week', created_at)::date AS week_start,
+            COUNT(*)::bigint AS new_signups
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND DATE(created_at) BETWEEN DATE '{week_start}' - ({int(num_weeks) - 1} * 7)
+                                    AND DATE '{week_start}' + 6
+        GROUP BY 1
+    ),
+    events AS (
+        SELECT
+            date_trunc('week', e.event_timestamp)::date AS week_start,
+            COUNT(DISTINCT e.user_id)::bigint AS wau,
+            COUNT(*)::bigint AS total_events,
+            COUNT(*) FILTER (WHERE e.event_type IN ('save', 'saved'))::bigint AS saves,
+            COUNT(*) FILTER (WHERE e.event_type = 'query')::bigint AS prompts,
+            COUNT(*) FILTER (WHERE e.event_type IN ('swipe_right', 'swipe_left'))::bigint AS total_swipes,
+            COUNT(*) FILTER (WHERE e.event_type = 'swipe_right')::bigint AS right_swipes
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        WHERE u.is_test_user = 0
+          AND DATE(e.event_timestamp) BETWEEN DATE '{week_start}' - ({int(num_weeks) - 1} * 7)
+                                           AND DATE '{week_start}' + 6
+        GROUP BY 1
+    )
+    SELECT
+        w.week_start,
+        COALESCE(s.new_signups, 0) AS new_signups,
+        COALESCE(e.wau, 0) AS wau,
+        COALESCE(e.total_events, 0) AS total_events,
+        COALESCE(e.saves, 0) AS saves,
+        COALESCE(e.prompts, 0) AS prompts,
+        COALESCE(e.total_swipes, 0) AS total_swipes,
+        CASE WHEN COALESCE(e.total_swipes, 0) > 0
+             THEN e.right_swipes::numeric / e.total_swipes
+             ELSE NULL END AS like_rate
+    FROM weeks w
+    LEFT JOIN signups s ON s.week_start = w.week_start
+    LEFT JOIN events e ON e.week_start = w.week_start
+    ORDER BY w.week_start
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading multi-week trend: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_weekly_activation_checklist(week_start):
+    """Activation checklist funnel for users who signed up during the week."""
+    engine = get_database_connection()
+    query = f"""
+    WITH cohort AS (
+        SELECT user_id
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND DATE(created_at) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+    ),
+    task_events AS (
+        SELECT
+            c.user_id,
+            BOOL_OR(e.task_name = 'deck_created') AS did_deck,
+            BOOL_OR(e.task_name = 'places_saved') AS did_saves,
+            BOOL_OR(e.task_name = 'multiplayer_started') AS did_mp
+        FROM cohort c
+        LEFT JOIN analytics_prod_silver.stg_app_events_enriched e
+            ON c.user_id = e.user_id
+           AND e.event_name = 'checklist_task_completed'
+        GROUP BY c.user_id
+    )
+    SELECT
+        COUNT(*)::bigint AS new_signups,
+        COUNT(*) FILTER (WHERE COALESCE(did_deck, false))::bigint AS deck_created,
+        COUNT(*) FILTER (WHERE COALESCE(did_saves, false))::bigint AS places_saved,
+        COUNT(*) FILTER (WHERE COALESCE(did_mp, false))::bigint AS multiplayer_started,
+        COUNT(*) FILTER (
+            WHERE COALESCE(did_deck, false)
+              AND COALESCE(did_saves, false)
+              AND COALESCE(did_mp, false)
+        )::bigint AS all_three,
+        COUNT(*) FILTER (WHERE NOT COALESCE(did_deck, false))::bigint AS stuck_no_deck,
+        COUNT(*) FILTER (
+            WHERE COALESCE(did_deck, false) AND NOT COALESCE(did_saves, false)
+        )::bigint AS stuck_at_saves,
+        COUNT(*) FILTER (
+            WHERE COALESCE(did_deck, false) AND COALESCE(did_saves, false) AND NOT COALESCE(did_mp, false)
+        )::bigint AS stuck_at_mp
+    FROM task_events
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        if df.empty:
+            return {}
+        return df.iloc[0].to_dict()
+    except Exception as e:
+        st.error(f"Error loading weekly activation checklist: {str(e)}")
+        return {}
+
+
+@st.cache_data(ttl=300)
+def load_weekly_new_signups_status(week_start):
+    """Per-user onboarding & checklist status for users who signed up during the week."""
+    engine = get_database_connection()
+    query = f"""
+    WITH cohort AS (
+        SELECT user_id, email, username, full_name, onboarding_completed, created_at
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND DATE(created_at) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+    ),
+    task_events AS (
+        SELECT
+            user_id,
+            BOOL_OR(task_name = 'deck_created') AS did_deck,
+            BOOL_OR(task_name = 'places_saved') AS did_saves,
+            BOOL_OR(task_name = 'multiplayer_started') AS did_mp
+        FROM analytics_prod_silver.stg_app_events_enriched
+        WHERE event_name = 'checklist_task_completed'
+          AND user_id IN (SELECT user_id FROM cohort)
+        GROUP BY user_id
+    )
+    SELECT
+        COALESCE(NULLIF(c.full_name, ''), NULLIF(c.username, ''), c.email, 'Unknown') AS display_name,
+        DATE(c.created_at) AS signup_date,
+        COALESCE(c.onboarding_completed, false) AS onboarded,
+        COALESCE(te.did_deck, false) AS deck_created,
+        COALESCE(te.did_saves, false) AS places_saved,
+        COALESCE(te.did_mp, false) AS multiplayer_started,
+        (COALESCE(te.did_deck, false)
+         AND COALESCE(te.did_saves, false)
+         AND COALESCE(te.did_mp, false)) AS all_three
+    FROM cohort c
+    LEFT JOIN task_events te ON c.user_id = te.user_id
+    ORDER BY all_three DESC, deck_created DESC, places_saved DESC, display_name
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading weekly new signups status: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_weekly_category_popularity(week_start):
+    """Category-level likes/dislikes for swipes during the week."""
+    engine = get_database_connection()
+    query = f"""
+    WITH swipes AS (
+        SELECT e.card_id, e.event_type
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        WHERE u.is_test_user = 0
+          AND DATE(e.event_timestamp) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+          AND e.event_type IN ('swipe_right', 'swipe_left')
+          AND e.card_id IS NOT NULL
+    ),
+    joined AS (
+        SELECT
+            c.is_drinks, c.is_dining, c.is_entertainment,
+            c.is_culture, c.is_adventure, c.is_health,
+            s.event_type
+        FROM swipes s
+        INNER JOIN analytics_prod_silver.stg_cards c ON c.card_id = s.card_id
+    ),
+    unpivoted AS (
+        SELECT 'Drinks' AS category, event_type FROM joined WHERE is_drinks
+        UNION ALL SELECT 'Dining', event_type FROM joined WHERE is_dining
+        UNION ALL SELECT 'Entertainment', event_type FROM joined WHERE is_entertainment
+        UNION ALL SELECT 'Culture', event_type FROM joined WHERE is_culture
+        UNION ALL SELECT 'Adventure', event_type FROM joined WHERE is_adventure
+        UNION ALL SELECT 'Health', event_type FROM joined WHERE is_health
+    )
+    SELECT
+        category,
+        COUNT(*) FILTER (WHERE event_type = 'swipe_right')::bigint AS likes,
+        COUNT(*) FILTER (WHERE event_type = 'swipe_left')::bigint AS dislikes,
+        COUNT(*)::bigint AS total,
+        CASE WHEN COUNT(*) > 0
+             THEN COUNT(*) FILTER (WHERE event_type = 'swipe_right')::numeric / COUNT(*)
+             ELSE NULL END AS like_pct
+    FROM unpivoted
+    GROUP BY category
+    ORDER BY total DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading weekly category popularity: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_weekly_places_flagged(week_start, min_swipes=10):
+    """Places with more dislikes than likes during the week."""
+    engine = get_database_connection()
+    query = f"""
+    WITH swipes AS (
+        SELECT e.card_id, pr.resolved_place_id, e.event_type
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        LEFT JOIN analytics_prod_silver.int_place_resolver pr
+            ON e.card_id = pr.original_card_id
+        WHERE u.is_test_user = 0
+          AND DATE(e.event_timestamp) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+          AND e.event_type IN ('swipe_right', 'swipe_left')
+          AND e.card_id IS NOT NULL
+    ),
+    agg AS (
+        SELECT
+            resolved_place_id,
+            COUNT(*) FILTER (WHERE event_type = 'swipe_right')::bigint AS likes,
+            COUNT(*) FILTER (WHERE event_type = 'swipe_left')::bigint AS dislikes,
+            COUNT(*)::bigint AS total_swipes
+        FROM swipes
+        WHERE resolved_place_id IS NOT NULL
+        GROUP BY resolved_place_id
+    )
+    SELECT
+        p.place_id AS id, p.name,
+        split_part(p.formatted_address, ',', 1) AS area,
+        a.likes, a.dislikes, a.total_swipes AS total,
+        a.dislikes::numeric / NULLIF(a.total_swipes, 0) AS dislike_pct
+    FROM agg a
+    INNER JOIN analytics_prod_bronze.src_places p ON a.resolved_place_id = p.place_id
+    WHERE a.total_swipes >= {int(min_swipes)}
+      AND a.dislikes > a.likes
+    ORDER BY dislike_pct DESC, a.total_swipes DESC
+    LIMIT 20
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading weekly places flagged: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_weekly_top_liked_places(week_start, limit=10):
+    """Top liked places during the week."""
+    engine = get_database_connection()
+    query = f"""
+    WITH swipes AS (
+        SELECT e.card_id, pr.resolved_place_id, e.event_type
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        LEFT JOIN analytics_prod_silver.int_place_resolver pr
+            ON e.card_id = pr.original_card_id
+        WHERE u.is_test_user = 0
+          AND DATE(e.event_timestamp) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+          AND e.event_type IN ('swipe_right', 'swipe_left')
+          AND e.card_id IS NOT NULL
+    ),
+    agg AS (
+        SELECT
+            resolved_place_id,
+            COUNT(*) FILTER (WHERE event_type = 'swipe_right')::bigint AS likes,
+            COUNT(*) FILTER (WHERE event_type = 'swipe_left')::bigint AS dislikes
+        FROM swipes
+        WHERE resolved_place_id IS NOT NULL
+        GROUP BY resolved_place_id
+    )
+    SELECT
+        p.place_id AS id, p.name,
+        split_part(p.formatted_address, ',', 1) AS area,
+        a.likes, a.dislikes
+    FROM agg a
+    INNER JOIN analytics_prod_bronze.src_places p ON a.resolved_place_id = p.place_id
+    WHERE a.likes > 0
+    ORDER BY a.likes DESC, (a.likes::numeric / NULLIF(a.likes + a.dislikes, 0)) DESC
+    LIMIT {int(limit)}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading weekly top liked places: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_weekly_user_activity(week_start):
+    """Per-user activity during the week. is_new = signed up that week."""
+    engine = get_database_connection()
+    query = f"""
+    WITH event_agg AS (
+        SELECT
+            e.user_id,
+            COUNT(*) FILTER (WHERE e.event_type = 'swipe_right')::bigint AS likes,
+            COUNT(*) FILTER (WHERE e.event_type = 'swipe_left')::bigint AS dislikes,
+            COUNT(*) FILTER (WHERE e.event_type IN ('save', 'saved'))::bigint AS saves,
+            COUNT(*) FILTER (WHERE e.event_type = 'query')::bigint AS prompts,
+            COUNT(*)::bigint AS total_events
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        WHERE u.is_test_user = 0
+          AND DATE(e.event_timestamp) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+        GROUP BY e.user_id
+    ),
+    boards_agg AS (
+        SELECT user_id, COUNT(*)::bigint AS boards_created
+        FROM analytics_prod_bronze.src_boards
+        WHERE DATE(created_at) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6
+          AND (is_default = false OR is_default IS NULL)
+        GROUP BY user_id
+    )
+    SELECT
+        COALESCE(NULLIF(u.full_name, ''), NULLIF(u.username, ''), u.email, 'Unknown') AS display_name,
+        ea.likes, ea.dislikes,
+        CASE WHEN (ea.likes + ea.dislikes) > 0
+             THEN ea.likes::numeric / (ea.likes + ea.dislikes)
+             ELSE NULL END AS like_rate,
+        ea.saves,
+        COALESCE(ba.boards_created, 0) AS boards_created,
+        ea.prompts, ea.total_events,
+        (DATE(u.created_at) BETWEEN DATE '{week_start}' AND DATE '{week_start}' + 6) AS is_new
+    FROM event_agg ea
+    INNER JOIN analytics_prod_silver.stg_users u ON ea.user_id = u.user_id
+    LEFT JOIN boards_agg ba ON ba.user_id = u.user_id
+    WHERE u.is_test_user = 0
+    ORDER BY ea.total_events DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading weekly user activity: {str(e)}")
+        return pd.DataFrame()
+
+
+# ============================================================================
+# Monthly Report loaders
+# ============================================================================
+# Each mirrors a daily loader but aggregates over a calendar month.
+# year and month are integers (e.g. 2026, 3 for March 2026).
+
+
+@st.cache_data(ttl=300)
+def load_monthly_topline_kpis(year, month):
+    """Top-line KPIs aggregated over a calendar month. Returns dict with MAU instead of DAU."""
+    engine = get_database_connection()
+    query = f"""
+    WITH signups AS (
+        SELECT COUNT(*)::bigint AS new_signups
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND date_trunc('month', created_at) = '{year}-{month:02d}-01'::date
+    ),
+    event_tallies AS (
+        SELECT
+            COUNT(DISTINCT e.user_id)::bigint AS mau,
+            COUNT(*) FILTER (WHERE e.event_type IN ('swipe_right', 'swipe_left'))::bigint AS total_swipes,
+            COUNT(*) FILTER (WHERE e.event_type = 'swipe_right')::bigint AS total_right_swipes,
+            COUNT(*) FILTER (WHERE e.event_type IN ('save', 'saved'))::bigint AS saves,
+            COUNT(*) FILTER (WHERE e.event_type = 'query')::bigint AS prompts,
+            COUNT(*)::bigint AS total_events
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        WHERE u.is_test_user = 0
+          AND date_trunc('month', e.event_timestamp) = '{year}-{month:02d}-01'::date
+    ),
+    onboarding AS (
+        SELECT COUNT(*)::bigint AS onboarding_completed
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND onboarding_completed = true
+          AND date_trunc('month', created_at) = '{year}-{month:02d}-01'::date
+    )
+    SELECT
+        s.new_signups,
+        COALESCE(e.mau, 0) AS mau,
+        COALESCE(e.total_swipes, 0) AS total_swipes,
+        COALESCE(e.total_right_swipes, 0) AS total_right_swipes,
+        CASE WHEN COALESCE(e.total_swipes, 0) > 0
+             THEN e.total_right_swipes::numeric / e.total_swipes
+             ELSE NULL END AS like_rate,
+        COALESCE(e.saves, 0) AS saves,
+        COALESCE(e.prompts, 0) AS prompts,
+        COALESCE(o.onboarding_completed, 0) AS onboarding_completed,
+        COALESCE(e.total_events, 0) AS total_events
+    FROM signups s
+    CROSS JOIN event_tallies e
+    CROSS JOIN onboarding o
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        if df.empty:
+            return {}
+        return df.iloc[0].to_dict()
+    except Exception as e:
+        st.error(f"Error loading monthly topline KPIs: {str(e)}")
+        return {}
+
+
+@st.cache_data(ttl=300)
+def load_monthly_multimonth_trend(year, month, num_months=6):
+    """Return num_months months ending on the target month with MAU, new_signups, etc."""
+    engine = get_database_connection()
+    query = f"""
+    WITH months AS (
+        SELECT generate_series(
+            ('{year}-{month:02d}-01'::date - INTERVAL '{int(num_months) - 1} months')::date,
+            '{year}-{month:02d}-01'::date,
+            INTERVAL '1 month'
+        )::date AS month_start
+    ),
+    signups AS (
+        SELECT
+            date_trunc('month', created_at)::date AS month_start,
+            COUNT(*)::bigint AS new_signups
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND created_at >= ('{year}-{month:02d}-01'::date - INTERVAL '{int(num_months) - 1} months')
+          AND date_trunc('month', created_at) <= '{year}-{month:02d}-01'::date
+        GROUP BY 1
+    ),
+    events AS (
+        SELECT
+            date_trunc('month', e.event_timestamp)::date AS month_start,
+            COUNT(DISTINCT e.user_id)::bigint AS mau,
+            COUNT(*)::bigint AS total_events,
+            COUNT(*) FILTER (WHERE e.event_type IN ('save', 'saved'))::bigint AS saves,
+            COUNT(*) FILTER (WHERE e.event_type = 'query')::bigint AS prompts,
+            COUNT(*) FILTER (WHERE e.event_type IN ('swipe_right', 'swipe_left'))::bigint AS total_swipes,
+            COUNT(*) FILTER (WHERE e.event_type = 'swipe_right')::bigint AS right_swipes
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        WHERE u.is_test_user = 0
+          AND e.event_timestamp >= ('{year}-{month:02d}-01'::date - INTERVAL '{int(num_months) - 1} months')
+          AND date_trunc('month', e.event_timestamp) <= '{year}-{month:02d}-01'::date
+        GROUP BY 1
+    )
+    SELECT
+        m.month_start,
+        COALESCE(s.new_signups, 0) AS new_signups,
+        COALESCE(e.mau, 0) AS mau,
+        COALESCE(e.total_events, 0) AS total_events,
+        COALESCE(e.saves, 0) AS saves,
+        COALESCE(e.prompts, 0) AS prompts,
+        COALESCE(e.total_swipes, 0) AS total_swipes,
+        CASE WHEN COALESCE(e.total_swipes, 0) > 0
+             THEN e.right_swipes::numeric / e.total_swipes
+             ELSE NULL END AS like_rate
+    FROM months m
+    LEFT JOIN signups s ON s.month_start = m.month_start
+    LEFT JOIN events e ON e.month_start = m.month_start
+    ORDER BY m.month_start
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading multi-month trend: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_monthly_activation_checklist(year, month):
+    """Activation checklist funnel for users who signed up during the month."""
+    engine = get_database_connection()
+    query = f"""
+    WITH cohort AS (
+        SELECT user_id
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND date_trunc('month', created_at) = '{year}-{month:02d}-01'::date
+    ),
+    task_events AS (
+        SELECT
+            c.user_id,
+            BOOL_OR(e.task_name = 'deck_created') AS did_deck,
+            BOOL_OR(e.task_name = 'places_saved') AS did_saves,
+            BOOL_OR(e.task_name = 'multiplayer_started') AS did_mp
+        FROM cohort c
+        LEFT JOIN analytics_prod_silver.stg_app_events_enriched e
+            ON c.user_id = e.user_id
+           AND e.event_name = 'checklist_task_completed'
+        GROUP BY c.user_id
+    )
+    SELECT
+        COUNT(*)::bigint AS new_signups,
+        COUNT(*) FILTER (WHERE COALESCE(did_deck, false))::bigint AS deck_created,
+        COUNT(*) FILTER (WHERE COALESCE(did_saves, false))::bigint AS places_saved,
+        COUNT(*) FILTER (WHERE COALESCE(did_mp, false))::bigint AS multiplayer_started,
+        COUNT(*) FILTER (
+            WHERE COALESCE(did_deck, false)
+              AND COALESCE(did_saves, false)
+              AND COALESCE(did_mp, false)
+        )::bigint AS all_three,
+        COUNT(*) FILTER (WHERE NOT COALESCE(did_deck, false))::bigint AS stuck_no_deck,
+        COUNT(*) FILTER (
+            WHERE COALESCE(did_deck, false) AND NOT COALESCE(did_saves, false)
+        )::bigint AS stuck_at_saves,
+        COUNT(*) FILTER (
+            WHERE COALESCE(did_deck, false) AND COALESCE(did_saves, false) AND NOT COALESCE(did_mp, false)
+        )::bigint AS stuck_at_mp
+    FROM task_events
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        if df.empty:
+            return {}
+        return df.iloc[0].to_dict()
+    except Exception as e:
+        st.error(f"Error loading monthly activation checklist: {str(e)}")
+        return {}
+
+
+@st.cache_data(ttl=300)
+def load_monthly_new_signups_status(year, month):
+    """Per-user onboarding & checklist status for users who signed up during the month."""
+    engine = get_database_connection()
+    query = f"""
+    WITH cohort AS (
+        SELECT user_id, email, username, full_name, onboarding_completed, created_at
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+          AND date_trunc('month', created_at) = '{year}-{month:02d}-01'::date
+    ),
+    task_events AS (
+        SELECT
+            user_id,
+            BOOL_OR(task_name = 'deck_created') AS did_deck,
+            BOOL_OR(task_name = 'places_saved') AS did_saves,
+            BOOL_OR(task_name = 'multiplayer_started') AS did_mp
+        FROM analytics_prod_silver.stg_app_events_enriched
+        WHERE event_name = 'checklist_task_completed'
+          AND user_id IN (SELECT user_id FROM cohort)
+        GROUP BY user_id
+    )
+    SELECT
+        COALESCE(NULLIF(c.full_name, ''), NULLIF(c.username, ''), c.email, 'Unknown') AS display_name,
+        DATE(c.created_at) AS signup_date,
+        COALESCE(c.onboarding_completed, false) AS onboarded,
+        COALESCE(te.did_deck, false) AS deck_created,
+        COALESCE(te.did_saves, false) AS places_saved,
+        COALESCE(te.did_mp, false) AS multiplayer_started,
+        (COALESCE(te.did_deck, false)
+         AND COALESCE(te.did_saves, false)
+         AND COALESCE(te.did_mp, false)) AS all_three
+    FROM cohort c
+    LEFT JOIN task_events te ON c.user_id = te.user_id
+    ORDER BY all_three DESC, deck_created DESC, places_saved DESC, display_name
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading monthly new signups status: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_monthly_category_popularity(year, month):
+    """Category-level likes/dislikes for swipes during the month."""
+    engine = get_database_connection()
+    query = f"""
+    WITH swipes AS (
+        SELECT e.card_id, e.event_type
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        WHERE u.is_test_user = 0
+          AND date_trunc('month', e.event_timestamp) = '{year}-{month:02d}-01'::date
+          AND e.event_type IN ('swipe_right', 'swipe_left')
+          AND e.card_id IS NOT NULL
+    ),
+    joined AS (
+        SELECT
+            c.is_drinks, c.is_dining, c.is_entertainment,
+            c.is_culture, c.is_adventure, c.is_health,
+            s.event_type
+        FROM swipes s
+        INNER JOIN analytics_prod_silver.stg_cards c ON c.card_id = s.card_id
+    ),
+    unpivoted AS (
+        SELECT 'Drinks' AS category, event_type FROM joined WHERE is_drinks
+        UNION ALL SELECT 'Dining', event_type FROM joined WHERE is_dining
+        UNION ALL SELECT 'Entertainment', event_type FROM joined WHERE is_entertainment
+        UNION ALL SELECT 'Culture', event_type FROM joined WHERE is_culture
+        UNION ALL SELECT 'Adventure', event_type FROM joined WHERE is_adventure
+        UNION ALL SELECT 'Health', event_type FROM joined WHERE is_health
+    )
+    SELECT
+        category,
+        COUNT(*) FILTER (WHERE event_type = 'swipe_right')::bigint AS likes,
+        COUNT(*) FILTER (WHERE event_type = 'swipe_left')::bigint AS dislikes,
+        COUNT(*)::bigint AS total,
+        CASE WHEN COUNT(*) > 0
+             THEN COUNT(*) FILTER (WHERE event_type = 'swipe_right')::numeric / COUNT(*)
+             ELSE NULL END AS like_pct
+    FROM unpivoted
+    GROUP BY category
+    ORDER BY total DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading monthly category popularity: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_monthly_places_flagged(year, month, min_swipes=20):
+    """Places with more dislikes than likes during the month."""
+    engine = get_database_connection()
+    query = f"""
+    WITH swipes AS (
+        SELECT e.card_id, pr.resolved_place_id, e.event_type
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        LEFT JOIN analytics_prod_silver.int_place_resolver pr
+            ON e.card_id = pr.original_card_id
+        WHERE u.is_test_user = 0
+          AND date_trunc('month', e.event_timestamp) = '{year}-{month:02d}-01'::date
+          AND e.event_type IN ('swipe_right', 'swipe_left')
+          AND e.card_id IS NOT NULL
+    ),
+    agg AS (
+        SELECT
+            resolved_place_id,
+            COUNT(*) FILTER (WHERE event_type = 'swipe_right')::bigint AS likes,
+            COUNT(*) FILTER (WHERE event_type = 'swipe_left')::bigint AS dislikes,
+            COUNT(*)::bigint AS total_swipes
+        FROM swipes
+        WHERE resolved_place_id IS NOT NULL
+        GROUP BY resolved_place_id
+    )
+    SELECT
+        p.place_id AS id, p.name,
+        split_part(p.formatted_address, ',', 1) AS area,
+        a.likes, a.dislikes, a.total_swipes AS total,
+        a.dislikes::numeric / NULLIF(a.total_swipes, 0) AS dislike_pct
+    FROM agg a
+    INNER JOIN analytics_prod_bronze.src_places p ON a.resolved_place_id = p.place_id
+    WHERE a.total_swipes >= {int(min_swipes)}
+      AND a.dislikes > a.likes
+    ORDER BY dislike_pct DESC, a.total_swipes DESC
+    LIMIT 20
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading monthly places flagged: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_monthly_top_liked_places(year, month, limit=10):
+    """Top liked places during the month."""
+    engine = get_database_connection()
+    query = f"""
+    WITH swipes AS (
+        SELECT e.card_id, pr.resolved_place_id, e.event_type
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        LEFT JOIN analytics_prod_silver.int_place_resolver pr
+            ON e.card_id = pr.original_card_id
+        WHERE u.is_test_user = 0
+          AND date_trunc('month', e.event_timestamp) = '{year}-{month:02d}-01'::date
+          AND e.event_type IN ('swipe_right', 'swipe_left')
+          AND e.card_id IS NOT NULL
+    ),
+    agg AS (
+        SELECT
+            resolved_place_id,
+            COUNT(*) FILTER (WHERE event_type = 'swipe_right')::bigint AS likes,
+            COUNT(*) FILTER (WHERE event_type = 'swipe_left')::bigint AS dislikes
+        FROM swipes
+        WHERE resolved_place_id IS NOT NULL
+        GROUP BY resolved_place_id
+    )
+    SELECT
+        p.place_id AS id, p.name,
+        split_part(p.formatted_address, ',', 1) AS area,
+        a.likes, a.dislikes
+    FROM agg a
+    INNER JOIN analytics_prod_bronze.src_places p ON a.resolved_place_id = p.place_id
+    WHERE a.likes > 0
+    ORDER BY a.likes DESC, (a.likes::numeric / NULLIF(a.likes + a.dislikes, 0)) DESC
+    LIMIT {int(limit)}
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading monthly top liked places: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_monthly_user_activity(year, month):
+    """Per-user activity during the month. is_new = signed up that month."""
+    engine = get_database_connection()
+    query = f"""
+    WITH event_agg AS (
+        SELECT
+            e.user_id,
+            COUNT(*) FILTER (WHERE e.event_type = 'swipe_right')::bigint AS likes,
+            COUNT(*) FILTER (WHERE e.event_type = 'swipe_left')::bigint AS dislikes,
+            COUNT(*) FILTER (WHERE e.event_type IN ('save', 'saved'))::bigint AS saves,
+            COUNT(*) FILTER (WHERE e.event_type = 'query')::bigint AS prompts,
+            COUNT(*)::bigint AS total_events
+        FROM analytics_prod_silver.stg_unified_events e
+        INNER JOIN analytics_prod_silver.stg_users u USING (user_id)
+        WHERE u.is_test_user = 0
+          AND date_trunc('month', e.event_timestamp) = '{year}-{month:02d}-01'::date
+        GROUP BY e.user_id
+    ),
+    boards_agg AS (
+        SELECT user_id, COUNT(*)::bigint AS boards_created
+        FROM analytics_prod_bronze.src_boards
+        WHERE date_trunc('month', created_at) = '{year}-{month:02d}-01'::date
+          AND (is_default = false OR is_default IS NULL)
+        GROUP BY user_id
+    )
+    SELECT
+        COALESCE(NULLIF(u.full_name, ''), NULLIF(u.username, ''), u.email, 'Unknown') AS display_name,
+        ea.likes, ea.dislikes,
+        CASE WHEN (ea.likes + ea.dislikes) > 0
+             THEN ea.likes::numeric / (ea.likes + ea.dislikes)
+             ELSE NULL END AS like_rate,
+        ea.saves,
+        COALESCE(ba.boards_created, 0) AS boards_created,
+        ea.prompts, ea.total_events,
+        (date_trunc('month', u.created_at) = '{year}-{month:02d}-01'::date) AS is_new
+    FROM event_agg ea
+    INNER JOIN analytics_prod_silver.stg_users u ON ea.user_id = u.user_id
+    LEFT JOIN boards_agg ba ON ba.user_id = u.user_id
+    WHERE u.is_test_user = 0
+    ORDER BY ea.total_events DESC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading monthly user activity: {str(e)}")
+        return pd.DataFrame()
+
+
+# ============================================================================
 # Track 2 loaders — new gold models from Phase D/E (PRs #50, #51)
 # ============================================================================
 

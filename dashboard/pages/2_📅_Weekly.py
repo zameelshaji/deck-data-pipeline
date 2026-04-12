@@ -1,8 +1,8 @@
-"""DECK Daily Report — replicates the CEO's SwipeOnDeck Daily Report as an interactive page.
+"""DECK Weekly Report — aggregates all Daily Report sections over a Mon–Sun week.
 
-Every section is keyed off a single date picker (defaults to yesterday). Change
-the date to time-travel: the 7-day trend, activation funnel, category popularity,
-and per-user activity all re-roll to reflect that date.
+Sidebar lets you pick from the last 26 weeks. The 8-week trend, activation
+funnel, category popularity, and per-user activity all re-roll for the
+selected week.
 """
 
 import streamlit as st
@@ -14,57 +14,74 @@ from datetime import date, timedelta
 from fpdf import FPDF
 from utils.styling import apply_deck_branding, add_deck_footer, BRAND_COLORS
 from utils.data_loader import (
-    load_daily_topline_kpis,
-    load_daily_7day_trend,
-    load_daily_activation_checklist,
-    load_daily_new_signups_status,
-    load_daily_category_popularity,
-    load_daily_places_flagged,
-    load_daily_top_liked_places,
+    load_weekly_topline_kpis,
+    load_weekly_multiweek_trend,
+    load_weekly_activation_checklist,
+    load_weekly_new_signups_status,
+    load_weekly_category_popularity,
+    load_weekly_places_flagged,
+    load_weekly_top_liked_places,
     load_daily_weekly_intensity,
-    load_daily_user_activity,
+    load_weekly_user_activity,
 )
 
 st.set_page_config(
-    page_title="Daily Report | DECK Analytics",
+    page_title="Weekly Report | DECK Analytics",
     page_icon="📅",
     layout="wide"
 )
 
 apply_deck_branding()
 
-st.title("Daily Report")
+st.title("Weekly Report")
 
 # ----------------------------------------------------------------------------
-# Date picker — default to yesterday
+# Week picker — default to last completed Mon–Sun week
 # ----------------------------------------------------------------------------
+
+def _monday(d):
+    """Return Monday of the week containing date d."""
+    return d - timedelta(days=d.weekday())
+
+today = date.today()
+# Last completed week ends on the most recent Sunday
+last_sunday = today - timedelta(days=today.weekday() + 1) if today.weekday() != 6 else today - timedelta(days=7)
+last_completed_monday = last_sunday - timedelta(days=6)
+
+week_options = []
+for i in range(26):
+    mon = last_completed_monday - timedelta(weeks=i)
+    sun = mon + timedelta(days=6)
+    week_options.append((mon, f"{mon.strftime('%b %d')} – {sun.strftime('%b %d, %Y')}"))
+
 with st.sidebar:
     st.header("Filters")
-    report_date = st.date_input(
-        "Report Date",
-        value=date.today() - timedelta(days=1),
-        max_value=date.today(),
-        help="All metrics below filter to this single date. Defaults to yesterday.",
+    selected_idx = st.selectbox(
+        "Report Week",
+        options=range(len(week_options)),
+        format_func=lambda i: week_options[i][1],
+        help="All metrics below aggregate over this Mon–Sun week.",
     )
+    week_start = week_options[selected_idx][0]
+    week_end = week_start + timedelta(days=6)
     min_swipe_threshold = st.number_input(
         "Places-to-remove min swipes",
-        min_value=1, max_value=20, value=4, step=1,
-        help="A place is flagged only if it had at least this many swipes on the report date."
+        min_value=1, max_value=50, value=10, step=1,
+        help="A place is flagged only if it had at least this many swipes during the week."
     )
 
-report_date_str = str(report_date)
-st.markdown(f"### {report_date.strftime('%A, %B %d, %Y')}")
+week_start_str = str(week_start)
+st.markdown(f"### {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}")
 
-# Reserve a slot for the PDF download button (filled at the bottom after all data loads)
 pdf_slot = st.empty()
 
 # ============================================================================
-# Section A: Top-line KPI tiles (matches CEO report page 1)
+# Section A: Top-line KPI tiles
 # ============================================================================
-kpi = load_daily_topline_kpis(report_date_str)
+kpi = load_weekly_topline_kpis(week_start_str)
 
 if not kpi:
-    st.warning("No data for the selected date. Try a different date.")
+    st.warning("No data for the selected week. Try a different week.")
     st.stop()
 
 def _fmt_int(v):
@@ -78,19 +95,17 @@ def _fmt_pct(v):
         return "—"
     return f"{float(v) * 100:.1f}%"
 
-# Row 1: the 4 hero tiles from the CEO report
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     st.metric("New Signups", _fmt_int(kpi.get('new_signups', 0)))
 with c2:
-    st.metric("DAU", _fmt_int(kpi.get('dau', 0)))
+    st.metric("WAU", _fmt_int(kpi.get('wau', 0)))
 with c3:
     st.metric("Total Swipes", _fmt_int(kpi.get('total_swipes', 0)))
 with c4:
     st.metric("Like Rate", _fmt_pct(kpi.get('like_rate')),
               help=f"{_fmt_int(kpi.get('total_right_swipes', 0))} right of {_fmt_int(kpi.get('total_swipes', 0))} total swipes")
 
-# Row 2: the 4 secondary tiles
 c1, c2, c3, c4 = st.columns(4)
 with c1:
     st.metric("Saves", _fmt_int(kpi.get('saves', 0)))
@@ -98,29 +113,29 @@ with c2:
     st.metric("Prompts", _fmt_int(kpi.get('prompts', 0)))
 with c3:
     st.metric("Onboarding", _fmt_int(kpi.get('onboarding_completed', 0)),
-              help="Users who completed onboarding on this date (signed up AND finished onboarding)")
+              help="Users who completed onboarding this week (signed up AND finished onboarding)")
 with c4:
     st.metric("Total Events", _fmt_int(kpi.get('total_events', 0)))
 
 st.divider()
 
 # ============================================================================
-# Section B: 7-Day Trend
+# Section B: 8-Week Trend
 # ============================================================================
-st.subheader("7-Day Trend")
-st.caption(f"Rolling 7 days ending {report_date.strftime('%b %d')}")
+st.subheader("8-Week Trend")
+st.caption(f"Rolling 8 weeks ending {week_end.strftime('%b %d')}")
 
-trend_df = load_daily_7day_trend(report_date_str)
+trend_df = load_weekly_multiweek_trend(week_start_str, num_weeks=8)
 
 if not trend_df.empty:
     metric_choice = st.radio(
         "Metric",
-        options=["DAU", "New Signups", "Total Events", "Saves", "Prompts", "Like Rate"],
+        options=["WAU", "New Signups", "Total Events", "Saves", "Prompts", "Like Rate"],
         horizontal=True,
         label_visibility="collapsed",
     )
     metric_col = {
-        "DAU": "dau",
+        "WAU": "wau",
         "New Signups": "new_signups",
         "Total Events": "total_events",
         "Saves": "saves",
@@ -129,7 +144,7 @@ if not trend_df.empty:
     }[metric_choice]
 
     display_df = trend_df.copy()
-    display_df['day'] = pd.to_datetime(display_df['day'])
+    display_df['week_start'] = pd.to_datetime(display_df['week_start'])
     y_vals = display_df[metric_col].astype(float)
     if metric_col == 'like_rate':
         y_vals = y_vals * 100
@@ -140,19 +155,19 @@ if not trend_df.empty:
         text_vals = [f"{int(v):,}" if pd.notna(v) else "—" for v in y_vals]
 
     fig = go.Figure(go.Bar(
-        x=display_df['day'],
+        x=display_df['week_start'],
         y=y_vals,
         text=text_vals,
         textposition='outside',
-        marker_color=['#E91E8C' if d.date() == report_date else BRAND_COLORS['info']
-                      for d in display_df['day']],
+        marker_color=['#E91E8C' if d.date() == week_start else BRAND_COLORS['info']
+                      for d in display_df['week_start']],
     ))
     fig.update_layout(
         yaxis_title=y_label,
         font=dict(family="Inter, system-ui, sans-serif", size=13),
         plot_bgcolor='white', paper_bgcolor='white',
         margin=dict(l=40, r=20, t=20, b=40),
-        xaxis=dict(showgrid=False, tickformat='%a %b %d'),
+        xaxis=dict(showgrid=False, tickformat='%b %d'),
         yaxis=dict(showgrid=True, gridcolor=BRAND_COLORS['border']),
         showlegend=False,
     )
@@ -167,7 +182,7 @@ st.divider()
 # ============================================================================
 st.subheader("Activation Checklist Funnel — New Signups")
 
-checklist = load_daily_activation_checklist(report_date_str)
+checklist = load_weekly_activation_checklist(week_start_str)
 new_signups_n = int(checklist.get('new_signups', 0) or 0)
 deck_n = int(checklist.get('deck_created', 0) or 0)
 saves_n = int(checklist.get('places_saved', 0) or 0)
@@ -178,7 +193,7 @@ stuck_at_saves = int(checklist.get('stuck_at_saves', 0) or 0)
 stuck_at_mp = int(checklist.get('stuck_at_mp', 0) or 0)
 
 if new_signups_n == 0:
-    st.info("No new signups on this date — nothing to funnel.")
+    st.info("No new signups this week — nothing to funnel.")
 else:
     st.caption(
         f"**{all_three_n} / {new_signups_n}** new users completed all 3 steps and earned the spin wheel"
@@ -221,17 +236,16 @@ st.divider()
 # ============================================================================
 st.subheader("New Signups — Onboarding & Checklist Status")
 
-signups_df = load_daily_new_signups_status(report_date_str)
+signups_df = load_weekly_new_signups_status(week_start_str)
 
 if signups_df.empty:
-    st.info("No new signups on this date.")
+    st.info("No new signups this week.")
 else:
     onboarded_n = int(signups_df['onboarded'].sum())
     total_n = len(signups_df)
     pct = (onboarded_n / total_n * 100) if total_n else 0
     st.caption(f"{onboarded_n} of {total_n} completed onboarding ({pct:.0f}%)")
 
-    # Render the checkmark table
     display = signups_df.copy()
     def _check(v):
         return "Y" if bool(v) else "-"
@@ -240,6 +254,7 @@ else:
 
     display = display.rename(columns={
         'display_name': 'Name',
+        'signup_date': 'Signed Up',
         'onboarded': 'Onboarded',
         'deck_created': 'Deck',
         'places_saved': 'Saves',
@@ -255,10 +270,10 @@ st.divider()
 # ============================================================================
 st.subheader("Category Popularity")
 
-cat_df = load_daily_category_popularity(report_date_str)
+cat_df = load_weekly_category_popularity(week_start_str)
 
 if cat_df.empty:
-    st.info("No category swipes recorded on this date.")
+    st.info("No category swipes recorded this week.")
 else:
     display = cat_df.copy()
     display['Like %'] = (display['like_pct'].astype(float) * 100).round(0).astype(int).astype(str) + '%'
@@ -273,14 +288,14 @@ st.divider()
 # ============================================================================
 st.subheader("Places Flagged for Removal (Candidates to Review)")
 st.caption(
-    f"Places with more dislikes than likes on this date, minimum {int(min_swipe_threshold)} swipes. "
+    f"Places with more dislikes than likes this week, minimum {int(min_swipe_threshold)} swipes. "
     "Review before removing from the database."
 )
 
-flagged_df = load_daily_places_flagged(report_date_str, min_swipes=int(min_swipe_threshold))
+flagged_df = load_weekly_places_flagged(week_start_str, min_swipes=int(min_swipe_threshold))
 
 if flagged_df.empty:
-    st.info(f"No places met the flagging criteria on {report_date.strftime('%b %d')}.")
+    st.info(f"No places met the flagging criteria for the week of {week_start.strftime('%b %d')}.")
 else:
     display = flagged_df.copy()
     display['Dislike %'] = (display['dislike_pct'].astype(float) * 100).round(0).astype(int).astype(str) + '%'
@@ -295,10 +310,10 @@ st.divider()
 # ============================================================================
 st.subheader("Top Liked Places")
 
-top_df = load_daily_top_liked_places(report_date_str, limit=10)
+top_df = load_weekly_top_liked_places(week_start_str, limit=10)
 
 if top_df.empty:
-    st.info("No likes recorded on this date.")
+    st.info("No likes recorded this week.")
 else:
     display = top_df.copy()
     display.columns = ['ID', 'Name', 'Area', 'Likes', 'Dislikes']
@@ -315,9 +330,8 @@ st.caption(
     "Saves and shares are only instrumented from the week of 2026-01-26 onward."
 )
 
-intensity_df = load_daily_weekly_intensity(report_date_str, weeks=12)
+intensity_df = load_daily_weekly_intensity(week_start_str, weeks=12)
 
-# Build the intensity chart (used both for display and PDF)
 intensity_fig = None
 if not intensity_df.empty:
     idf = intensity_df.copy()
@@ -351,7 +365,6 @@ if not intensity_df.empty:
     )
     st.plotly_chart(intensity_fig, use_container_width=True)
 
-    # Table view
     with st.expander("Weekly values table"):
         table = idf.copy()
         table.columns = ['Week Start', 'Active Activated Users', 'Avg Swipes', 'Avg Saves', 'Avg Shares']
@@ -362,14 +375,14 @@ else:
 st.divider()
 
 # ============================================================================
-# Section I: User Activity — Report Date
+# Section I: User Activity — Week
 # ============================================================================
-st.subheader(f"User Activity — {report_date.strftime('%b %d')}")
+st.subheader(f"User Activity — Week of {week_start.strftime('%b %d')}")
 
-user_df = load_daily_user_activity(report_date_str)
+user_df = load_weekly_user_activity(week_start_str)
 
 if user_df.empty:
-    st.info("No user activity on this date.")
+    st.info("No user activity this week.")
 else:
     display = user_df.copy()
     display['Like %'] = display['like_rate'].apply(
@@ -383,12 +396,11 @@ else:
     display.columns = ['Name', 'Likes', 'Dis.', 'Like %', 'Saves', 'Boards', 'Prompts', 'Total', 'New?']
     st.dataframe(display, use_container_width=True, hide_index=True)
 
-    # Download button
     csv = user_df.to_csv(index=False)
     st.download_button(
         label="Download user activity CSV",
         data=csv,
-        file_name=f"deck_user_activity_{report_date_str}.csv",
+        file_name=f"deck_weekly_user_activity_{week_start_str}.csv",
         mime="text/csv",
     )
 
@@ -400,11 +412,11 @@ else:
 def _pdf_safe(s):
     """Replace Unicode characters unsupported by Helvetica with ASCII equivalents."""
     return (str(s)
-            .replace('\u2014', '-')   # em dash
-            .replace('\u2013', '-')   # en dash
-            .replace('\u2713', 'Y')   # checkmark
-            .replace('\u2717', 'N')   # ballot X
-            .replace('\u2022', '*')   # bullet
+            .replace('\u2014', '-')
+            .replace('\u2013', '-')
+            .replace('\u2713', 'Y')
+            .replace('\u2717', 'N')
+            .replace('\u2022', '*')
             .encode('latin-1', errors='replace').decode('latin-1'))
 
 
@@ -432,15 +444,11 @@ def _pdf_table(pdf, headers, rows, col_widths=None):
     """Render a table. col_widths can be a list of mm widths matching headers."""
     if col_widths is None:
         col_widths = [pdf.epw / len(headers)] * len(headers)
-
-    # Header row
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_fill_color(240, 240, 240)
     for i, h in enumerate(headers):
         pdf.cell(col_widths[i], 6, _pdf_safe(h), border=1, align="C", fill=True)
     pdf.ln()
-
-    # Data rows
     pdf.set_font("Helvetica", "", 8)
     for row in rows:
         for i, val in enumerate(row):
@@ -448,23 +456,25 @@ def _pdf_table(pdf, headers, rows, col_widths=None):
         pdf.ln()
 
 
-def _generate_daily_pdf():
-    """Build a PDF mirroring the Daily Report page content."""
+def _generate_weekly_pdf():
+    """Build a PDF mirroring the Weekly Report page content."""
     pdf = FPDF(orientation='P', unit='mm', format='A4')
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
     # --- Title ---
     pdf.set_font("Helvetica", "B", 20)
-    pdf.cell(0, 10, "SwipeOnDeck Daily Report", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.cell(0, 10, "SwipeOnDeck Weekly Report", new_x="LMARGIN", new_y="NEXT", align="C")
     pdf.set_font("Helvetica", "", 12)
-    pdf.cell(0, 7, report_date.strftime('%A, %B %d, %Y'), new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.cell(0, 7,
+             f"{week_start.strftime('%b %d')} - {week_end.strftime('%b %d, %Y')}",
+             new_x="LMARGIN", new_y="NEXT", align="C")
     pdf.ln(6)
 
     # --- KPI tiles (2 rows x 4) ---
     kpi_items_row1 = [
         ("New Signups", _fmt_int(kpi.get('new_signups', 0))),
-        ("DAU", _fmt_int(kpi.get('dau', 0))),
+        ("WAU", _fmt_int(kpi.get('wau', 0))),
         ("Total Swipes", _fmt_int(kpi.get('total_swipes', 0))),
         ("Like Rate", _fmt_pct(kpi.get('like_rate'))),
     ]
@@ -476,12 +486,10 @@ def _generate_daily_pdf():
     ]
     tile_w = pdf.epw / 4
     for row_items in [kpi_items_row1, kpi_items_row2]:
-        # Values
         pdf.set_font("Helvetica", "B", 18)
         for label, val in row_items:
             pdf.cell(tile_w, 10, _pdf_safe(val), align="C")
         pdf.ln()
-        # Labels
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(120, 120, 120)
         for label, val in row_items:
@@ -490,14 +498,14 @@ def _generate_daily_pdf():
         pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
 
-    # --- 7-Day Trend charts (all 6 metrics) ---
+    # --- 8-Week Trend charts (all 6 metrics) ---
     if not trend_df.empty:
-        _pdf_section_heading(pdf, "7-Day Trend")
+        _pdf_section_heading(pdf, "8-Week Trend")
         trend_display = trend_df.copy()
-        trend_display['day'] = pd.to_datetime(trend_display['day'])
+        trend_display['week_start'] = pd.to_datetime(trend_display['week_start'])
 
         trend_metrics = [
-            ("DAU", "dau", False),
+            ("WAU", "wau", False),
             ("New Signups", "new_signups", False),
             ("Total Events", "total_events", False),
             ("Saves", "saves", False),
@@ -511,24 +519,24 @@ def _generate_daily_pdf():
                 text_vals = [f"{v:.1f}%" if pd.notna(v) else "-" for v in y_vals]
             else:
                 text_vals = [str(int(v)) if pd.notna(v) else "-" for v in y_vals]
-            pdf_trend_fig = go.Figure(go.Bar(
-                x=trend_display['day'], y=y_vals,
+            pdf_fig = go.Figure(go.Bar(
+                x=trend_display['week_start'], y=y_vals,
                 text=text_vals, textposition='outside',
                 marker_color=[
-                    '#E91E8C' if d.date() == report_date else '#2383E2'
-                    for d in trend_display['day']
+                    '#E91E8C' if d.date() == week_start else '#2383E2'
+                    for d in trend_display['week_start']
                 ],
             ))
-            pdf_trend_fig.update_layout(
+            pdf_fig.update_layout(
                 yaxis_title=f"{label} (%)" if is_pct else label,
                 font=dict(family="Helvetica", size=12),
                 plot_bgcolor='white', paper_bgcolor='white',
                 margin=dict(l=40, r=20, t=10, b=40),
-                xaxis=dict(showgrid=False, tickformat='%a %b %d'),
+                xaxis=dict(showgrid=False, tickformat='%b %d'),
                 yaxis=dict(showgrid=True, gridcolor='#E5E5E5'),
                 showlegend=False,
             )
-            png = _fig_to_png_bytes(pdf_trend_fig, width=700, height=220)
+            png = _fig_to_png_bytes(pdf_fig, width=700, height=220)
             with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
                 tmp.write(png)
                 tmp_path = tmp.name
@@ -568,16 +576,16 @@ def _generate_daily_pdf():
                  f"{onboarded_n} of {total_n} completed onboarding ({pct:.0f}%)",
                  new_x="LMARGIN", new_y="NEXT")
         pdf.ln(2)
-        signup_headers = ["Name", "Onboarded", "Deck", "Saves", "MP", "All 3"]
+        signup_headers = ["Name", "Signed Up", "Onboarded", "Deck", "Saves", "MP", "All 3"]
         signup_rows = []
         for _, r in signups_df.iterrows():
             ck = lambda v: "Y" if bool(v) else "-"
-            name = str(r['display_name'])[:25]
+            name = str(r['display_name'])[:22]
             signup_rows.append([
-                name, ck(r['onboarded']), ck(r['deck_created']),
+                name, str(r.get('signup_date', '')), ck(r['onboarded']), ck(r['deck_created']),
                 ck(r['places_saved']), ck(r['multiplayer_started']), ck(r['all_three']),
             ])
-        cw = [pdf.epw * 0.35] + [pdf.epw * 0.13] * 5
+        cw = [pdf.epw * 0.25, pdf.epw * 0.15] + [pdf.epw * 0.12] * 5
         _pdf_table(pdf, signup_headers, signup_rows, col_widths=cw)
         pdf.ln(4)
 
@@ -640,7 +648,7 @@ def _generate_daily_pdf():
 
     # --- User Activity table ---
     if not user_df.empty:
-        _pdf_section_heading(pdf, f"User Activity — {report_date.strftime('%b %d')}")
+        _pdf_section_heading(pdf, f"User Activity — Week of {week_start.strftime('%b %d')}")
         ua_headers = ["Name", "Likes", "Dis.", "Like %", "Saves", "Boards", "Prompts", "Total", "New?"]
         ua_rows = []
         for _, r in user_df.iterrows():
@@ -661,11 +669,11 @@ def _generate_daily_pdf():
 
 # Generate PDF and fill the slot near the top
 try:
-    pdf_bytes = _generate_daily_pdf()
+    pdf_bytes = _generate_weekly_pdf()
     pdf_slot.download_button(
         label="Download as PDF",
         data=pdf_bytes,
-        file_name=f"SwipeOnDeck_Daily_Report_{report_date_str}.pdf",
+        file_name=f"SwipeOnDeck_Weekly_Report_{week_start_str}.pdf",
         mime="application/pdf",
     )
 except Exception as e:
