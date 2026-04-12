@@ -1,10 +1,10 @@
-"""DECK Place Curation — Filter, review, and soft-delete low-quality places."""
+"""DECK Place Curation — Filter, review, and delete low-quality places."""
 
 import streamlit as st
 import pandas as pd
 from datetime import datetime
 from utils.styling import apply_deck_branding, add_deck_footer
-from utils.data_loader import load_places_for_curation, soft_delete_places, restore_places
+from utils.data_loader import load_places_for_curation, delete_places
 
 st.set_page_config(
     page_title="Place Curation | DECK Analytics",
@@ -17,10 +17,6 @@ apply_deck_branding()
 # ---------------------------------------------------------------------------
 # Session state
 # ---------------------------------------------------------------------------
-if "last_deleted_ids" not in st.session_state:
-    st.session_state.last_deleted_ids = []
-if "last_deleted_names" not in st.session_state:
-    st.session_state.last_deleted_names = []
 if "deletion_log" not in st.session_state:
     st.session_state.deletion_log = []
 if "confirm_delete" not in st.session_state:
@@ -34,12 +30,12 @@ if "pending_names" not in st.session_state:
 # Title & data load
 # ---------------------------------------------------------------------------
 st.title("Place Curation")
-st.caption("Review and remove low-quality places from the active catalog")
+st.caption("Review and remove low-quality places from the catalog")
 
 df = load_places_for_curation()
 
 if df.empty:
-    st.warning("No active places found.")
+    st.warning("No places found.")
     st.stop()
 
 # ---------------------------------------------------------------------------
@@ -113,7 +109,7 @@ if zero_impressions_only:
 # ---------------------------------------------------------------------------
 c1, c2, c3, c4 = st.columns(4)
 with c1:
-    st.metric("Total Active Places", f"{len(df):,}")
+    st.metric("Total Places", f"{len(df):,}")
 with c2:
     st.metric("Matching Filters", f"{len(filtered):,}")
 with c3:
@@ -122,28 +118,6 @@ with c3:
 with c4:
     zero_images = int((filtered["media_count"] == 0).sum())
     st.metric("Zero Images", f"{zero_images:,}")
-
-# ---------------------------------------------------------------------------
-# Undo last delete (shown above table for visibility)
-# ---------------------------------------------------------------------------
-if st.session_state.last_deleted_ids:
-    undo_names = ", ".join(st.session_state.last_deleted_names[:5])
-    suffix = (
-        f" and {len(st.session_state.last_deleted_names) - 5} more"
-        if len(st.session_state.last_deleted_names) > 5
-        else ""
-    )
-    if st.button(
-        f"Undo Last Delete ({len(st.session_state.last_deleted_ids)} places: {undo_names}{suffix})"
-    ):
-        restored = restore_places(st.session_state.last_deleted_ids)
-        if restored > 0:
-            st.toast(f"Restored {restored} place(s)")
-            st.session_state.last_deleted_ids = []
-            st.session_state.last_deleted_names = []
-            st.rerun()
-        else:
-            st.error("Could not restore places. They may have already been restored.")
 
 # ---------------------------------------------------------------------------
 # Table display
@@ -234,18 +208,16 @@ if selected_count > 0:
 
 if st.session_state.confirm_delete:
     with st.expander("Confirm Deletion", expanded=True):
-        st.write("The following places will be soft-deleted (`is_active = false`):")
+        st.error("This will **permanently delete** these places from the database. This cannot be undone.")
         for name in st.session_state.pending_names:
             st.write(f"- {name}")
 
         col_confirm, col_cancel = st.columns(2)
         with col_confirm:
-            if st.button("Confirm Soft-Delete", type="primary"):
-                count = soft_delete_places(st.session_state.pending_ids)
+            if st.button("Confirm Delete", type="primary"):
+                count = delete_places(st.session_state.pending_ids)
                 if count > 0:
-                    st.toast(f"Removed {count} place(s)")
-                    st.session_state.last_deleted_ids = st.session_state.pending_ids
-                    st.session_state.last_deleted_names = st.session_state.pending_names
+                    st.toast(f"Deleted {count} place(s)")
                     st.session_state.deletion_log.append(
                         {
                             "timestamp": datetime.now().strftime("%H:%M:%S"),
@@ -254,7 +226,7 @@ if st.session_state.confirm_delete:
                         }
                     )
                 else:
-                    st.error("No places were deleted. They may have already been removed.")
+                    st.error("No places were deleted.")
                 st.session_state.confirm_delete = False
                 st.session_state.pending_ids = []
                 st.session_state.pending_names = []
@@ -275,7 +247,7 @@ if st.session_state.deletion_log:
             names_preview = ", ".join(entry["names"][:3])
             suffix = f" +{len(entry['names']) - 3} more" if len(entry["names"]) > 3 else ""
             st.write(
-                f"**{entry['timestamp']}** — Removed {entry['count']} place(s): "
+                f"**{entry['timestamp']}** — Deleted {entry['count']} place(s): "
                 f"{names_preview}{suffix}"
             )
 
