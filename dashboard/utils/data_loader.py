@@ -3907,3 +3907,86 @@ def load_first_session_experience():
     except Exception as e:
         st.error(f"Error loading first-session experience: {str(e)}")
         return pd.DataFrame()
+
+
+# ---------------------------------------------------------------------------
+# Place Curation (page 13) — first write-capable loaders
+# ---------------------------------------------------------------------------
+
+def load_places_for_curation():
+    """Load all active places with media counts and engagement metrics for curation.
+
+    NOT cached — must reflect live state immediately after soft-deletes.
+    """
+    engine = get_database_connection()
+    query = """
+    SELECT
+        p.id,
+        p.name,
+        COALESCE(perf.neighborhood, split_part(p.formatted_address, ',', 1)) AS neighborhood,
+        p.categories,
+        p.rating,
+        p.user_ratings_total,
+        COALESCE(pm.media_count, 0) AS media_count,
+        COALESCE(perf.total_impressions, 0) AS total_impressions,
+        COALESCE(perf.total_left_swipes, 0) AS total_left_swipes,
+        COALESCE(perf.total_saves, 0) AS total_saves,
+        ROUND(
+            perf.total_left_swipes::numeric
+            / NULLIF(perf.total_impressions, 0) * 100, 1
+        ) AS dislike_rate_pct,
+        ROUND(perf.save_rate * 100, 1) AS save_rate_pct,
+        p.source_type,
+        p.is_featured
+    FROM public.places p
+    LEFT JOIN (
+        SELECT place_id, COUNT(*) AS media_count
+        FROM public.place_media
+        WHERE is_active = true
+        GROUP BY place_id
+    ) pm ON pm.place_id = p.id
+    LEFT JOIN analytics_prod_gold.fct_place_performance perf
+        ON perf.place_id = p.id
+    WHERE p.is_active = true
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading places for curation: {str(e)}")
+        return pd.DataFrame()
+
+
+def soft_delete_places(place_ids: list[int]) -> int:
+    """Soft-delete places by setting is_active = false. Returns affected row count."""
+    engine = get_database_connection()
+    query = text("""
+        UPDATE public.places
+        SET is_active = false, updated_at = now()
+        WHERE id = ANY(:place_ids) AND is_active = true
+    """)
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(query, {"place_ids": place_ids})
+        return result.rowcount
+    except Exception as e:
+        st.error(f"Error soft-deleting places: {str(e)}")
+        return 0
+
+
+def restore_places(place_ids: list[int]) -> int:
+    """Restore soft-deleted places by setting is_active = true. Returns affected row count."""
+    engine = get_database_connection()
+    query = text("""
+        UPDATE public.places
+        SET is_active = true, updated_at = now()
+        WHERE id = ANY(:place_ids) AND is_active = false
+    """)
+    try:
+        with engine.begin() as conn:
+            result = conn.execute(query, {"place_ids": place_ids})
+        return result.rowcount
+    except Exception as e:
+        st.error(f"Error restoring places: {str(e)}")
+        return 0
