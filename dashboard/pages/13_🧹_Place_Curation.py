@@ -124,6 +124,21 @@ with c4:
 # ---------------------------------------------------------------------------
 st.subheader("Places")
 
+SORT_OPTIONS = {
+    "Rating (low first)": ("rating", True),
+    "Rating (high first)": ("rating", False),
+    "Reviews (low first)": ("user_ratings_total", True),
+    "Reviews (high first)": ("user_ratings_total", False),
+    "Images (low first)": ("media_count", True),
+    "Impressions (low first)": ("total_impressions", True),
+    "Impressions (high first)": ("total_impressions", False),
+    "Dislike % (high first)": ("dislike_rate_pct", False),
+    "Save % (low first)": ("save_rate_pct", True),
+}
+sort_label = st.selectbox("Sort by", list(SORT_OPTIONS.keys()), index=0)
+sort_col, sort_asc = SORT_OPTIONS[sort_label]
+filtered = filtered.sort_values(sort_col, ascending=sort_asc, na_position="first")
+
 display_df = filtered.copy()
 display_df.insert(0, "Select", False)
 display_df["categories_str"] = display_df["categories"].apply(
