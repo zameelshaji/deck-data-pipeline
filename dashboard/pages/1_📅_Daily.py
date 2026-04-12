@@ -1,14 +1,17 @@
 """DECK Daily Report — replicates the CEO's SwipeOnDeck Daily Report as an interactive page.
 
 Every section is keyed off a single date picker (defaults to yesterday). Change
-the date to time-travel: the all-time topline, 7-day trend, activation funnel,
-category popularity, and per-user activity all re-roll to reflect that date.
+the date to time-travel: the 7-day trend, activation funnel, category popularity,
+and per-user activity all re-roll to reflect that date.
 """
 
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+import tempfile
+import os
 from datetime import date, timedelta
+from fpdf import FPDF
 from utils.styling import apply_deck_branding, add_deck_footer, BRAND_COLORS
 from utils.data_loader import (
     load_daily_topline_kpis,
@@ -51,6 +54,9 @@ with st.sidebar:
 
 report_date_str = str(report_date)
 st.markdown(f"### {report_date.strftime('%A, %B %d, %Y')}")
+
+# Reserve a slot for the PDF download button (filled at the bottom after all data loads)
+pdf_slot = st.empty()
 
 # ============================================================================
 # Section A: Top-line KPI tiles (matches CEO report page 1)
@@ -228,7 +234,7 @@ else:
     # Render the checkmark table
     display = signups_df.copy()
     def _check(v):
-        return "✓" if bool(v) else "—"
+        return "Y" if bool(v) else "-"
     for col in ['onboarded', 'deck_created', 'places_saved', 'multiplayer_started', 'all_three']:
         display[col] = display[col].apply(_check)
 
@@ -311,29 +317,29 @@ st.caption(
 
 intensity_df = load_daily_weekly_intensity(report_date_str, weeks=12)
 
-if intensity_df.empty:
-    st.info("No weekly intensity data available.")
-else:
+# Build the intensity chart (used both for display and PDF)
+intensity_fig = None
+if not intensity_df.empty:
     idf = intensity_df.copy()
     idf['week_start'] = pd.to_datetime(idf['week_start'])
 
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
+    intensity_fig = go.Figure()
+    intensity_fig.add_trace(go.Scatter(
         x=idf['week_start'], y=idf['avg_swipes'].astype(float),
         name='Avg Swipes', line=dict(color=BRAND_COLORS['info'], width=2),
         mode='lines+markers',
     ))
-    fig.add_trace(go.Scatter(
+    intensity_fig.add_trace(go.Scatter(
         x=idf['week_start'], y=idf['avg_saves'].astype(float),
         name='Avg Saves', line=dict(color='#E91E8C', width=2),
         mode='lines+markers',
     ))
-    fig.add_trace(go.Scatter(
+    intensity_fig.add_trace(go.Scatter(
         x=idf['week_start'], y=idf['avg_shares'].astype(float),
         name='Avg Shares', line=dict(color=BRAND_COLORS['success'], width=2),
         mode='lines+markers',
     ))
-    fig.update_layout(
+    intensity_fig.update_layout(
         yaxis_title="Avg per active activated user",
         xaxis_title="Week starting",
         font=dict(family="Inter, system-ui, sans-serif", size=13),
@@ -343,13 +349,15 @@ else:
         xaxis=dict(showgrid=False),
         yaxis=dict(showgrid=True, gridcolor=BRAND_COLORS['border']),
     )
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(intensity_fig, use_container_width=True)
 
     # Table view
     with st.expander("Weekly values table"):
         table = idf.copy()
         table.columns = ['Week Start', 'Active Activated Users', 'Avg Swipes', 'Avg Saves', 'Avg Shares']
         st.dataframe(table, use_container_width=True, hide_index=True)
+else:
+    st.info("No weekly intensity data available.")
 
 st.divider()
 
@@ -367,7 +375,7 @@ else:
     display['Like %'] = display['like_rate'].apply(
         lambda v: f"{float(v) * 100:.0f}%" if pd.notna(v) else "—"
     )
-    display['New?'] = display['is_new'].apply(lambda v: "✓" if bool(v) else "")
+    display['New?'] = display['is_new'].apply(lambda v: "Y" if bool(v) else "")
     display = display[[
         'display_name', 'likes', 'dislikes', 'Like %',
         'saves', 'boards_created', 'prompts', 'total_events', 'New?'
@@ -383,5 +391,260 @@ else:
         file_name=f"deck_user_activity_{report_date_str}.csv",
         mime="text/csv",
     )
+
+
+# ============================================================================
+# PDF Generation
+# ============================================================================
+
+def _fig_to_png_bytes(fig, width=700, height=350):
+    """Render a Plotly figure to PNG bytes using kaleido."""
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        fig.write_image(tmp.name, width=width, height=height, scale=2)
+        tmp.seek(0)
+    with open(tmp.name, 'rb') as f:
+        data = f.read()
+    os.unlink(tmp.name)
+    return data
+
+
+def _pdf_section_heading(pdf, title):
+    """Render a section heading with a subtle underline."""
+    pdf.set_font("Helvetica", "B", 13)
+    pdf.cell(0, 8, title, new_x="LMARGIN", new_y="NEXT")
+    pdf.set_draw_color(200, 200, 200)
+    pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
+    pdf.ln(3)
+
+
+def _pdf_table(pdf, headers, rows, col_widths=None):
+    """Render a table. col_widths can be a list of mm widths matching headers."""
+    if col_widths is None:
+        col_widths = [pdf.epw / len(headers)] * len(headers)
+
+    # Header row
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_fill_color(240, 240, 240)
+    for i, h in enumerate(headers):
+        pdf.cell(col_widths[i], 6, str(h), border=1, align="C", fill=True)
+    pdf.ln()
+
+    # Data rows
+    pdf.set_font("Helvetica", "", 8)
+    for row in rows:
+        for i, val in enumerate(row):
+            pdf.cell(col_widths[i], 5.5, str(val), border=1, align="C")
+        pdf.ln()
+
+
+def _generate_daily_pdf():
+    """Build a PDF mirroring the Daily Report page content."""
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    # --- Title ---
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.cell(0, 10, "SwipeOnDeck Daily Report", new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.set_font("Helvetica", "", 12)
+    pdf.cell(0, 7, report_date.strftime('%A, %B %d, %Y'), new_x="LMARGIN", new_y="NEXT", align="C")
+    pdf.ln(6)
+
+    # --- KPI tiles (2 rows x 4) ---
+    kpi_items_row1 = [
+        ("New Signups", _fmt_int(kpi.get('new_signups', 0))),
+        ("DAU", _fmt_int(kpi.get('dau', 0))),
+        ("Total Swipes", _fmt_int(kpi.get('total_swipes', 0))),
+        ("Like Rate", _fmt_pct(kpi.get('like_rate'))),
+    ]
+    kpi_items_row2 = [
+        ("Saves", _fmt_int(kpi.get('saves', 0))),
+        ("Prompts", _fmt_int(kpi.get('prompts', 0))),
+        ("Onboarding", _fmt_int(kpi.get('onboarding_completed', 0))),
+        ("Total Events", _fmt_int(kpi.get('total_events', 0))),
+    ]
+    tile_w = pdf.epw / 4
+    for row_items in [kpi_items_row1, kpi_items_row2]:
+        # Values
+        pdf.set_font("Helvetica", "B", 18)
+        for label, val in row_items:
+            pdf.cell(tile_w, 10, val, align="C")
+        pdf.ln()
+        # Labels
+        pdf.set_font("Helvetica", "", 8)
+        pdf.set_text_color(120, 120, 120)
+        for label, val in row_items:
+            pdf.cell(tile_w, 5, label, align="C")
+        pdf.ln(8)
+        pdf.set_text_color(0, 0, 0)
+    pdf.ln(4)
+
+    # --- 7-Day Trend chart ---
+    if not trend_df.empty:
+        _pdf_section_heading(pdf, "7-Day Trend")
+        # Build a DAU bar chart for the PDF (fixed metric, not interactive)
+        trend_display = trend_df.copy()
+        trend_display['day'] = pd.to_datetime(trend_display['day'])
+        pdf_trend_fig = go.Figure(go.Bar(
+            x=trend_display['day'],
+            y=trend_display['dau'].astype(float),
+            text=[str(int(v)) for v in trend_display['dau'].astype(float)],
+            textposition='outside',
+            marker_color=[
+                '#E91E8C' if d.date() == report_date else '#2383E2'
+                for d in trend_display['day']
+            ],
+        ))
+        pdf_trend_fig.update_layout(
+            yaxis_title="DAU",
+            font=dict(family="Helvetica", size=12),
+            plot_bgcolor='white', paper_bgcolor='white',
+            margin=dict(l=40, r=20, t=10, b=40),
+            xaxis=dict(showgrid=False, tickformat='%a %b %d'),
+            yaxis=dict(showgrid=True, gridcolor='#E5E5E5'),
+            showlegend=False,
+        )
+        png = _fig_to_png_bytes(pdf_trend_fig, width=700, height=300)
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp.write(png)
+            tmp_path = tmp.name
+        pdf.image(tmp_path, w=pdf.epw)
+        os.unlink(tmp_path)
+        pdf.ln(4)
+
+    # --- Activation Checklist Funnel ---
+    if new_signups_n > 0:
+        _pdf_section_heading(pdf, "Activation Checklist Funnel — New Signups")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(0, 5,
+                 f"{all_three_n} / {new_signups_n} new users completed all 3 steps and earned the spin wheel",
+                 new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        funnel_headers = ["Step", "Count", "% of new users"]
+        funnel_rows = [
+            ["1. Deck created", str(deck_n), f"{_pct(deck_n) * 100:.0f}%"],
+            ["2. 3+ places saved", str(saves_n), f"{_pct(saves_n) * 100:.0f}%"],
+            ["3. Multiplayer started", str(mp_n), f"{_pct(mp_n) * 100:.0f}%"],
+            ["All 3 complete", str(all_three_n), f"{_pct(all_three_n) * 100:.0f}%"],
+        ]
+        _pdf_table(pdf, funnel_headers, funnel_rows, col_widths=[pdf.epw * 0.5, pdf.epw * 0.25, pdf.epw * 0.25])
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.cell(0, 4,
+                 f"Drop-off: {stuck_no_deck} never created a deck | "
+                 f"{stuck_at_saves} stuck at saves | {stuck_at_mp} stuck at multiplayer",
+                 new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(4)
+
+    # --- New Signups Onboarding Status ---
+    if not signups_df.empty:
+        _pdf_section_heading(pdf, "New Signups — Onboarding & Checklist Status")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(0, 5,
+                 f"{onboarded_n} of {total_n} completed onboarding ({pct:.0f}%)",
+                 new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(2)
+        signup_headers = ["Name", "Onboarded", "Deck", "Saves", "MP", "All 3"]
+        signup_rows = []
+        for _, r in signups_df.iterrows():
+            ck = lambda v: "Y" if bool(v) else "-"
+            name = str(r['display_name'])[:25]
+            signup_rows.append([
+                name, ck(r['onboarded']), ck(r['deck_created']),
+                ck(r['places_saved']), ck(r['multiplayer_started']), ck(r['all_three']),
+            ])
+        cw = [pdf.epw * 0.35] + [pdf.epw * 0.13] * 5
+        _pdf_table(pdf, signup_headers, signup_rows, col_widths=cw)
+        pdf.ln(4)
+
+    # --- Category Popularity ---
+    if not cat_df.empty:
+        _pdf_section_heading(pdf, "Category Popularity")
+        cat_headers = ["Category", "Likes", "Dislikes", "Total", "Like %"]
+        cat_rows = []
+        for _, r in cat_df.iterrows():
+            like_pct_val = float(r['like_pct']) * 100 if pd.notna(r['like_pct']) else 0
+            cat_rows.append([
+                str(r['category']), str(int(r['likes'])), str(int(r['dislikes'])),
+                str(int(r['total'])), f"{like_pct_val:.0f}%",
+            ])
+        _pdf_table(pdf, cat_headers, cat_rows)
+        pdf.ln(4)
+
+    # --- Places Flagged for Removal ---
+    if not flagged_df.empty:
+        _pdf_section_heading(pdf, "Places Flagged for Removal")
+        flag_headers = ["ID", "Name", "Area", "Likes", "Dislikes", "Total", "Dislike %"]
+        flag_rows = []
+        for _, r in flagged_df.iterrows():
+            dp = float(r['dislike_pct']) * 100 if pd.notna(r['dislike_pct']) else 0
+            flag_rows.append([
+                str(r['id']), str(r['name'])[:28], str(r['area'])[:20],
+                str(int(r['likes'])), str(int(r['dislikes'])), str(int(r['total'])),
+                f"{dp:.0f}%",
+            ])
+        cw = [pdf.epw * 0.08, pdf.epw * 0.25, pdf.epw * 0.2,
+              pdf.epw * 0.1, pdf.epw * 0.12, pdf.epw * 0.1, pdf.epw * 0.15]
+        _pdf_table(pdf, flag_headers, flag_rows, col_widths=cw)
+        pdf.ln(4)
+
+    # --- Top Liked Places ---
+    if not top_df.empty:
+        _pdf_section_heading(pdf, "Top Liked Places")
+        top_headers = ["ID", "Name", "Area", "Likes", "Dislikes"]
+        top_rows = []
+        for _, r in top_df.iterrows():
+            top_rows.append([
+                str(r['id']), str(r['name'])[:30], str(r['area'])[:22],
+                str(int(r['likes'])), str(int(r['dislikes'])),
+            ])
+        cw = [pdf.epw * 0.1, pdf.epw * 0.3, pdf.epw * 0.3, pdf.epw * 0.15, pdf.epw * 0.15]
+        _pdf_table(pdf, top_headers, top_rows, col_widths=cw)
+        pdf.ln(4)
+
+    # --- Weekly Engagement Intensity chart ---
+    if intensity_fig is not None:
+        pdf.add_page()
+        _pdf_section_heading(pdf, "Weekly Engagement Intensity — Per Active Activated User")
+        png = _fig_to_png_bytes(intensity_fig, width=700, height=350)
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp.write(png)
+            tmp_path = tmp.name
+        pdf.image(tmp_path, w=pdf.epw)
+        os.unlink(tmp_path)
+        pdf.ln(4)
+
+    # --- User Activity table ---
+    if not user_df.empty:
+        _pdf_section_heading(pdf, f"User Activity — {report_date.strftime('%b %d')}")
+        ua_headers = ["Name", "Likes", "Dis.", "Like %", "Saves", "Boards", "Prompts", "Total", "New?"]
+        ua_rows = []
+        for _, r in user_df.iterrows():
+            lr = f"{float(r['like_rate']) * 100:.0f}%" if pd.notna(r.get('like_rate')) else "-"
+            new_flag = "Y" if bool(r.get('is_new')) else ""
+            name = str(r.get('display_name', ''))[:22]
+            ua_rows.append([
+                name, str(int(r['likes'])), str(int(r['dislikes'])),
+                lr, str(int(r['saves'])), str(int(r.get('boards_created', 0))),
+                str(int(r['prompts'])), str(int(r['total_events'])), new_flag,
+            ])
+        cw_unit = pdf.epw / 9
+        cw = [cw_unit * 2] + [cw_unit * 7 / 8] * 8
+        _pdf_table(pdf, ua_headers, ua_rows, col_widths=cw)
+
+    return pdf.output()
+
+
+# Generate PDF and fill the slot near the top
+try:
+    pdf_bytes = _generate_daily_pdf()
+    pdf_slot.download_button(
+        label="Download as PDF",
+        data=pdf_bytes,
+        file_name=f"SwipeOnDeck_Daily_Report_{report_date_str}.pdf",
+        mime="application/pdf",
+    )
+except Exception as e:
+    pdf_slot.warning(f"PDF generation failed: {str(e)}")
 
 add_deck_footer()
