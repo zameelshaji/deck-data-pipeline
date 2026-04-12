@@ -643,7 +643,7 @@ def _generate_daily_pdf():
         cw = [cw_unit * 2] + [cw_unit * 7 / 8] * 8
         _pdf_table(pdf, ua_headers, ua_rows, col_widths=cw)
 
-    return pdf.output()
+    return bytes(pdf.output())
 
 
 # Generate PDF and fill the slot near the top
