@@ -397,6 +397,17 @@ else:
 # PDF Generation
 # ============================================================================
 
+def _pdf_safe(s):
+    """Replace Unicode characters unsupported by Helvetica with ASCII equivalents."""
+    return (str(s)
+            .replace('\u2014', '-')   # em dash
+            .replace('\u2013', '-')   # en dash
+            .replace('\u2713', 'Y')   # checkmark
+            .replace('\u2717', 'N')   # ballot X
+            .replace('\u2022', '*')   # bullet
+            .encode('latin-1', errors='replace').decode('latin-1'))
+
+
 def _fig_to_png_bytes(fig, width=700, height=350):
     """Render a Plotly figure to PNG bytes using kaleido."""
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
@@ -411,7 +422,7 @@ def _fig_to_png_bytes(fig, width=700, height=350):
 def _pdf_section_heading(pdf, title):
     """Render a section heading with a subtle underline."""
     pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 8, title, new_x="LMARGIN", new_y="NEXT")
+    pdf.cell(0, 8, _pdf_safe(title), new_x="LMARGIN", new_y="NEXT")
     pdf.set_draw_color(200, 200, 200)
     pdf.line(pdf.l_margin, pdf.get_y(), pdf.w - pdf.r_margin, pdf.get_y())
     pdf.ln(3)
@@ -426,14 +437,14 @@ def _pdf_table(pdf, headers, rows, col_widths=None):
     pdf.set_font("Helvetica", "B", 8)
     pdf.set_fill_color(240, 240, 240)
     for i, h in enumerate(headers):
-        pdf.cell(col_widths[i], 6, str(h), border=1, align="C", fill=True)
+        pdf.cell(col_widths[i], 6, _pdf_safe(h), border=1, align="C", fill=True)
     pdf.ln()
 
     # Data rows
     pdf.set_font("Helvetica", "", 8)
     for row in rows:
         for i, val in enumerate(row):
-            pdf.cell(col_widths[i], 5.5, str(val), border=1, align="C")
+            pdf.cell(col_widths[i], 5.5, _pdf_safe(val), border=1, align="C")
         pdf.ln()
 
 
@@ -468,13 +479,13 @@ def _generate_daily_pdf():
         # Values
         pdf.set_font("Helvetica", "B", 18)
         for label, val in row_items:
-            pdf.cell(tile_w, 10, val, align="C")
+            pdf.cell(tile_w, 10, _pdf_safe(val), align="C")
         pdf.ln()
         # Labels
         pdf.set_font("Helvetica", "", 8)
         pdf.set_text_color(120, 120, 120)
         for label, val in row_items:
-            pdf.cell(tile_w, 5, label, align="C")
+            pdf.cell(tile_w, 5, _pdf_safe(label), align="C")
         pdf.ln(8)
         pdf.set_text_color(0, 0, 0)
     pdf.ln(4)
