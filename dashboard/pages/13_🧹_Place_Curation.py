@@ -47,6 +47,7 @@ with st.sidebar:
     max_rating = st.slider("Max Rating", 0.0, 5.0, 5.0, step=0.5)
     max_reviews = st.number_input("Max Reviews", min_value=0, value=1000, step=10)
     max_images = st.number_input("Max Images", min_value=0, value=100, step=1)
+    max_impressions = st.number_input("Max Impressions", min_value=0, value=10000, step=10)
     min_dislike_rate = st.slider("Min Dislike Rate %", 0, 100, 0)
 
     all_categories = sorted(
@@ -61,7 +62,6 @@ with st.sidebar:
     all_sources = sorted(df["source_type"].dropna().unique().tolist())
     selected_sources = st.multiselect("Source Type", all_sources, default=all_sources)
 
-    zero_impressions_only = st.checkbox("Zero Impressions Only", value=False)
 
 # ---------------------------------------------------------------------------
 # Apply filters (pandas)
@@ -78,6 +78,9 @@ filtered = filtered[
 
 # Media count
 filtered = filtered[filtered["media_count"] <= max_images]
+
+# Impressions
+filtered = filtered[filtered["total_impressions"] <= max_impressions]
 
 # Dislike rate — only applies to places with impressions
 if min_dislike_rate > 0:
@@ -100,9 +103,6 @@ if selected_categories:
 if selected_sources:
     filtered = filtered[filtered["source_type"].isin(selected_sources)]
 
-# Zero impressions
-if zero_impressions_only:
-    filtered = filtered[filtered["total_impressions"] == 0]
 
 # ---------------------------------------------------------------------------
 # KPI row
