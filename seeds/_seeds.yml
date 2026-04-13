@@ -10,3 +10,23 @@ seeds:
         description: "Date this version was released"
       - name: release_date_end
         description: "Last date this version was current (day before next release)"
+
+  - name: experiments
+    description: "Registry of A/B experiments. Each row defines an experiment with metadata about control/treatment definitions, assignment method, and status. Future experiments get new rows."
+    columns:
+      - name: experiment_id
+        description: "Unique experiment identifier"
+      - name: experiment_name
+        description: "Short name for the experiment (e.g., ml_rerank_v1)"
+      - name: start_date
+        description: "Date the experiment went live"
+      - name: end_date
+        description: "Date the experiment ended. NULL if ongoing"
+      - name: control_description
+        description: "What the control arm experiences"
+      - name: treatment_description
+        description: "What the treatment arm experiences"
+      - name: assignment_method
+        description: "How users are assigned to arms (e.g., md5_hash_user_id_50_50)"
+      - name: status
+        description: "Current status: active, paused, completed"

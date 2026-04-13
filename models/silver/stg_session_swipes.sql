@@ -46,13 +46,16 @@ session_swipes as (
         count(*) filter (where event_name = 'card_swiped_right' and origin_surface = 'shared_link') as right_swipes_shared_link,
         count(*) filter (where event_name = 'card_swiped_right' and origin_surface = 'multiplayer') as right_swipes_multiplayer,
         count(*) filter (where event_name = 'card_swiped_right' and origin_surface = 'import') as right_swipes_import,
+        count(*) filter (where event_name = 'card_swiped_right' and origin_surface = 'explore') as right_swipes_explore,
+        count(*) filter (where event_name = 'card_swiped_right' and origin_surface = 'map') as right_swipes_map,
+        count(*) filter (where event_name = 'card_swiped_right' and origin_surface = 'mini_dextr') as right_swipes_mini_dextr,
         count(*) filter (where event_name = 'card_swiped_right' and origin_surface is null) as right_swipes_unknown,
         count(*) filter (
             where event_name = 'card_swiped_right'
               and origin_surface is not null
               and origin_surface not in (
                   'dextr', 'featured', 'search', 'mydecks', 'shared_link',
-                  'multiplayer', 'import'
+                  'multiplayer', 'import', 'explore', 'map', 'mini_dextr'
               )
         ) as right_swipes_other_surface,
 
@@ -64,13 +67,16 @@ session_swipes as (
         count(*) filter (where event_name = 'card_swiped_left' and origin_surface = 'shared_link') as left_swipes_shared_link,
         count(*) filter (where event_name = 'card_swiped_left' and origin_surface = 'multiplayer') as left_swipes_multiplayer,
         count(*) filter (where event_name = 'card_swiped_left' and origin_surface = 'import') as left_swipes_import,
+        count(*) filter (where event_name = 'card_swiped_left' and origin_surface = 'explore') as left_swipes_explore,
+        count(*) filter (where event_name = 'card_swiped_left' and origin_surface = 'map') as left_swipes_map,
+        count(*) filter (where event_name = 'card_swiped_left' and origin_surface = 'mini_dextr') as left_swipes_mini_dextr,
         count(*) filter (where event_name = 'card_swiped_left' and origin_surface is null) as left_swipes_unknown,
         count(*) filter (
             where event_name = 'card_swiped_left'
               and origin_surface is not null
               and origin_surface not in (
                   'dextr', 'featured', 'search', 'mydecks', 'shared_link',
-                  'multiplayer', 'import'
+                  'multiplayer', 'import', 'explore', 'map', 'mini_dextr'
               )
         ) as left_swipes_other_surface
     from telemetry_swipes

@@ -3,10 +3,11 @@ version: 2
 models:
   - name: gold_recommendation_training_set
     description: >
-      Training dataset for Phase 3 ML recommendation system.
-      Each row is a (prompt_context, candidate_place, swipe_outcome) tuple
-      with ~28 engineered features across four groups: candidate, prompt,
-      session context, and interaction features.
+      Training dataset for Phase 3 ML recommendation system (v2 — multi-surface).
+      Each row is a (context, candidate_place, swipe_outcome) tuple from ALL swipe
+      surfaces: Dextr AI packs, explore/featured, shared decks, and board review.
+      ~35 engineered features across six groups: candidate, prompt, session context,
+      interaction, user-level, and place-level features.
       Used to train LightGBM pointwise classifier and LambdaRank models.
     config:
       tags: ['ml', 'recommendation', 'phase3']
@@ -19,9 +20,7 @@ models:
           - accepted_values:
               values: [0, 1]
       - name: pack_id
-        description: "Group ID for LambdaRank ranking groups"
-        tests:
-          - not_null
+        description: "Group ID for Dextr packs. NULL for non-Dextr swipes (explore, shared decks, etc.)"
       - name: user_id
         description: "User ID for user-level holdout splits"
         tests:
@@ -37,10 +36,18 @@ models:
         tests:
           - not_null
       - name: data_source
-        description: "'current' for dextr_places (2025-11-20+), 'legacy' for dextr_pack_cards (2025-09-05 to 2025-11-19)"
+        description: "'current' for dextr_places (2025-11-20+), 'legacy' for dextr_pack_cards (2025-09-05 to 2025-11-19), 'telemetry' for non-Dextr app_events swipes (2026-01-30+)"
         tests:
           - accepted_values:
-              values: ['current', 'legacy']
+              values: ['current', 'legacy', 'telemetry']
+      - name: origin_surface
+        description: "Swipe surface: 'dextr' (AI pack), 'featured' (explore page), 'shared_link' (other user's deck), 'mydecks' (own boards), 'search', 'import', 'other'"
+        tests:
+          - not_null
+      - name: group_key
+        description: "Cross-validation grouping key. pack_id for Dextr swipes, session_id for non-Dextr, fallback to user_id. Used for GroupKFold to prevent session leakage"
+        tests:
+          - not_null
 
       # === Candidate Features ===
       - name: rating
@@ -86,17 +93,17 @@ models:
 
       # === Session Context Features ===
       - name: likes_so_far
-        description: "Count of 'like' actions on cards BEFORE this card in the same pack"
+        description: "Count of 'like' actions BEFORE this card in the same session/pack (partitioned by group_key)"
       - name: dislikes_so_far
-        description: "Count of 'dislike' actions on cards BEFORE this card in the same pack"
+        description: "Count of 'dislike' actions BEFORE this card in the same session/pack"
       - name: like_ratio_so_far
         description: "likes_so_far / total_so_far. 0.5 default when no prior swipes"
       - name: cards_seen_count
-        description: "Total cards swiped BEFORE this card in the same pack"
+        description: "Total cards swiped BEFORE this card in the same session/pack"
       - name: avg_liked_rating
-        description: "Mean rating of liked places so far in this pack. NULL if no prior likes"
+        description: "Mean rating of liked places so far in this session/pack. NULL if no prior likes"
       - name: avg_liked_price
-        description: "Mean price_level of liked places so far in this pack. NULL if no prior likes"
+        description: "Mean price_level of liked places so far in this session/pack. NULL if no prior likes"
 
       # === Interaction Features ===
       - name: category_overlap_with_likes
@@ -104,4 +111,18 @@ models:
       - name: price_delta_from_like_avg
         description: "abs(this_place.price_level - avg_liked_price). NULL if either is unknown"
       - name: distance_from_like_centroid_km
-        description: "Haversine distance from this place to the mean lat/lng of liked places so far in the pack. NULL if no prior likes"
+        description: "Haversine distance from this place to the mean lat/lng of liked places so far in the session/pack. NULL if no prior likes"
+
+      # === User-Level Features ===
+      - name: user_total_saves
+        description: "Total places this user has saved to any board (all-time from board_places_v2). 0 for users with no saves"
+      - name: user_total_shares
+        description: "Total share events by this user (all-time from app_events). 0 for users with no shares"
+      - name: user_preferred_rating
+        description: "Average Google rating of places this user has saved. NULL for users with no saves"
+      - name: user_preferred_price
+        description: "Average price_level of places this user has saved. NULL for users with no saves"
+
+      # === Place-Level Features ===
+      - name: place_save_count
+        description: "Number of distinct users who have saved this place to a board. 0 for unsaved places"

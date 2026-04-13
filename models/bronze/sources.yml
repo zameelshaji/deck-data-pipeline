@@ -93,6 +93,14 @@ sources:
         description: "Post Gemini dextr_pack_cards. Active from Nov 20 2025."
         meta:
           status: current
+      - name: dextr_refine_log
+        description: "Audit trail of ML refinement attempts per batch. Logs latency, scores, and candidates remaining."
+        meta:
+          status: current
+      - name: dextr_candidate_pool
+        description: "Full candidate pool for each pack. Tracks original embedding rank, similarity score, and serving status."
+        meta:
+          status: current
 
       # Personal Organization
       - name: boards
@@ -118,6 +126,38 @@ sources:
         description: "Tracking the claims made on places"
         meta:
           status: current
+
+      # Groups / Friend Clusters (Apr 2026+)
+      - name: groups
+        description: "Friend-cluster groups created by users. Active from Apr 2026."
+        meta:
+          status: current
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+      - name: group_members
+        description: "Group membership records linking users to groups with roles (admin/member)."
+        meta:
+          status: current
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
+      - name: group_invites
+        description: "Group invite records with status tracking (pending/accepted/declined)."
+        meta:
+          status: current
+        columns:
+          - name: id
+            description: "Primary key"
+            tests:
+              - unique
+              - not_null
 
       # North Star Metrics - Planning & Sharing (TelemetryManager, Jan 30 2026+)
       - name: planning_sessions

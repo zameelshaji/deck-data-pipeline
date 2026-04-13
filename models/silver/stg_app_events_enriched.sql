@@ -118,6 +118,9 @@ select
         when origin_surface_raw = 'import_swipe_cards' then 'import'
         when origin_surface_raw = 'server_cron' then 'server'
         when origin_surface_raw = 'unknown' then 'unknown'
+        when origin_surface_raw = 'explore' then 'explore'
+        when origin_surface_raw = 'map' then 'map'
+        when origin_surface_raw in ('mini_dextr', 'miniDextr') then 'mini_dextr'
         else 'other'
     end as origin_surface
 from enriched

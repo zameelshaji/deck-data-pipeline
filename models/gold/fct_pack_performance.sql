@@ -21,7 +21,9 @@ with pack_queries as (
         di.cards_shown,
         di.cards_liked,
         di.cards_disliked,
-        di.cards_acted_upon
+        di.cards_acted_upon,
+        di.candidate_pool_size,
+        di.experiment_arm
     from {{ ref('stg_dextr_interactions') }} di
     inner join {{ ref('stg_users') }} u on di.user_id = u.user_id
     where u.is_test_user = 0
@@ -79,6 +81,18 @@ pack_saves_combined as (
         union all
         select pack_id, cards_saved from pack_saves_current
     ) sub
+    group by pack_id
+),
+
+-- Refinement stats per pack (from dextr_refine_log)
+pack_refinement as (
+    select
+        pack_id,
+        count(*) as total_refine_batches,
+        count(*) filter (where was_refined = true) as refined_batch_count,
+        avg(latency_ms) as avg_refinement_latency_ms,
+        min(candidates_remaining) as min_candidates_remaining
+    from {{ ref('src_dextr_refine_log') }}
     group by pack_id
 )
 
@@ -144,8 +158,17 @@ select
     ps.session_id,
     coalesce(ps.session_has_save, false) as led_to_save,
     coalesce(ps.session_has_share, false) as led_to_share,
-    coalesce(ps.session_has_post_share, false) as led_to_post_share
+    coalesce(ps.session_has_post_share, false) as led_to_post_share,
+
+    -- Experiment context
+    pq.experiment_arm,
+    pq.candidate_pool_size,
+
+    -- Refinement stats
+    coalesce(pr.refined_batch_count, 0) as refined_batch_count,
+    pr.avg_refinement_latency_ms
 
 from pack_queries pq
 left join pack_sessions ps on pq.pack_id = ps.pack_id
 left join pack_saves_combined ps_c on pq.pack_id = ps_c.pack_id
+left join pack_refinement pr on pq.pack_id = pr.pack_id

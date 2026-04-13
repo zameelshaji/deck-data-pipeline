@@ -330,6 +330,9 @@ select
         when origin_surface in ('import_swipe_cards') then 'import'
         when origin_surface in ('server_cron') then 'server'
         when origin_surface in ('unknown') then 'unknown'
+        when origin_surface = 'explore' then 'explore'
+        when origin_surface = 'map' then 'map'
+        when origin_surface in ('mini_dextr', 'miniDextr') then 'mini_dextr'
         else 'other'
     end as origin_surface,
     origin_source_id,

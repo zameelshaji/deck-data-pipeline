@@ -15,7 +15,9 @@ with
             dp.pack_name,
             dp.total_cards,
             dp.featured_cards_count::int as featured_cards_count,
-            dp.experience_cards_count::int as experience_cards_count
+            dp.experience_cards_count::int as experience_cards_count,
+            dp.candidate_pool_size,
+            dp.experiment_arm
 
         from {{ ref("src_dextr_queries") }} dq
         left join {{ ref("src_dextr_packs") }} dp on dq.response_pack_id = dp.pack_id

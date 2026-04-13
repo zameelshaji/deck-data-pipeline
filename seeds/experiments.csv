@@ -1,0 +1,2 @@
+experiment_id,experiment_name,start_date,end_date,control_description,treatment_description,assignment_method,status
+1,ml_rerank_v1,2026-04-14,,Phase 1 embedding similarity pool-order for batch 2+,LightGBM pointwise Model A v1 (33 features AUC 0.8627) via dextr-refine,md5_hash_user_id_50_50,active

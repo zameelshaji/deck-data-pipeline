@@ -36,12 +36,16 @@ session_saves_by_surface as (
         count(*) filter (where origin_surface = 'whats_next') as saves_whats_next,
         count(*) filter (where origin_surface = 'place_detail') as saves_place_detail,
         count(*) filter (where origin_surface = 'import') as saves_import,
+        count(*) filter (where origin_surface = 'explore') as saves_explore,
+        count(*) filter (where origin_surface = 'map') as saves_map,
+        count(*) filter (where origin_surface = 'mini_dextr') as saves_mini_dextr,
         count(*) filter (where origin_surface is null) as saves_unknown_surface,
         -- Catch-all for surfaces not explicitly pivoted (review, server,
         -- unknown, other). Keeps save_count = sum(pivots) invariant.
         count(*) filter (where origin_surface is not null and origin_surface not in (
             'dextr', 'featured', 'search', 'mydecks', 'shared_link',
-            'multiplayer', 'whats_next', 'place_detail', 'import'
+            'multiplayer', 'whats_next', 'place_detail', 'import',
+            'explore', 'map', 'mini_dextr'
         )) as saves_other_surface,
 
         -- Save-method pivots (how the user physically triggered the save)

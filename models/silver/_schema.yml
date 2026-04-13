@@ -40,6 +40,9 @@ models:
                   - import
                   - server
                   - unknown
+                  - explore
+                  - map
+                  - mini_dextr
                   - other
               config:
                 where: "origin_surface is not null"
@@ -83,6 +86,9 @@ models:
                   - import
                   - server
                   - unknown
+                  - explore
+                  - map
+                  - mini_dextr
                   - other
               config:
                 where: "origin_surface is not null"

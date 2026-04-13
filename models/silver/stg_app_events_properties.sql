@@ -71,6 +71,8 @@ select
     case when event_name in ('card_swiped_right', 'card_swiped_left')
          and properties->>'place_id' ~ '^-?[0-9]+$'
         then (properties->>'place_id')::bigint end as swiped_place_id,
+    case when event_name in ('card_swiped_right', 'card_swiped_left')
+        then nullif(properties->>'source', '') end as swipe_source,
 
     -- dextr_query_submitted
     case when event_name = 'dextr_query_submitted'
