@@ -3923,6 +3923,7 @@ def load_places_for_curation():
     SELECT
         p.id,
         p.name,
+        p.description,
         COALESCE(p.area, perf.neighborhood, split_part(p.formatted_address, ',', 1)) AS neighborhood,
         p.categories,
         p.rating,
@@ -3948,6 +3949,24 @@ def load_places_for_curation():
         return df
     except Exception as e:
         st.error(f"Error loading places for curation: {str(e)}")
+        return pd.DataFrame()
+
+
+def load_place_media(place_ids: list[int]) -> pd.DataFrame:
+    """Load media URLs for given place IDs, ordered by display_order."""
+    engine = get_database_connection()
+    query = text("""
+        SELECT place_id, media_url, display_order
+        FROM public.place_media
+        WHERE place_id = ANY(:place_ids) AND is_active = true
+        ORDER BY place_id, display_order
+    """)
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(query, conn, params={"place_ids": place_ids})
+        return df
+    except Exception as e:
+        st.error(f"Error loading place media: {str(e)}")
         return pd.DataFrame()
 
 

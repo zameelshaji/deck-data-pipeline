@@ -4,7 +4,7 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from utils.styling import apply_deck_branding, add_deck_footer
-from utils.data_loader import load_places_for_curation, delete_places
+from utils.data_loader import load_places_for_curation, load_place_media, delete_places
 
 st.set_page_config(
     page_title="Place Curation | DECK Analytics",
@@ -217,6 +217,53 @@ selected_count = len(selected_ids)
 if selected_count > 0:
     st.info(f"**{selected_count}** place{'s' if selected_count != 1 else ''} selected")
 
+    # ----- Place preview cards -----
+    st.subheader("Preview")
+    media_df = load_place_media(selected_ids)
+
+    for _, row in selected_rows.iterrows():
+        place_id = row["id"]
+        place_images = (
+            media_df[media_df["place_id"] == place_id]["media_url"].tolist()
+            if not media_df.empty
+            else []
+        )
+        # Look up full place data (description etc.) from the unfiltered df
+        place_data = df[df["id"] == place_id].iloc[0] if not df[df["id"] == place_id].empty else row
+
+        with st.container(border=True):
+            # Header: name + key stats
+            col_name, col_stats = st.columns([3, 2])
+            with col_name:
+                st.markdown(f"**{row['name']}**")
+                st.caption(f"{row['neighborhood'] or ''}")
+            with col_stats:
+                cats = row.get("categories_str", "")
+                rating_str = f"{row['rating']:.1f}" if pd.notna(row.get("rating")) else "N/A"
+                reviews = int(row["user_ratings_total"]) if pd.notna(row.get("user_ratings_total")) else 0
+                st.caption(f"Rating: {rating_str}  |  Reviews: {reviews:,}  |  {cats}")
+
+            # Description
+            desc = place_data["description"] if "description" in place_data.index else None
+            if pd.notna(desc) and desc:
+                st.caption(desc)
+
+            # Scrollable image strip
+            if place_images:
+                imgs_html = "".join(
+                    f'<img src="{url}" style="height:180px;border-radius:8px;flex-shrink:0;object-fit:cover;" />'
+                    for url in place_images
+                )
+                st.markdown(
+                    f'<div style="display:flex;overflow-x:auto;gap:8px;padding:4px 0;">{imgs_html}</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.caption("No images available")
+
+    st.divider()
+
+    # ----- Featured warning & delete button -----
     featured_selected = selected_rows[selected_rows["is_featured"] == True]  # noqa: E712
     if not featured_selected.empty:
         st.warning(
