@@ -2,7 +2,7 @@
 
 import pandas as pd
 import streamlit as st
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 from .db_connection import get_database_connection
 
 
@@ -3971,12 +3971,26 @@ def load_place_media(place_ids: list[int]) -> pd.DataFrame:
 
 
 def delete_places(place_ids: list[int]) -> int:
-    """Delete places from the database. Returns affected row count."""
+    """Delete places from the database. Returns affected row count.
+
+    Also removes child rows in tables with NO ACTION foreign keys
+    (dextr_candidate_pool, business_claims) before deleting places.
+    """
     engine = get_database_connection()
-    query = text("DELETE FROM public.places WHERE id = ANY(:place_ids)")
+    child_cleanup = text(
+        "DELETE FROM public.dextr_candidate_pool WHERE place_id IN :ids"
+    ).bindparams(bindparam("ids", expanding=True))
+    claims_cleanup = text(
+        "DELETE FROM public.business_claims WHERE place_id IN :ids"
+    ).bindparams(bindparam("ids", expanding=True))
+    delete_query = text(
+        "DELETE FROM public.places WHERE id IN :ids"
+    ).bindparams(bindparam("ids", expanding=True))
     try:
         with engine.begin() as conn:
-            result = conn.execute(query, {"place_ids": place_ids})
+            conn.execute(child_cleanup, {"ids": place_ids})
+            conn.execute(claims_cleanup, {"ids": place_ids})
+            result = conn.execute(delete_query, {"ids": place_ids})
         return result.rowcount
     except Exception as e:
         st.error(f"Error deleting places: {str(e)}")
