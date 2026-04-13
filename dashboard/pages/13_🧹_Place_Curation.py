@@ -44,6 +44,8 @@ if df.empty:
 with st.sidebar:
     st.header("Filters")
 
+    search_term = st.text_input("Search", placeholder="Search by name or area...")
+
     max_rating = st.slider("Max Rating", 0.0, 5.0, 5.0, step=0.5)
     max_reviews = st.number_input("Max Reviews", min_value=0, value=1000, step=10)
     max_images = st.number_input("Max Images", min_value=0, value=100, step=1)
@@ -102,6 +104,14 @@ if selected_categories:
 # Source type
 if selected_sources:
     filtered = filtered[filtered["source_type"].isin(selected_sources)]
+
+# Text search — name or neighborhood
+if search_term:
+    term = search_term.lower()
+    filtered = filtered[
+        filtered["name"].str.lower().str.contains(term, na=False)
+        | filtered["neighborhood"].str.lower().str.contains(term, na=False)
+    ]
 
 
 # ---------------------------------------------------------------------------
