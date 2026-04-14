@@ -1,0 +1,64 @@
+name: dbt scheduled rebuild
+
+on:
+  schedule:
+    - cron: '0 1,13 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: dbt-scheduled
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      DBT_HOST: ${{ secrets.DBT_HOST }}
+      DBT_USER: ${{ secrets.DBT_USER }}
+      DBT_PASSWORD: ${{ secrets.DBT_PASSWORD }}
+      DBT_DATABASE: ${{ secrets.DBT_DATABASE }}
+      DBT_PORT: ${{ secrets.DBT_PORT || '5432' }}
+      DBT_SCHEMA: ${{ secrets.DBT_SCHEMA || 'analytics_prod' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Python
+        uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements-dbt.txt
+
+      - name: Install dbt
+        run: pip install -r requirements-dbt.txt
+
+      - name: Write dbt profile
+        run: |
+          set +x
+          mkdir -p "$HOME/.dbt"
+          umask 077
+          cat > "$HOME/.dbt/profiles.yml" <<'PROFILE_EOF'
+          default:
+            target: prod
+            outputs:
+              prod:
+                type: postgres
+                host: "{{ env_var('DBT_HOST') }}"
+                port: "{{ env_var('DBT_PORT') | int }}"
+                user: "{{ env_var('DBT_USER') }}"
+                password: "{{ env_var('DBT_PASSWORD') }}"
+                database: "{{ env_var('DBT_DATABASE') }}"
+                schema: "{{ env_var('DBT_SCHEMA') }}"
+                threads: 4
+                keepalives_idle: 0
+          PROFILE_EOF
+
+      - name: dbt run
+        run: dbt run
+
+      - name: dbt test
+        run: dbt test

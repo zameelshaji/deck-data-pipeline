@@ -9,7 +9,7 @@ from utils.db_connection import get_database_connection
 from sqlalchemy import text
 
 try:
-    from scipy.stats import proportions_ztest
+    from statsmodels.stats.proportion import proportions_ztest
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
@@ -161,7 +161,7 @@ if HAS_SCIPY and 'control' in arms and 'treatment' in arms:
     else:
         st.info("Not enough swipe data for significance testing.")
 elif not HAS_SCIPY:
-    st.warning("Install `scipy` for statistical significance testing: `pip install scipy`")
+    st.warning("Install `statsmodels` for statistical significance testing: `pip install statsmodels`")
 else:
     st.info("Waiting for both control and treatment data to compute significance.")
 

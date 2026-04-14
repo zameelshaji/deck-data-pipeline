@@ -8,3 +8,14 @@ logs/
 dashboard/.streamlit/secrets.toml
 dashboard/venv/
 .streamlit/secrets.toml
+
+# Local QA reports / spreadsheets
+*.xlsx
+.~lock.*#
+
+# Claude Code local state
+.claude/
+
+# Python bytecode
+__pycache__/
+*.pyc

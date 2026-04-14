@@ -3995,3 +3995,369 @@ def delete_places(place_ids: list[int]) -> int:
     except Exception as e:
         st.error(f"Error deleting places: {str(e)}")
         return 0
+        st.error(f"Error loading monthly retention summary: {str(e)}")
+        return pd.DataFrame()
+
+
+# ============================================================================
+# CVP FUNNEL ANALYSIS DATA LOADERS
+# ============================================================================
+
+@st.cache_data(ttl=300)
+def load_cvp_funnel_metrics(days=90):
+    """
+    Load CVP funnel conversion metrics
+
+    Returns DataFrame with columns:
+    - total_users: All non-test users in the time period
+    - initiated: Users who prompted/searched/browsed featured
+    - considered: Users who saved at least 1 card
+    - validated: Users who shared OR created multiplayer
+    - decided: Users whose shares were clicked OR multiplayer had 2+ participants
+    """
+    engine = get_database_connection()
+
+    query = f"""
+    WITH user_base AS (
+        SELECT user_id, created_at
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+        AND created_at >= current_date - interval '{days} days'
+    ),
+
+    initiated AS (
+        -- Users who prompted Dextr
+        SELECT DISTINCT dq.user_id
+        FROM analytics_prod_bronze.src_dextr_queries dq
+        INNER JOIN user_base ub ON dq.user_id = ub.user_id
+    ),
+
+    considered AS (
+        -- Users who saved at least 1 card
+        SELECT DISTINCT cca.user_id
+        FROM analytics_prod_bronze.src_core_card_actions cca
+        INNER JOIN user_base ub ON cca.user_id = ub.user_id
+        WHERE cca.action_type = 'saved'
+    ),
+
+    validated AS (
+        -- Users who shared OR created multiplayer with 2+ participants
+        SELECT DISTINCT user_id FROM (
+            -- Shared a card
+            SELECT cca.user_id
+            FROM analytics_prod_bronze.src_core_card_actions cca
+            INNER JOIN user_base ub ON cca.user_id = ub.user_id
+            WHERE cca.action_type = 'share'
+
+            UNION
+
+            -- Created multiplayer session
+            SELECT sm.creator_id as user_id
+            FROM analytics_prod_silver.stg_multiplayer sm
+            INNER JOIN user_base ub ON sm.creator_id = ub.user_id
+        ) shared_or_multiplayer
+    ),
+
+    decided AS (
+        -- Multiplayer sessions that had actual participation (2+ participants already filtered in stg_multiplayer)
+        SELECT DISTINCT sm.creator_id as user_id
+        FROM analytics_prod_silver.stg_multiplayer sm
+        INNER JOIN user_base ub ON sm.creator_id = ub.user_id
+        WHERE sm.total_participants >= 2
+    )
+
+    SELECT
+        (SELECT COUNT(*) FROM user_base) as total_users,
+        (SELECT COUNT(*) FROM initiated) as initiated,
+        (SELECT COUNT(*) FROM considered) as considered,
+        (SELECT COUNT(*) FROM validated) as validated,
+        (SELECT COUNT(*) FROM decided) as decided
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading CVP funnel metrics: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_funnel_by_cohort(days=90):
+    """
+    Load funnel metrics broken down by signup week cohort
+    """
+    engine = get_database_connection()
+
+    query = f"""
+    WITH user_base AS (
+        SELECT
+            user_id,
+            created_at,
+            DATE_TRUNC('week', created_at) as cohort_week
+        FROM analytics_prod_silver.stg_users
+        WHERE is_test_user = 0
+        AND created_at >= current_date - interval '{days} days'
+    ),
+
+    initiated AS (
+        SELECT DISTINCT ub.cohort_week, dq.user_id
+        FROM analytics_prod_bronze.src_dextr_queries dq
+        INNER JOIN user_base ub ON dq.user_id = ub.user_id
+    ),
+
+    considered AS (
+        SELECT DISTINCT ub.cohort_week, cca.user_id
+        FROM analytics_prod_bronze.src_core_card_actions cca
+        INNER JOIN user_base ub ON cca.user_id = ub.user_id
+        WHERE cca.action_type = 'saved'
+    ),
+
+    validated AS (
+        SELECT DISTINCT cohort_week, user_id FROM (
+            SELECT ub.cohort_week, cca.user_id
+            FROM analytics_prod_bronze.src_core_card_actions cca
+            INNER JOIN user_base ub ON cca.user_id = ub.user_id
+            WHERE cca.action_type = 'share'
+
+            UNION
+
+            SELECT ub.cohort_week, sm.creator_id as user_id
+            FROM analytics_prod_silver.stg_multiplayer sm
+            INNER JOIN user_base ub ON sm.creator_id = ub.user_id
+        ) shared_or_multiplayer
+    ),
+
+    decided AS (
+        SELECT DISTINCT ub.cohort_week, sm.creator_id as user_id
+        FROM analytics_prod_silver.stg_multiplayer sm
+        INNER JOIN user_base ub ON sm.creator_id = ub.user_id
+        WHERE sm.total_participants >= 2
+    )
+
+    SELECT
+        ub.cohort_week,
+        COUNT(DISTINCT ub.user_id) as total_users,
+        COUNT(DISTINCT i.user_id) as initiated,
+        COUNT(DISTINCT c.user_id) as considered,
+        COUNT(DISTINCT v.user_id) as validated,
+        COUNT(DISTINCT d.user_id) as decided
+    FROM user_base ub
+    LEFT JOIN initiated i ON ub.cohort_week = i.cohort_week AND ub.user_id = i.user_id
+    LEFT JOIN considered c ON ub.cohort_week = c.cohort_week AND ub.user_id = c.user_id
+    LEFT JOIN validated v ON ub.cohort_week = v.cohort_week AND ub.user_id = v.user_id
+    LEFT JOIN decided d ON ub.cohort_week = d.cohort_week AND ub.user_id = d.user_id
+    GROUP BY ub.cohort_week
+    ORDER BY ub.cohort_week DESC
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading funnel by cohort: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_prompt_to_save_analysis(days=90):
+    """
+    Detailed analysis of the Initiated → Considered conversion
+
+    Returns metrics about:
+    - Total prompts
+    - Prompts with at least 1 right swipe
+    - Prompts with at least 1 save
+    - Avg cards shown per prompt
+    - Avg cards swiped per prompt
+    - Avg cards liked per prompt
+    - Avg cards saved per prompt
+    """
+    engine = get_database_connection()
+
+    query = f"""
+    WITH prompt_sessions AS (
+        SELECT
+            dq.user_id,
+            dq.query_id,
+            dq.response_pack_id as pack_id,
+            dq.query_timestamp
+        FROM analytics_prod_bronze.src_dextr_queries dq
+        INNER JOIN analytics_prod_silver.stg_users u ON dq.user_id = u.user_id
+        WHERE u.is_test_user = 0
+        AND dq.query_timestamp >= current_date - interval '{days} days'
+    ),
+
+    pack_engagement AS (
+        SELECT
+            ps.query_id,
+            ps.user_id,
+            ps.pack_id,
+            COUNT(*) as cards_in_pack,
+            COUNT(CASE WHEN dpc.shown_to_user THEN 1 END) as cards_shown,
+            COUNT(CASE WHEN dpc.user_action IS NOT NULL THEN 1 END) as cards_swiped,
+            COUNT(CASE WHEN dpc.user_action = 'right' THEN 1 END) as cards_liked,
+            COUNT(CASE WHEN dpc.user_action = 'left' THEN 1 END) as cards_disliked
+        FROM prompt_sessions ps
+        LEFT JOIN analytics_prod_bronze.src_dextr_pack_cards dpc ON ps.pack_id = dpc.pack_id
+        GROUP BY ps.query_id, ps.user_id, ps.pack_id
+    ),
+
+    saves_per_session AS (
+        SELECT
+            pe.query_id,
+            pe.user_id,
+            COUNT(DISTINCT cca.card_id) as cards_saved
+        FROM pack_engagement pe
+        LEFT JOIN analytics_prod_bronze.src_core_card_actions cca
+            ON pe.user_id = cca.user_id
+            AND cca.action_type = 'saved'
+            AND cca.source = 'dextr'
+            AND cca.source_id = pe.pack_id::text
+        GROUP BY pe.query_id, pe.user_id
+    )
+
+    SELECT
+        COUNT(*) as total_prompts,
+        COUNT(CASE WHEN pe.cards_swiped > 0 THEN 1 END) as prompts_with_swipes,
+        COUNT(CASE WHEN pe.cards_liked > 0 THEN 1 END) as prompts_with_likes,
+        COUNT(CASE WHEN ss.cards_saved > 0 THEN 1 END) as prompts_with_saves,
+
+        ROUND(AVG(pe.cards_in_pack), 1) as avg_cards_per_pack,
+        ROUND(AVG(pe.cards_shown), 1) as avg_cards_shown,
+        ROUND(AVG(pe.cards_swiped), 1) as avg_cards_swiped,
+        ROUND(AVG(pe.cards_liked), 1) as avg_cards_liked,
+        ROUND(AVG(COALESCE(ss.cards_saved, 0)), 2) as avg_cards_saved,
+
+        -- Conversion rates
+        ROUND(100.0 * COUNT(CASE WHEN pe.cards_swiped > 0 THEN 1 END) / NULLIF(COUNT(*), 0), 1) as prompt_to_swipe_rate,
+        ROUND(100.0 * COUNT(CASE WHEN pe.cards_liked > 0 THEN 1 END) / NULLIF(COUNT(*), 0), 1) as prompt_to_like_rate,
+        ROUND(100.0 * COUNT(CASE WHEN ss.cards_saved > 0 THEN 1 END) / NULLIF(COUNT(*), 0), 1) as prompt_to_save_rate
+
+    FROM pack_engagement pe
+    LEFT JOIN saves_per_session ss ON pe.query_id = ss.query_id
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading prompt-to-save analysis: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_save_to_share_analysis(days=90):
+    """
+    Detailed analysis of Considered → Validated conversion
+    """
+    engine = get_database_connection()
+
+    query = f"""
+    WITH users_who_saved AS (
+        SELECT DISTINCT
+            cca.user_id,
+            MIN(cca.action_timestamp) as first_save_timestamp
+        FROM analytics_prod_bronze.src_core_card_actions cca
+        INNER JOIN analytics_prod_silver.stg_users u ON cca.user_id = u.user_id
+        WHERE u.is_test_user = 0
+        AND cca.action_type = 'saved'
+        AND cca.action_timestamp >= current_date - interval '{days} days'
+        GROUP BY cca.user_id
+    ),
+
+    saves_per_user AS (
+        SELECT
+            cca.user_id,
+            COUNT(DISTINCT cca.card_id) as total_cards_saved,
+            COUNT(DISTINCT cca.board_id) as boards_used
+        FROM analytics_prod_bronze.src_core_card_actions cca
+        INNER JOIN users_who_saved uws ON cca.user_id = uws.user_id
+        WHERE cca.action_type = 'saved'
+        GROUP BY cca.user_id
+    ),
+
+    users_who_shared AS (
+        SELECT DISTINCT
+            cca.user_id,
+            MIN(cca.action_timestamp) as first_share_timestamp
+        FROM analytics_prod_bronze.src_core_card_actions cca
+        INNER JOIN users_who_saved uws ON cca.user_id = uws.user_id
+        WHERE cca.action_type = 'share'
+        AND cca.action_timestamp >= uws.first_save_timestamp
+        GROUP BY cca.user_id
+    ),
+
+    users_who_created_multiplayer AS (
+        SELECT DISTINCT
+            sm.creator_id as user_id,
+            MIN(sm.created_at) as first_multiplayer_timestamp
+        FROM analytics_prod_silver.stg_multiplayer sm
+        INNER JOIN users_who_saved uws ON sm.creator_id = uws.user_id
+        WHERE sm.created_at >= uws.first_save_timestamp
+        GROUP BY sm.creator_id
+    )
+
+    SELECT
+        COUNT(DISTINCT uws.user_id) as users_who_saved,
+        COUNT(DISTINCT uwsh.user_id) as users_who_shared,
+        COUNT(DISTINCT uwmp.user_id) as users_who_created_multiplayer,
+        COUNT(DISTINCT COALESCE(uwsh.user_id, uwmp.user_id)) as users_who_validated,
+
+        AVG(spu.total_cards_saved) as avg_cards_saved_per_user,
+        AVG(spu.boards_used) as avg_boards_per_user,
+
+        ROUND(100.0 * COUNT(DISTINCT uwsh.user_id) / NULLIF(COUNT(DISTINCT uws.user_id), 0), 1) as save_to_share_rate,
+        ROUND(100.0 * COUNT(DISTINCT uwmp.user_id) / NULLIF(COUNT(DISTINCT uws.user_id), 0), 1) as save_to_multiplayer_rate,
+        ROUND(100.0 * COUNT(DISTINCT COALESCE(uwsh.user_id, uwmp.user_id)) / NULLIF(COUNT(DISTINCT uws.user_id), 0), 1) as save_to_validate_rate
+
+    FROM users_who_saved uws
+    LEFT JOIN saves_per_user spu ON uws.user_id = spu.user_id
+    LEFT JOIN users_who_shared uwsh ON uws.user_id = uwsh.user_id
+    LEFT JOIN users_who_created_multiplayer uwmp ON uws.user_id = uwmp.user_id
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading save-to-share analysis: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_like_rate_by_position(days=90):
+    """
+    Analyze like rate by card position in pack (validates refinement hypothesis)
+    """
+    engine = get_database_connection()
+
+    query = f"""
+    SELECT
+        dpc.card_order as position,
+        COUNT(*) as total_cards,
+        COUNT(CASE WHEN dpc.user_action = 'right' THEN 1 END) as liked,
+        COUNT(CASE WHEN dpc.user_action = 'left' THEN 1 END) as disliked,
+        ROUND(100.0 * COUNT(CASE WHEN dpc.user_action = 'right' THEN 1 END) /
+            NULLIF(COUNT(CASE WHEN dpc.user_action IS NOT NULL THEN 1 END), 0), 1) as like_rate
+    FROM analytics_prod_bronze.src_dextr_pack_cards dpc
+    INNER JOIN analytics_prod_bronze.src_dextr_queries dq ON dpc.pack_id = dq.response_pack_id
+    INNER JOIN analytics_prod_silver.stg_users u ON dq.user_id = u.user_id
+    WHERE u.is_test_user = 0
+    AND dq.query_timestamp >= current_date - interval '{days} days'
+    AND dpc.card_order IS NOT NULL
+    GROUP BY dpc.card_order
+    ORDER BY dpc.card_order
+    """
+
+    try:
+        with engine.begin() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading like rate by position: {str(e)}")
+        return pd.DataFrame()
