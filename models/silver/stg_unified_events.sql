@@ -1,6 +1,19 @@
 {{ config(materialized='table') }}
 
--- CTE 1: Queries (all eras)
+-- CTE 1: Queries from dextr_queries (legacy direct-insert path).
+--
+-- Era handoff for 'query' events:
+--   - Before 2026-02-05: legacy is the only source (telemetry
+--     app_events.dextr_query_submitted was rolling out Jan 30 – Feb 4 with
+--     partial coverage, e.g. Feb 1 had 23 legacy vs 3 telemetry).
+--   - From 2026-02-05 onward: telemetry is source of truth and is emitted
+--     alongside the legacy insert from the iOS client. Counting both would
+--     double the prompt count (verified: Apr 12 2026 had 83 legacy == 83
+--     telemetry, landing the dashboard on 152 vs the true ~83).
+--
+-- Telemetry-era queries come through the telemetry_events CTE below,
+-- sourced from app_events.dextr_query_submitted. Deprecating the legacy
+-- write path from the iOS client is an open follow-up.
 with queries as (
     select
         user_id,
@@ -18,7 +31,9 @@ with queries as (
         'dextr'::text as origin_surface,
         response_pack_id::text as origin_source_id
     from {{ ref('src_dextr_queries') }}
-    where user_id is not null and query_timestamp is not null
+    where user_id is not null
+      and query_timestamp is not null
+      and query_timestamp < '2026-02-05'::timestamptz
 ),
 
 -- CTE 2: Swipes from dextr_pack_cards (card system era, before Nov 20 2025)

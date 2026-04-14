@@ -35,6 +35,15 @@ The app went through major schema changes. Events are tagged with `data_era`:
 - `places_system`: Nov 20, 2025 – Jan 29, 2026 (places + dextr_places + core_card_actions)
 - `telemetry`: Jan 30, 2026+ (TelemetryManager: app_events, planning_sessions, share_links)
 
+**Exception — `query` events:** The iOS client writes a prompt to both
+`dextr_queries` (legacy direct insert) AND emits `app_events.dextr_query_submitted`
+(telemetry) on every submission. Telemetry rollout for this event was staggered
+over Jan 30 – Feb 4, so the handoff date for 'query' specifically is **2026-02-05**
+(first day both sources reconcile). `stg_unified_events` gates the legacy CTE at
+that date — anything earlier comes from `dextr_queries`, anything later from
+telemetry only. Other event types (save, share, swipe, click) cut over cleanly
+on Jan 30 and don't need this exception.
+
 ### Key Domain Concepts
 
 - **Planner vs Passenger**: Core user segmentation. Planners have saved AND shared; Passengers are activated but haven't done both.
