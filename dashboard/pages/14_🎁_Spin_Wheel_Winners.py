@@ -285,13 +285,22 @@ if audit.empty:
     st.caption("No activity yet.")
 else:
     audit_display = audit.rename(columns={
-        "updated_at":   "When",
-        "display_name": "Winner",
-        "place_name":   "Place",
-        "status":       "Status",
-        "assigned_to":  "Assigned to",
-        "sent_by":      "Sent by",
+        "updated_at":      "When",
+        "full_name":       "Name",
+        "username":        "Username",
+        "email":           "Email",
+        "place_name":      "Place",
+        "status":          "Status",
+        "assigned_to":     "Assigned to",
+        "sent_by":         "Sent by",
+        "gift_card_code":  "Gift card code",
+        "gift_card_value": "Gift card £",
     })
+    ordered_cols = [c for c in [
+        "When", "Name", "Username", "Email", "Place", "Status",
+        "Gift card code", "Gift card £", "Assigned to", "Sent by",
+    ] if c in audit_display.columns]
+    audit_display = audit_display[ordered_cols]
     st.dataframe(audit_display, hide_index=True, use_container_width=True)
 
 add_deck_footer()

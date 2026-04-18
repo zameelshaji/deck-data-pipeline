@@ -4584,7 +4584,12 @@ def load_spin_wheel_audit_log(limit=20):
             o.status,
             o.assigned_to,
             o.sent_by,
+            o.gift_card_code,
+            o.gift_card_value,
             w.place_name,
+            u.full_name,
+            u.username,
+            u.email,
             coalesce(u.username, u.full_name, u.email) as display_name
         from analytics_ops.spin_wheel_winner_outreach o
         join public.spin_wheel_wins w
@@ -4689,3 +4694,33 @@ def update_winner_outreach_notes(outreach_id, notes):
     except Exception as e:
         st.error(f"Error updating winner notes: {str(e)}")
         return False
+
+
+@st.cache_data(ttl=300)
+def load_latest_eqt_memo(page, period_key):
+    """Return the latest EQT insight memo for (page, period_key), or None.
+
+    Populated by scheduled Claude triggers — see
+    `dashboard/sql/002_eqt_insight_memos.sql` and
+    `.claude/skills/eqt-insights/`.
+
+    Returns dict with memo_markdown, scorecard_json, model_version, generated_at
+    or None if no memo has been generated yet for this period.
+    """
+    engine = get_database_connection()
+    query = text("""
+        select memo_markdown, scorecard_json, model_version, generated_at
+        from analytics_ops.eqt_insight_memos
+        where page = :page and period_key = :period_key
+        order by generated_at desc
+        limit 1
+    """)
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(query, conn, params={"page": page, "period_key": period_key})
+        if df.empty:
+            return None
+        return df.iloc[0].to_dict()
+    except Exception as e:
+        st.error(f"Error loading EQT memo: {str(e)}")
+        return None
