@@ -4393,15 +4393,19 @@ def load_spin_wheel_metrics(start_date, end_date):
     query = text("""
         with spins as (
             select count(*)::bigint as n
-            from public.spin_wheel_attempts
-            where game_type = 'spin_wheel'
-              and spun_at::date between :start_date and :end_date
+            from public.spin_wheel_attempts a
+            left join analytics_prod_silver.stg_users u on u.user_id = a.user_id
+            where a.game_type = 'spin_wheel'
+              and a.spun_at::date between :start_date and :end_date
+              and coalesce(u.is_test_user, 0) = 0
         ),
         wins as (
             select count(*)::bigint as n,
-                   count(distinct user_id)::bigint as unique_winners
-            from public.spin_wheel_wins
-            where created_at::date between :start_date and :end_date
+                   count(distinct w.user_id)::bigint as unique_winners
+            from public.spin_wheel_wins w
+            left join analytics_prod_silver.stg_users u on u.user_id = w.user_id
+            where w.created_at::date between :start_date and :end_date
+              and coalesce(u.is_test_user, 0) = 0
         ),
         outreach as (
             select
@@ -4410,7 +4414,9 @@ def load_spin_wheel_metrics(start_date, end_date):
                 count(*) filter (where o.status = 'redeemed')::bigint    as redeemed_count,
                 count(*) filter (where o.status in ('sent','redeemed'))::bigint as fulfilled
             from analytics_ops.spin_wheel_winner_outreach o
+            left join analytics_prod_silver.stg_users u on u.user_id = o.win_user_id
             where o.win_created_at::date between :start_date and :end_date
+              and coalesce(u.is_test_user, 0) = 0
         )
         select
             spins.n                                                    as total_spins,
@@ -4443,16 +4449,20 @@ def load_spin_wheel_daily_trend(start_date, end_date):
             select generate_series(cast(:start_date as date), cast(:end_date as date), interval '1 day')::date as day
         ),
         spins as (
-            select spun_at::date as day, count(*)::bigint as spins
-            from public.spin_wheel_attempts
-            where game_type = 'spin_wheel'
-              and spun_at::date between :start_date and :end_date
+            select a.spun_at::date as day, count(*)::bigint as spins
+            from public.spin_wheel_attempts a
+            left join analytics_prod_silver.stg_users u on u.user_id = a.user_id
+            where a.game_type = 'spin_wheel'
+              and a.spun_at::date between :start_date and :end_date
+              and coalesce(u.is_test_user, 0) = 0
             group by 1
         ),
         wins as (
-            select created_at::date as day, count(*)::bigint as wins
-            from public.spin_wheel_wins
-            where created_at::date between :start_date and :end_date
+            select w.created_at::date as day, count(*)::bigint as wins
+            from public.spin_wheel_wins w
+            left join analytics_prod_silver.stg_users u on u.user_id = w.user_id
+            where w.created_at::date between :start_date and :end_date
+              and coalesce(u.is_test_user, 0) = 0
             group by 1
         )
         select d.day,
@@ -4476,10 +4486,12 @@ def load_spin_wheel_top_places(start_date, end_date, limit=10):
     """Top places by win count in the selected range."""
     engine = get_database_connection()
     query = text("""
-        select place_name, count(*)::bigint as win_count
-        from public.spin_wheel_wins
-        where created_at::date between :start_date and :end_date
-        group by place_name
+        select w.place_name, count(*)::bigint as win_count
+        from public.spin_wheel_wins w
+        left join analytics_prod_silver.stg_users u on u.user_id = w.user_id
+        where w.created_at::date between :start_date and :end_date
+          and coalesce(u.is_test_user, 0) = 0
+        group by w.place_name
         order by win_count desc
         limit :lim
     """)
@@ -4521,6 +4533,8 @@ def load_spin_wheel_winners_board(start_date, end_date, search_term=None, includ
             w.place_data                as place_data,
             w.created_at                as won_at,
             coalesce(u.username, u.full_name, u.email) as display_name,
+            u.full_name                 as full_name,
+            u.username                  as username,
             u.email                     as email,
             u.is_test_user              as is_test_user
         from public.spin_wheel_wins w
@@ -4578,6 +4592,7 @@ def load_spin_wheel_audit_log(limit=20):
          and w.place_id   = o.win_place_id
          and w.created_at = o.win_created_at
         left join analytics_prod_silver.stg_users u on u.user_id = o.win_user_id
+        where coalesce(u.is_test_user, 0) = 0
         order by o.updated_at desc
         limit :lim
     """)

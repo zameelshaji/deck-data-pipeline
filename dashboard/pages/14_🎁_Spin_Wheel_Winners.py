@@ -45,7 +45,7 @@ ACTIONS = {
 # Session state
 # ---------------------------------------------------------------------------
 if "operator_email" not in st.session_state:
-    st.session_state.operator_email = ""
+    st.session_state.operator_email = "isaac@swipeondeck.com"
 if "sending_form_for" not in st.session_state:
     st.session_state.sending_form_for = None  # outreach_id of card showing the send form
 
@@ -185,10 +185,21 @@ else:
             info_col, meta_col, action_col = st.columns([3, 2, 3])
 
             with info_col:
-                display_name = row["display_name"] or "(unknown user)"
-                st.markdown(f"**{display_name}**")
-                if row.get("email"):
-                    st.caption(row["email"])
+                full_name = (row.get("full_name") or "").strip()
+                username  = (row.get("username") or "").strip()
+                email     = (row.get("email") or "").strip()
+
+                header = full_name or username or email or "(unknown user)"
+                st.markdown(f"**{header}**")
+
+                sub_parts = []
+                if username and username != header:
+                    sub_parts.append(f"@{username}")
+                if email and email != header:
+                    sub_parts.append(email)
+                if sub_parts:
+                    st.caption(" · ".join(sub_parts))
+
                 st.caption(f"\U0001f4cd {row['place_name']}")
 
             with meta_col:
