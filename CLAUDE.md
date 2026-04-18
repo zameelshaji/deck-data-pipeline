@@ -121,8 +121,26 @@ dashboard/          # Streamlit dashboard app
     9_🔄_Conversion_&_Viral.py  # Conversion signals, viral loop
     10_🚀_Onboarding.py         # Onboarding funnel + first-session experience (checklist → spin wheel)
     11_🔍_Power_User_Deep_Dive.py # Power user diagnostics
+    13_🧹_Place_Curation.py       # Admin: curate/delete low-quality places (write-capable)
+    14_🎁_Spin_Wheel_Winners.py   # Ops kanban: winner outreach + gift-card fulfillment (write-capable)
   utils/            # DB connection, data loading, styling, filters
+  sql/              # Hand-applied migrations for dashboard-owned state (e.g. analytics_ops)
 ```
+
+### Dashboard-owned schemas
+
+Most dashboard pages are read-only consumers of `analytics_prod_gold`. Two pages
+write back to the database, to schemas that sit **outside** the dbt pipeline so
+`dbt run` cannot recreate or truncate them:
+
+- **`public.*`** — page 13 (Place Curation) deletes from `public.places` and
+  related tables. Source-of-truth tables owned by Dracon2; used cautiously.
+- **`analytics_ops.*`** — page 14 (Spin Wheel Winners) reads+writes
+  `analytics_ops.spin_wheel_winner_outreach` to track gift-card fulfillment
+  state. This schema was introduced specifically to keep dashboard-writable
+  operational state separate from both `public` (iOS-owned) and
+  `analytics_prod_gold` (dbt-generated). DDL lives in `dashboard/sql/` and is
+  applied manually via the Supabase SQL editor or MCP `apply_migration`.
 
 ## Naming Conventions
 

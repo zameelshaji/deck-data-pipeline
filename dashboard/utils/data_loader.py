@@ -4361,3 +4361,316 @@ def load_like_rate_by_position(days=90):
     except Exception as e:
         st.error(f"Error loading like rate by position: {str(e)}")
         return pd.DataFrame()
+
+
+# ---------------------------------------------------------------------------
+# Spin Wheel Winners (page 14) — kanban board + mechanism metrics
+#
+# Source of truth for winners: public.spin_wheel_wins (read-only, owned by Dracon2).
+# Fulfillment state lives in analytics_ops.spin_wheel_winner_outreach, keyed by the
+# composite natural key (win_user_id, win_place_id, win_created_at). On every board
+# read we upsert a placeholder outreach row for any win that doesn't have one, so
+# new winners appear automatically without a separate sync job.
+# ---------------------------------------------------------------------------
+
+_OUTREACH_UPSERT_SQL = """
+insert into analytics_ops.spin_wheel_winner_outreach
+  (win_user_id, win_place_id, win_created_at, status)
+select w.user_id, w.place_id, w.created_at, 'to_contact'
+from public.spin_wheel_wins w
+on conflict (win_user_id, win_place_id, win_created_at) do nothing
+"""
+
+
+@st.cache_data(ttl=60)
+def load_spin_wheel_metrics(start_date, end_date):
+    """Mechanism metrics for the spin-wheel winners page.
+
+    Returns dict: total_spins, total_wins, win_rate, fulfillment_rate,
+                  unique_winners, pending_contact, sent_count, redeemed_count.
+    """
+    engine = get_database_connection()
+    query = text("""
+        with spins as (
+            select count(*)::bigint as n
+            from public.spin_wheel_attempts
+            where game_type = 'spin_wheel'
+              and spun_at::date between :start_date and :end_date
+        ),
+        wins as (
+            select count(*)::bigint as n,
+                   count(distinct user_id)::bigint as unique_winners
+            from public.spin_wheel_wins
+            where created_at::date between :start_date and :end_date
+        ),
+        outreach as (
+            select
+                count(*) filter (where o.status = 'to_contact')::bigint  as pending_contact,
+                count(*) filter (where o.status = 'sent')::bigint        as sent_count,
+                count(*) filter (where o.status = 'redeemed')::bigint    as redeemed_count,
+                count(*) filter (where o.status in ('sent','redeemed'))::bigint as fulfilled
+            from analytics_ops.spin_wheel_winner_outreach o
+            where o.win_created_at::date between :start_date and :end_date
+        )
+        select
+            spins.n                                                    as total_spins,
+            wins.n                                                     as total_wins,
+            wins.unique_winners                                        as unique_winners,
+            case when spins.n > 0 then wins.n::numeric / spins.n end   as win_rate,
+            case when wins.n > 0
+                 then outreach.fulfilled::numeric / wins.n
+            end                                                        as fulfillment_rate,
+            outreach.pending_contact,
+            outreach.sent_count,
+            outreach.redeemed_count
+        from spins, wins, outreach
+    """)
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date})
+        return df.iloc[0].to_dict() if not df.empty else {}
+    except Exception as e:
+        st.error(f"Error loading spin wheel metrics: {str(e)}")
+        return {}
+
+
+@st.cache_data(ttl=60)
+def load_spin_wheel_daily_trend(start_date, end_date):
+    """Daily spins vs wins in the selected range. Returns df[day, spins, wins]."""
+    engine = get_database_connection()
+    query = text("""
+        with days as (
+            select generate_series(cast(:start_date as date), cast(:end_date as date), interval '1 day')::date as day
+        ),
+        spins as (
+            select spun_at::date as day, count(*)::bigint as spins
+            from public.spin_wheel_attempts
+            where game_type = 'spin_wheel'
+              and spun_at::date between :start_date and :end_date
+            group by 1
+        ),
+        wins as (
+            select created_at::date as day, count(*)::bigint as wins
+            from public.spin_wheel_wins
+            where created_at::date between :start_date and :end_date
+            group by 1
+        )
+        select d.day,
+               coalesce(s.spins, 0) as spins,
+               coalesce(w.wins, 0)  as wins
+        from days d
+        left join spins s on s.day = d.day
+        left join wins  w on w.day = d.day
+        order by d.day
+    """)
+    try:
+        with engine.connect() as conn:
+            return pd.read_sql(query, conn, params={"start_date": start_date, "end_date": end_date})
+    except Exception as e:
+        st.error(f"Error loading spin wheel daily trend: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=60)
+def load_spin_wheel_top_places(start_date, end_date, limit=10):
+    """Top places by win count in the selected range."""
+    engine = get_database_connection()
+    query = text("""
+        select place_name, count(*)::bigint as win_count
+        from public.spin_wheel_wins
+        where created_at::date between :start_date and :end_date
+        group by place_name
+        order by win_count desc
+        limit :lim
+    """)
+    try:
+        with engine.connect() as conn:
+            return pd.read_sql(
+                query, conn,
+                params={"start_date": start_date, "end_date": end_date, "lim": limit},
+            )
+    except Exception as e:
+        st.error(f"Error loading top win places: {str(e)}")
+        return pd.DataFrame()
+
+
+def load_spin_wheel_winners_board(start_date, end_date, search_term=None, include_skipped=False):
+    """Main kanban query.
+
+    Auto-upserts a placeholder outreach row for every win before reading, so the
+    board reflects the true universe of winners. Not cached — writes on this page
+    must be visible on the next rerun.
+    """
+    engine = get_database_connection()
+    select_sql = text("""
+        select
+            o.id                        as outreach_id,
+            o.status,
+            o.assigned_to,
+            o.contacted_at,
+            o.sent_at,
+            o.sent_by,
+            o.gift_card_code,
+            o.gift_card_value,
+            o.redeemed_at,
+            o.notes,
+            o.updated_at,
+            w.user_id                   as user_id,
+            w.place_id                  as place_id,
+            w.place_name                as place_name,
+            w.place_data                as place_data,
+            w.created_at                as won_at,
+            coalesce(u.username, u.full_name, u.email) as display_name,
+            u.email                     as email,
+            u.is_test_user              as is_test_user
+        from public.spin_wheel_wins w
+        join analytics_ops.spin_wheel_winner_outreach o
+          on o.win_user_id    = w.user_id
+         and o.win_place_id   = w.place_id
+         and o.win_created_at = w.created_at
+        left join analytics_prod_silver.stg_users u
+          on u.user_id = w.user_id
+        where w.created_at::date between :start_date and :end_date
+          and coalesce(u.is_test_user, 0) = 0
+          and (:include_skipped or o.status <> 'skipped')
+          and (
+                cast(:search_term as text) is null
+                or lower(w.place_name)              like '%' || cast(:search_term as text) || '%'
+                or lower(coalesce(u.username, ''))  like '%' || cast(:search_term as text) || '%'
+                or lower(coalesce(u.full_name, '')) like '%' || cast(:search_term as text) || '%'
+                or lower(coalesce(u.email, ''))     like '%' || cast(:search_term as text) || '%'
+              )
+        order by w.created_at desc
+    """)
+    search_lc = search_term.lower().strip() if search_term else None
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(_OUTREACH_UPSERT_SQL))
+            df = pd.read_sql(
+                select_sql, conn,
+                params={
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "search_term": search_lc,
+                    "include_skipped": include_skipped,
+                },
+            )
+        return df
+    except Exception as e:
+        st.error(f"Error loading spin wheel winners board: {str(e)}")
+        return pd.DataFrame()
+
+
+def load_spin_wheel_audit_log(limit=20):
+    """Recent outreach updates, most recent first. MVP treats updated_at as audit."""
+    engine = get_database_connection()
+    query = text("""
+        select
+            o.updated_at,
+            o.status,
+            o.assigned_to,
+            o.sent_by,
+            w.place_name,
+            coalesce(u.username, u.full_name, u.email) as display_name
+        from analytics_ops.spin_wheel_winner_outreach o
+        join public.spin_wheel_wins w
+          on w.user_id    = o.win_user_id
+         and w.place_id   = o.win_place_id
+         and w.created_at = o.win_created_at
+        left join analytics_prod_silver.stg_users u on u.user_id = o.win_user_id
+        order by o.updated_at desc
+        limit :lim
+    """)
+    try:
+        with engine.connect() as conn:
+            return pd.read_sql(query, conn, params={"lim": limit})
+    except Exception as e:
+        st.error(f"Error loading spin wheel audit log: {str(e)}")
+        return pd.DataFrame()
+
+
+def update_winner_outreach_status(
+    outreach_id,
+    new_status,
+    operator_email=None,
+    gift_card_code=None,
+    gift_card_value=None,
+    notes=None,
+):
+    """Transition a winner's outreach row to a new status.
+
+    Sets the matching timestamp for the destination state:
+      contacted → contacted_at = now()
+      sent      → sent_at = now(), sent_by = operator_email, plus gift card fields
+      redeemed  → redeemed_at = now()
+      skipped   → no timestamp set
+      to_contact → clears contacted_at/sent_at/redeemed_at (for undo)
+    updated_at is always bumped. Notes, if provided, overwrite the existing value.
+    """
+    valid_statuses = {"to_contact", "contacted", "sent", "redeemed", "skipped"}
+    if new_status not in valid_statuses:
+        st.error(f"Invalid status: {new_status}")
+        return False
+
+    set_clauses = ["status = :status", "updated_at = now()"]
+    params = {"outreach_id": outreach_id, "status": new_status}
+
+    if operator_email:
+        set_clauses.append("assigned_to = coalesce(assigned_to, :operator_email)")
+        params["operator_email"] = operator_email
+
+    if new_status == "contacted":
+        set_clauses.append("contacted_at = coalesce(contacted_at, now())")
+    elif new_status == "sent":
+        set_clauses.append("sent_at = coalesce(sent_at, now())")
+        if operator_email:
+            set_clauses.append("sent_by = coalesce(sent_by, :operator_email)")
+        if gift_card_code is not None:
+            set_clauses.append("gift_card_code = :gift_card_code")
+            params["gift_card_code"] = gift_card_code
+        if gift_card_value is not None:
+            set_clauses.append("gift_card_value = :gift_card_value")
+            params["gift_card_value"] = gift_card_value
+    elif new_status == "redeemed":
+        set_clauses.append("redeemed_at = coalesce(redeemed_at, now())")
+    elif new_status == "to_contact":
+        set_clauses.extend([
+            "contacted_at = null",
+            "sent_at = null",
+            "redeemed_at = null",
+        ])
+
+    if notes is not None:
+        set_clauses.append("notes = :notes")
+        params["notes"] = notes
+
+    query = text(
+        f"update analytics_ops.spin_wheel_winner_outreach "
+        f"set {', '.join(set_clauses)} "
+        f"where id = :outreach_id"
+    )
+    engine = get_database_connection()
+    try:
+        with engine.begin() as conn:
+            conn.execute(query, params)
+        return True
+    except Exception as e:
+        st.error(f"Error updating winner outreach: {str(e)}")
+        return False
+
+
+def update_winner_outreach_notes(outreach_id, notes):
+    """Notes-only write for the inline notes field on each card."""
+    engine = get_database_connection()
+    query = text("""
+        update analytics_ops.spin_wheel_winner_outreach
+        set notes = :notes, updated_at = now()
+        where id = :outreach_id
+    """)
+    try:
+        with engine.begin() as conn:
+            conn.execute(query, {"outreach_id": outreach_id, "notes": notes})
+        return True
+    except Exception as e:
+        st.error(f"Error updating winner notes: {str(e)}")
+        return False
