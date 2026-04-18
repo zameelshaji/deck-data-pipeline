@@ -15,6 +15,7 @@ from utils.data_loader import (
     load_engagement_quality_weekly,
     load_swipe_to_save_weekly,
     load_engagement_cohort_heatmap,
+    load_engagement_frequency_distribution,
 )
 
 st.set_page_config(
@@ -430,6 +431,107 @@ if filters['activation_week'] is None:
 
     except Exception as e:
         st.error(f"Error loading cohort heatmap data: {str(e)}")
+
+# =============================================================================
+# Section F: Engagement Frequency Distribution (monthly snapshots)
+# =============================================================================
+st.divider()
+st.subheader("Engagement Frequency Distribution")
+st.caption(
+    "For each month, the share of MAU split by number of active days in a "
+    "reference week. Compare two months to see whether users are engaging "
+    "more or less frequently over time."
+)
+
+try:
+    all_freq = load_engagement_frequency_distribution()
+    if all_freq.empty:
+        st.info("No engagement frequency data available.")
+    else:
+        all_freq['snapshot_month'] = pd.to_datetime(all_freq['snapshot_month'])
+        month_options = (
+            all_freq['snapshot_month']
+            .dt.strftime('%Y-%m')
+            .drop_duplicates()
+            .sort_values(ascending=False)
+            .tolist()
+        )
+        if len(month_options) < 1:
+            st.info("Not enough months of data for the overlay yet.")
+        else:
+            default_recent = month_options[0]
+            default_compare = month_options[-1] if len(month_options) > 1 else month_options[0]
+
+            c1, c2 = st.columns(2)
+            with c1:
+                month_a = st.selectbox(
+                    "Month A (recent)", month_options, index=0, key='freq_month_a'
+                )
+            with c2:
+                default_idx_b = min(len(month_options) - 1, 12)
+                month_b = st.selectbox(
+                    "Month B (comparison)",
+                    month_options,
+                    index=default_idx_b,
+                    key='freq_month_b',
+                )
+
+            selected = all_freq[
+                all_freq['snapshot_month'].dt.strftime('%Y-%m').isin([month_a, month_b])
+            ].copy()
+            selected['month_label'] = selected['snapshot_month'].dt.strftime('%b %Y')
+            selected['pct_of_users_display'] = selected['pct_of_users'] * 100
+
+            fig_freq = go.Figure()
+            colors = [CHART_COLORS['pink'], CHART_COLORS['blue']]
+            for idx, label in enumerate([
+                pd.to_datetime(month_a + '-01').strftime('%b %Y'),
+                pd.to_datetime(month_b + '-01').strftime('%b %Y'),
+            ]):
+                sub = (
+                    selected[selected['month_label'] == label]
+                    .sort_values('days_active_bucket')
+                )
+                if sub.empty:
+                    continue
+                fig_freq.add_trace(
+                    go.Bar(
+                        x=sub['days_active_bucket'].astype(str),
+                        y=sub['pct_of_users_display'],
+                        name=label,
+                        marker_color=colors[idx % len(colors)],
+                        text=[f"{v:.0f}%" for v in sub['pct_of_users_display']],
+                        textposition='outside',
+                        hovertemplate=(
+                            f"{label}"
+                            "<br>Days active: %{x}"
+                            "<br>% of MAU: %{y:.1f}%"
+                            "<br>Users: %{customdata}<extra></extra>"
+                        ),
+                        customdata=sub['users_in_bucket'],
+                    )
+                )
+
+            fig_freq.update_layout(
+                barmode='group',
+                xaxis_title="Days active in reference week",
+                yaxis_title="% of monthly active users",
+                yaxis=dict(ticksuffix="%", gridcolor=BRAND_COLORS["border"]),
+                font=CHART_FONT,
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                margin=dict(l=40, r=20, t=40, b=40),
+                height=420,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            )
+            st.plotly_chart(fig_freq, use_container_width=True)
+            st.caption(
+                "Bucket 0 = users who were active somewhere in the month but "
+                "not in the reference week. Buckets 1–7 = distinct days active "
+                "in the reference week."
+            )
+except Exception as e:
+    st.error(f"Error loading engagement frequency distribution: {str(e)}")
 
 # --- Footer ---
 add_deck_footer()

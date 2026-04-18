@@ -1181,3 +1181,162 @@ models:
         description: "When user won the (rigged) spin"
       - name: granted_notif
         description: "TRUE if user granted notification permission after the spin"
+
+  - name: fct_churned_user_profile
+    description: >
+      Profile of each activated-then-dormant user, combining acquisition
+      attributes, lifetime totals, last 3 sessions, and first/last prompt
+      intent. One row per (user_id) where fct_user_segments.is_churned = true
+      and is_activated = true.
+    columns:
+      - name: user_id
+        description: "Churned user's ID"
+        tests:
+          - not_null
+          - unique
+      - name: cohort_week
+        description: "Monday of the user's activation week"
+        tests:
+          - not_null
+      - name: referral_source
+        description: "organic vs referral (from fct_user_segments)"
+      - name: activation_trigger
+        description: "What first activated this user"
+      - name: first_prompt_intent
+        description: "Intent category of the user's very first prompt, if any"
+      - name: last_prompt_intent
+        description: "Intent category of the user's final prompt, if any"
+      - name: churned_without_save
+        description: "TRUE if user churned without ever saving a place"
+      - name: churned_after_activation
+        description: "TRUE if the user did activate before churning (always true for this model)"
+
+  - name: fct_cohort_retention_floor
+    description: >
+      Per-cohort fit of retention(t) = floor + (1-floor) * exp(-t/tau) using
+      D7/D30/D60/D90 points. fitted_floor is EQT's "steady-state retention
+      share". Directional only — four points fit two parameters with high
+      noise. Only cohorts with mature_d90 >= 10 are included.
+    columns:
+      - name: cohort_week
+        description: "Monday of the activation week"
+        tests:
+          - not_null
+          - unique
+      - name: cohort_size
+        description: "Total activated users in this cohort"
+      - name: fitted_floor
+        description: "Asymptotic retention share (the floor). Bounded 0..1."
+        tests:
+          - not_null
+      - name: fitted_tau_days
+        description: "Time-constant of decay in days"
+      - name: sse
+        description: "Sum of squared residuals across the four known points (fit quality)"
+      - name: retention_d180_estimate
+        description: "Model-extrapolated D180 retention"
+      - name: retention_d365_estimate
+        description: "Model-extrapolated D365 retention"
+
+  - name: fct_retention_by_social_connectivity
+    description: >
+      Weekly cohort retention split by group-membership count near activation
+      (0, 1-2, 3+ groups joined on or before activation_date + 7 days).
+      Retention windows D7/D30/D60/D90.
+    columns:
+      - name: cohort_week
+        description: "Monday of the activation week"
+        tests:
+          - not_null
+      - name: connectivity_bucket
+        description: "Group-count bucket at acquisition"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['0_groups', '1-2_groups', '3+_groups']
+      - name: cohort_size
+        description: "Count of activated users in the (cohort_week, bucket) slice"
+      - name: retention_rate_d7
+        description: "retained_d7 / mature_d7"
+      - name: retention_rate_d30
+        description: "retained_d30 / mature_d30"
+      - name: retention_rate_d60
+        description: "retained_d60 / mature_d60"
+      - name: retention_rate_d90
+        description: "retained_d90 / mature_d90"
+
+  - name: fct_engagement_frequency_distribution
+    description: >
+      Monthly snapshot of "days active in a week" distribution. Each month has
+      eight rows, one per bucket 0..7. Bucket 0 = MAU-of-month minus users
+      active in the reference week. Buckets 1..7 = users with that many active
+      days in the reference week (the latest full activity_week of the month).
+      Powers EQT's Part-3 "frequency of engagement" overlay chart.
+    columns:
+      - name: snapshot_month
+        description: "First day of the calendar month being summarized"
+        tests:
+          - not_null
+      - name: reference_week
+        description: "Monday of the chosen reference week within snapshot_month"
+      - name: days_active_bucket
+        description: "Bucket 0..7 for days active in reference_week"
+        tests:
+          - not_null
+          - accepted_values:
+              values: [0, 1, 2, 3, 4, 5, 6, 7]
+      - name: users_in_bucket
+        description: "Distinct users in this bucket for this month"
+      - name: total_users_in_month
+        description: "MAU for the snapshot_month (sum across buckets)"
+      - name: pct_of_users
+        description: "users_in_bucket / total_users_in_month, 0–1 decimal"
+
+  - name: fct_retention_by_acquisition_attribute
+    description: >
+      Weekly cohort retention split by a single acquisition attribute. One row
+      per (cohort_week, attribute_name, attribute_value). Attributes covered:
+      referral_source, activation_trigger, first_prompt_intent,
+      app_version_at_signup. Uniqueness of the triple is enforced by a
+      singular test.
+    columns:
+      - name: cohort_week
+        description: "Monday of the activation week"
+        tests:
+          - not_null
+      - name: attribute_name
+        description: "Which attribute this row slices by"
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['referral_source', 'activation_trigger', 'first_prompt_intent', 'app_version_at_signup']
+      - name: attribute_value
+        description: "The value of the attribute for this slice"
+        tests:
+          - not_null
+      - name: cohort_size
+        description: "Count of activated users in this slice"
+      - name: mature_d7
+        description: "Users in slice old enough to measure D7"
+      - name: mature_d30
+        description: "Users in slice old enough to measure D30"
+      - name: mature_d60
+        description: "Users in slice old enough to measure D60"
+      - name: mature_d90
+        description: "Users in slice old enough to measure D90"
+      - name: retained_d7
+        description: "Mature-at-D7 users who returned within 7 days of activation"
+      - name: retained_d30
+        description: "Mature-at-D30 users who returned within 30 days of activation"
+      - name: retained_d60
+        description: "Mature-at-D60 users who returned within 60 days of activation"
+      - name: retained_d90
+        description: "Mature-at-D90 users who returned within 90 days of activation"
+      - name: retention_rate_d7
+        description: "retained_d7 / mature_d7"
+      - name: retention_rate_d30
+        description: "retained_d30 / mature_d30"
+      - name: retention_rate_d60
+        description: "retained_d60 / mature_d60"
+      - name: retention_rate_d90
+        description: "retained_d90 / mature_d90"

@@ -10,6 +10,7 @@ from utils.data_loader import (
     load_conversion_by_category,
     load_viral_loop_summary,
     load_viral_loop_detail,
+    load_organic_vs_referred_weekly,
 )
 
 st.set_page_config(
@@ -195,6 +196,115 @@ try:
             )
 except Exception as e:
     st.error(f"Error loading viral loop metrics: {str(e)}")
+
+st.divider()
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Section D2: Organic vs Referred Acquisition (weekly trend)
+# ══════════════════════════════════════════════════════════════════════════════
+
+st.subheader("\U0001f331 Organic vs Referred Acquisition")
+st.markdown(
+    "*Share of new activated users arriving organically vs via a share link / "
+    "referral code, plus D30 retention for each group. A rising organic share "
+    "is one signal of a working network effect.*"
+)
+
+try:
+    mix_df = load_organic_vs_referred_weekly()
+    if mix_df.empty:
+        st.info("No organic/referral data available.")
+    else:
+        mix_df = mix_df.copy()
+        mix_df["activation_week"] = pd.to_datetime(mix_df["activation_week"])
+        mix_df["organic_count"] = mix_df["organic_count"].fillna(0).astype(int)
+        mix_df["referral_count"] = mix_df["referral_count"].fillna(0).astype(int)
+        mix_df["total_count"] = mix_df["organic_count"] + mix_df["referral_count"]
+        mix_df["pct_organic"] = (
+            mix_df["organic_count"] / mix_df["total_count"].where(mix_df["total_count"] > 0)
+        ) * 100
+
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**% of activated users arriving organically**")
+            plot_df = mix_df.dropna(subset=["pct_organic"])
+            if plot_df.empty:
+                st.info("Not enough data to render.")
+            else:
+                fig_pct = go.Figure(
+                    go.Scatter(
+                        x=plot_df["activation_week"],
+                        y=plot_df["pct_organic"],
+                        mode="lines+markers",
+                        line=dict(color=BRAND_COLORS.get("primary", "#E91E8C"), width=3),
+                        marker=dict(size=6),
+                        hovertemplate="Week: %{x|%Y-%m-%d}<br>Organic: %{y:.1f}%<extra></extra>",
+                    )
+                )
+                fig_pct.update_layout(
+                    xaxis_title="Activation week",
+                    yaxis_title="% organic",
+                    yaxis=dict(range=[0, 100], ticksuffix="%", gridcolor=BRAND_COLORS["border"]),
+                    font=dict(family="Inter, system-ui, sans-serif", size=13),
+                    plot_bgcolor="white",
+                    paper_bgcolor="white",
+                    margin=dict(l=40, r=20, t=20, b=40),
+                    height=360,
+                )
+                st.plotly_chart(fig_pct, use_container_width=True)
+
+        with col2:
+            st.markdown("**D30 retention: organic vs referred cohorts**")
+            ret_df = mix_df.copy()
+            ret_df["organic_retention_d30_pct"] = ret_df["organic_retention_d30"] * 100
+            ret_df["referral_retention_d30_pct"] = ret_df["referral_retention_d30"] * 100
+
+            fig_ret = go.Figure()
+            fig_ret.add_trace(
+                go.Scatter(
+                    x=ret_df["activation_week"],
+                    y=ret_df["organic_retention_d30_pct"],
+                    mode="lines+markers",
+                    name="Organic",
+                    line=dict(color=BRAND_COLORS.get("primary", "#E91E8C"), width=3),
+                    marker=dict(size=6),
+                    connectgaps=False,
+                    hovertemplate="Week: %{x|%Y-%m-%d}<br>Organic D30: %{y:.1f}%<extra></extra>",
+                )
+            )
+            fig_ret.add_trace(
+                go.Scatter(
+                    x=ret_df["activation_week"],
+                    y=ret_df["referral_retention_d30_pct"],
+                    mode="lines+markers",
+                    name="Referred",
+                    line=dict(color=BRAND_COLORS.get("accent", "#6366F1"), width=3, dash="dot"),
+                    marker=dict(size=6),
+                    connectgaps=False,
+                    hovertemplate="Week: %{x|%Y-%m-%d}<br>Referred D30: %{y:.1f}%<extra></extra>",
+                )
+            )
+            fig_ret.update_layout(
+                xaxis_title="Activation week",
+                yaxis_title="D30 retention",
+                yaxis=dict(range=[0, 100], ticksuffix="%", gridcolor=BRAND_COLORS["border"]),
+                font=dict(family="Inter, system-ui, sans-serif", size=13),
+                plot_bgcolor="white",
+                paper_bgcolor="white",
+                margin=dict(l=40, r=20, t=20, b=40),
+                height=360,
+                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+            )
+            st.plotly_chart(fig_ret, use_container_width=True)
+
+        st.caption(
+            "Cohorts with zero users in a group render as gaps in the retention "
+            "line rather than 0%. Early weeks with tiny referral counts will be "
+            "noisy."
+        )
+except Exception as e:
+    st.error(f"Error loading organic-vs-referred trend: {str(e)}")
 
 st.divider()
 
