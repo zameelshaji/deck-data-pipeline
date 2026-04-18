@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 from utils.styling import apply_deck_branding, add_deck_footer, BRAND_COLORS
 from utils.filters import render_sidebar_filters
 from utils.data_loader import (
@@ -16,7 +17,12 @@ from utils.data_loader import (
     load_signup_to_activation_funnel,
     load_cohort_quality_table,
     load_retention_heatmap_data,
+    load_retention_by_acquisition_attribute,
+    load_retention_by_connectivity,
+    load_cohort_retention_floor,
     load_churn_analysis,
+    load_churned_user_profile_summary,
+    load_churned_user_profile_detail,
     load_churn_risk_distribution,
     load_planner_vs_passenger,
 )
@@ -353,17 +359,31 @@ else:
             axis=1,
         )
 
-        retention_labels = ['D7', 'D30']
-        retention_cols_map = ['retention_rate_d7', 'retention_rate_d30']
+        retention_labels = ['D7', 'D30', 'D60', 'D90']
+        retention_cols_map = [
+            ('retention_rate_d7', 'mature_d7'),
+            ('retention_rate_d30', 'mature_d30'),
+            ('retention_rate_d60', 'mature_d60'),
+            ('retention_rate_d90', 'mature_d90'),
+        ]
 
         z_data = []
         text_data = []
         for _, row in heatmap_df.iterrows():
             row_vals = []
             row_text = []
-            for col in retention_cols_map:
-                val = row.get(col)
-                if val is not None and pd.notna(val):
+            for rate_col, mature_col in retention_cols_map:
+                val = row.get(rate_col)
+                mature_val = row.get(mature_col)
+                # Mask cells where the cohort has not matured yet (mature_dN = 0).
+                # Cells read as blank rather than 0%.
+                if (
+                    val is not None
+                    and pd.notna(val)
+                    and mature_val is not None
+                    and pd.notna(mature_val)
+                    and int(mature_val) > 0
+                ):
                     pct_val = float(val) * 100
                     row_vals.append(pct_val)
                     row_text.append(f"{pct_val:.0f}%")
@@ -373,50 +393,352 @@ else:
             z_data.append(row_vals)
             text_data.append(row_text)
 
-        fig_heatmap = go.Figure(data=go.Heatmap(
-            z=z_data,
-            x=retention_labels,
-            y=heatmap_df['cohort_label'].tolist(),
-            colorscale=[
-                [0, '#FEE2E2'],       # Red (low)
-                [0.25, '#FEF3C7'],    # Yellow
-                [0.5, '#D1FAE5'],     # Light green
-                [0.75, '#6EE7B7'],    # Medium green
-                [1.0, BRAND_COLORS['success']],  # Dark green (high)
-            ],
-            colorbar=dict(title="Retention %", ticksuffix="%"),
-            zmin=0,
-            zmax=100,
-            hovertemplate="Cohort: %{y}<br>Window: %{x}<br>Retention: %{z:.1f}%<extra></extra>",
-        ))
+        cohort_labels = heatmap_df['cohort_label'].tolist()
+        cohort_sizes = heatmap_df['cohort_size'].astype(int).tolist()
 
-        # Add text annotations
+        # Two-panel layout: horizontal cohort-size bar on the left, heatmap on the right.
+        # Sharing the y-axis keeps bars aligned to the corresponding heatmap row.
+        fig_heatmap = make_subplots(
+            rows=1,
+            cols=2,
+            shared_yaxes=True,
+            column_widths=[0.2, 0.8],
+            horizontal_spacing=0.02,
+            subplot_titles=("Cohort size", "Retention %"),
+        )
+
+        fig_heatmap.add_trace(
+            go.Bar(
+                x=cohort_sizes,
+                y=cohort_labels,
+                orientation='h',
+                marker_color=BRAND_COLORS.get('primary', '#E91E8C'),
+                text=[str(n) for n in cohort_sizes],
+                textposition='outside',
+                hovertemplate="Cohort: %{y}<br>Size: %{x}<extra></extra>",
+                showlegend=False,
+            ),
+            row=1,
+            col=1,
+        )
+
+        fig_heatmap.add_trace(
+            go.Heatmap(
+                z=z_data,
+                x=retention_labels,
+                y=cohort_labels,
+                colorscale=[
+                    [0, '#FEE2E2'],       # Red (low)
+                    [0.25, '#FEF3C7'],    # Yellow
+                    [0.5, '#D1FAE5'],     # Light green
+                    [0.75, '#6EE7B7'],    # Medium green
+                    [1.0, BRAND_COLORS['success']],  # Dark green (high)
+                ],
+                colorbar=dict(title="Retention %", ticksuffix="%"),
+                zmin=0,
+                zmax=100,
+                hovertemplate="Cohort: %{y}<br>Window: %{x}<br>Retention: %{z:.1f}%<extra></extra>",
+            ),
+            row=1,
+            col=2,
+        )
+
+        # Cell annotations on the heatmap (skip masked cells).
         for i, (row_vals, row_text) in enumerate(zip(z_data, text_data)):
             for j, (val, txt) in enumerate(zip(row_vals, row_text)):
                 if val is not None:
                     fig_heatmap.add_annotation(
                         x=retention_labels[j],
-                        y=heatmap_df['cohort_label'].iloc[i],
+                        y=cohort_labels[i],
                         text=txt,
                         showarrow=False,
                         font=dict(
                             size=11,
                             color='white' if val > 50 else BRAND_COLORS['text_primary'],
                         ),
+                        xref='x2',
+                        yref='y2',
                     )
 
         fig_heatmap.update_layout(
             font=dict(family="Inter, system-ui, sans-serif", size=13),
             plot_bgcolor='white',
             paper_bgcolor='white',
-            margin=dict(l=200, r=20, t=20, b=40),
+            margin=dict(l=200, r=20, t=40, b=40),
             height=max(400, len(heatmap_df) * 25 + 100),
-            xaxis=dict(side='top'),
-            yaxis=dict(autorange='reversed'),
         )
+        fig_heatmap.update_yaxes(autorange='reversed', row=1, col=1)
+        fig_heatmap.update_yaxes(autorange='reversed', row=1, col=2)
+        fig_heatmap.update_xaxes(title_text="Users", row=1, col=1)
+        fig_heatmap.update_xaxes(side='top', row=1, col=2)
         st.plotly_chart(fig_heatmap, use_container_width=True)
+        st.caption(
+            "Blank cells indicate cohorts not yet mature at that retention window "
+            "(e.g. cohorts younger than 90 days have no D90 value)."
+        )
     else:
         st.info("Not enough mature cohorts for heatmap visualization.")
+
+st.divider()
+
+# =============================================================================
+# Section E2: Retention by Acquisition Attribute
+# =============================================================================
+st.subheader("Retention by Acquisition Attribute")
+st.caption(
+    "Which attributes at signup predict better D7–D90 retention? Users who "
+    "first prompted 'date_night' vs 'dining', signed up organically vs via a "
+    "share link, etc. Cohorts smaller than 10 users are hidden."
+)
+
+ATTR_CHOICES = {
+    "Referral source (organic vs referral)": "referral_source",
+    "First activation trigger (save / share / prompt)": "activation_trigger",
+    "First prompt intent (date_night, dining, …)": "first_prompt_intent",
+    "App version at signup": "app_version_at_signup",
+}
+WINDOW_CHOICES = {
+    "D7": "retention_rate_d7",
+    "D30": "retention_rate_d30",
+    "D60": "retention_rate_d60",
+    "D90": "retention_rate_d90",
+}
+
+attr_col, window_col = st.columns([2, 1])
+with attr_col:
+    selected_attr_label = st.selectbox(
+        "Slice by",
+        list(ATTR_CHOICES.keys()),
+        index=1,  # default to activation_trigger
+    )
+with window_col:
+    selected_window = st.selectbox(
+        "Retention window",
+        list(WINDOW_CHOICES.keys()),
+        index=1,  # default to D30
+    )
+
+attr_df = load_retention_by_acquisition_attribute(ATTR_CHOICES[selected_attr_label])
+
+if attr_df.empty:
+    st.info("Not enough data for this attribute yet (all slices <10 users).")
+else:
+    rate_col = WINDOW_CHOICES[selected_window]
+    plot_df = attr_df.dropna(subset=[rate_col]).copy()
+    plot_df['cohort_week'] = pd.to_datetime(plot_df['cohort_week'])
+    plot_df[f'{rate_col}_pct'] = plot_df[rate_col] * 100
+
+    fig_attr = go.Figure()
+    values = sorted(plot_df['attribute_value'].unique())
+    palette = px.colors.qualitative.Set2 + px.colors.qualitative.Set3
+    for idx, val in enumerate(values):
+        sub = plot_df[plot_df['attribute_value'] == val].sort_values('cohort_week')
+        if sub.empty:
+            continue
+        max_size = max(sub['cohort_size'].max(), 1)
+        # Line width scales with avg cohort size so small slices visually recede.
+        width = 1.5 + 3.5 * min(sub['cohort_size'].mean() / max(max_size, 1), 1.0)
+        fig_attr.add_trace(
+            go.Scatter(
+                x=sub['cohort_week'],
+                y=sub[f'{rate_col}_pct'],
+                mode='lines+markers',
+                name=str(val),
+                line=dict(color=palette[idx % len(palette)], width=width),
+                marker=dict(size=6 + (sub['cohort_size'] ** 0.5) / 2),
+                hovertemplate=(
+                    f"{val}"
+                    "<br>Week: %{x|%Y-%m-%d}"
+                    f"<br>{selected_window}: "
+                    "%{y:.1f}%"
+                    "<br>Cohort size: %{customdata}<extra></extra>"
+                ),
+                customdata=sub['cohort_size'],
+            )
+        )
+
+    fig_attr.update_layout(
+        xaxis_title="Activation week",
+        yaxis_title=f"{selected_window} retention",
+        yaxis=dict(range=[0, 100], ticksuffix="%", gridcolor=BRAND_COLORS["border"]),
+        font=dict(family="Inter, system-ui, sans-serif", size=13),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        margin=dict(l=40, r=20, t=40, b=40),
+        height=420,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    st.plotly_chart(fig_attr, use_container_width=True)
+
+st.divider()
+
+# =============================================================================
+# Section E4: Retention Floor (fitted asymptote per cohort)
+# =============================================================================
+st.subheader("Retention Floor")
+st.caption(
+    "Per-cohort fit of retention(t) = floor + (1-floor)·exp(-t/τ) to the "
+    "four D7/D30/D60/D90 points. The fitted floor approximates the "
+    "steady-state share of users retained forever. Treat ±5pp as directional — "
+    "four data points give a noisy fit."
+)
+
+try:
+    floor_df = load_cohort_retention_floor()
+    if floor_df.empty:
+        st.info("Not enough mature cohorts for a floor fit (need mature_d90 ≥ 10).")
+    else:
+        floor_df = floor_df.copy()
+        floor_df['cohort_week'] = pd.to_datetime(floor_df['cohort_week'])
+        floor_df['fitted_floor_pct'] = floor_df['fitted_floor'] * 100
+        floor_df['d90_pct'] = floor_df['retention_rate_d90'] * 100
+
+        col_left, col_right = st.columns(2)
+
+        with col_left:
+            st.markdown("**Fitted floor over time**")
+            fig_floor = go.Figure(
+                go.Scatter(
+                    x=floor_df['cohort_week'],
+                    y=floor_df['fitted_floor_pct'],
+                    mode='lines+markers',
+                    line=dict(color=BRAND_COLORS.get('success', '#0F7B6C'), width=3),
+                    marker=dict(size=7 + (floor_df['cohort_size'] ** 0.5) / 3),
+                    hovertemplate=(
+                        "Cohort: %{x|%Y-%m-%d}"
+                        "<br>Floor: %{y:.1f}%"
+                        "<br>τ: %{customdata[0]} days"
+                        "<br>Cohort size: %{customdata[1]}<extra></extra>"
+                    ),
+                    customdata=floor_df[['fitted_tau_days', 'cohort_size']].values,
+                )
+            )
+            fig_floor.update_layout(
+                xaxis_title="Activation week",
+                yaxis_title="Fitted floor",
+                yaxis=dict(range=[0, 100], ticksuffix="%", gridcolor=BRAND_COLORS["border"]),
+                font=dict(family="Inter, system-ui, sans-serif", size=13),
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                margin=dict(l=40, r=20, t=20, b=40),
+                height=360,
+            )
+            st.plotly_chart(fig_floor, use_container_width=True)
+
+        with col_right:
+            st.markdown("**Observed D90 vs fitted floor (sanity)**")
+            fig_scatter = go.Figure(
+                go.Scatter(
+                    x=floor_df['d90_pct'],
+                    y=floor_df['fitted_floor_pct'],
+                    mode='markers',
+                    marker=dict(
+                        size=8 + (floor_df['cohort_size'] ** 0.5),
+                        color=BRAND_COLORS.get('accent', '#2383E2'),
+                        opacity=0.7,
+                    ),
+                    text=floor_df['cohort_week'].dt.strftime('%Y-%m-%d'),
+                    hovertemplate=(
+                        "Cohort: %{text}"
+                        "<br>D90 observed: %{x:.1f}%"
+                        "<br>Floor fitted: %{y:.1f}%<extra></extra>"
+                    ),
+                )
+            )
+            # Reference line y = x
+            max_axis = max(
+                float(floor_df['d90_pct'].max() or 0),
+                float(floor_df['fitted_floor_pct'].max() or 0),
+                60.0,
+            )
+            fig_scatter.add_shape(
+                type='line',
+                x0=0, y0=0, x1=max_axis, y1=max_axis,
+                line=dict(color='#CBD5E1', dash='dot'),
+            )
+            fig_scatter.update_layout(
+                xaxis_title="Observed D90 retention",
+                yaxis_title="Fitted floor",
+                xaxis=dict(ticksuffix="%", range=[0, max_axis], gridcolor=BRAND_COLORS["border"]),
+                yaxis=dict(ticksuffix="%", range=[0, max_axis], gridcolor=BRAND_COLORS["border"]),
+                font=dict(family="Inter, system-ui, sans-serif", size=13),
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                margin=dict(l=40, r=20, t=20, b=40),
+                height=360,
+            )
+            st.plotly_chart(fig_scatter, use_container_width=True)
+
+        st.caption(
+            f"Fit quality: median SSE across cohorts = "
+            f"{floor_df['sse'].median():.4f}."
+        )
+except Exception as e:
+    st.error(f"Error loading retention floor: {str(e)}")
+
+st.divider()
+
+# =============================================================================
+# Section E3: Social Connectivity & Retention
+# =============================================================================
+st.subheader("Social Connectivity & Retention")
+st.caption(
+    "Do users who join groups around activation retain better than isolated "
+    "users? Bucket is the count of distinct groups joined on or before "
+    "activation_date + 7 days."
+)
+
+try:
+    conn_df = load_retention_by_connectivity()
+    if conn_df.empty:
+        st.info("No group-membership data available yet.")
+    else:
+        rate_cols = ['retention_rate_d7', 'retention_rate_d30', 'retention_rate_d60', 'retention_rate_d90']
+        windows = ['D7', 'D30', 'D60', 'D90']
+
+        fig_conn = go.Figure()
+        bucket_colors = {
+            '0_groups':   BRAND_COLORS.get('text_secondary', '#6B7280'),
+            '1-2_groups': BRAND_COLORS.get('accent', '#2383E2'),
+            '3+_groups':  BRAND_COLORS.get('success', '#0F7B6C'),
+        }
+        for _, row in conn_df.iterrows():
+            bucket = row['connectivity_bucket']
+            y_vals = []
+            for col in rate_cols:
+                val = row.get(col)
+                y_vals.append(float(val) * 100 if val is not None and pd.notna(val) else None)
+            fig_conn.add_trace(
+                go.Scatter(
+                    x=windows,
+                    y=y_vals,
+                    mode='lines+markers',
+                    name=f"{bucket} (n={int(row['cohort_size'])})",
+                    line=dict(color=bucket_colors.get(bucket, '#888'), width=3),
+                    marker=dict(size=9),
+                    connectgaps=False,
+                    hovertemplate=f"{bucket}<br>%{{x}}: %{{y:.1f}}%<extra></extra>",
+                )
+            )
+
+        fig_conn.update_layout(
+            xaxis_title="Retention window",
+            yaxis_title="Retention rate",
+            yaxis=dict(range=[0, 100], ticksuffix="%", gridcolor=BRAND_COLORS["border"]),
+            font=dict(family="Inter, system-ui, sans-serif", size=13),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=40, r=20, t=20, b=40),
+            height=400,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+        )
+        st.plotly_chart(fig_conn, use_container_width=True)
+        st.caption(
+            "Averages across all mature cohorts. Missing D90 values for a "
+            "bucket mean no user in that bucket has matured to D90 yet."
+        )
+except Exception as e:
+    st.error(f"Error loading social connectivity: {str(e)}")
 
 st.divider()
 
@@ -480,6 +802,116 @@ else:
         st.plotly_chart(fig_churn, use_container_width=True)
     else:
         st.info("No churn risk distribution data available.")
+
+# --- Churned user profile (EQT: "the real answers are with the churned users") ---
+try:
+    cp_df = load_churned_user_profile_summary()
+    if not cp_df.empty:
+        st.markdown("---")
+        st.markdown("**Churned-User Profile**")
+
+        pct_no_save = 100.0 * cp_df['churned_without_save'].sum() / len(cp_df)
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            st.metric(
+                label="Activated + Churned users",
+                value=f"{len(cp_df):,}",
+                help="Users who activated but then went dormant (>30 days inactive)",
+            )
+        with col_b:
+            st.metric(
+                label="% Churned without a save",
+                value=f"{pct_no_save:.1f}%",
+                help="Of all churned activated users, the share that never saved a single place",
+            )
+        with col_c:
+            median_days = float(cp_df['days_since_last_activity'].median() or 0)
+            st.metric(
+                label="Median days dormant",
+                value=f"{median_days:.0f} days",
+                help="Median days since last activity across churned users",
+            )
+
+        dist_left, dist_right = st.columns(2)
+
+        with dist_left:
+            st.markdown("*Churn by activation trigger*")
+            trig_counts = (
+                cp_df['activation_trigger']
+                .fillna('unknown')
+                .value_counts()
+                .reset_index()
+            )
+            trig_counts.columns = ['activation_trigger', 'user_count']
+            fig_trig = go.Figure(
+                go.Bar(
+                    x=trig_counts['activation_trigger'],
+                    y=trig_counts['user_count'],
+                    marker_color=BRAND_COLORS.get('primary', '#37352F'),
+                    text=trig_counts['user_count'],
+                    textposition='outside',
+                )
+            )
+            fig_trig.update_layout(
+                xaxis=dict(title="Activation trigger"),
+                yaxis=dict(title="Churned users", gridcolor=BRAND_COLORS['border']),
+                font=dict(family="Inter, system-ui, sans-serif", size=13),
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                margin=dict(l=40, r=20, t=20, b=40),
+                height=320,
+                showlegend=False,
+            )
+            st.plotly_chart(fig_trig, use_container_width=True)
+
+        with dist_right:
+            st.markdown("*Churn by first prompt intent*")
+            intent_counts = (
+                cp_df['first_prompt_intent']
+                .fillna('_no_prompt')
+                .value_counts()
+                .head(10)
+                .reset_index()
+            )
+            intent_counts.columns = ['first_prompt_intent', 'user_count']
+            fig_intent = go.Figure(
+                go.Bar(
+                    x=intent_counts['first_prompt_intent'],
+                    y=intent_counts['user_count'],
+                    marker_color=BRAND_COLORS.get('accent', '#2383E2'),
+                    text=intent_counts['user_count'],
+                    textposition='outside',
+                )
+            )
+            fig_intent.update_layout(
+                xaxis=dict(title="First prompt intent"),
+                yaxis=dict(title="Churned users", gridcolor=BRAND_COLORS['border']),
+                font=dict(family="Inter, system-ui, sans-serif", size=13),
+                plot_bgcolor='white',
+                paper_bgcolor='white',
+                margin=dict(l=40, r=20, t=20, b=40),
+                height=320,
+                showlegend=False,
+            )
+            st.plotly_chart(fig_intent, use_container_width=True)
+
+        detail_df = load_churned_user_profile_detail(limit=50)
+        if not detail_df.empty:
+            st.markdown("*Most recently dormant churned users*")
+            display_df = detail_df.copy()
+            display_df['last_activity_date'] = pd.to_datetime(
+                display_df['last_activity_date']
+            ).dt.strftime('%Y-%m-%d')
+            display_df['cohort_week'] = pd.to_datetime(
+                display_df['cohort_week']
+            ).dt.strftime('%Y-%m-%d')
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                hide_index=True,
+            )
+except Exception as e:
+    st.error(f"Error loading churned user profile: {str(e)}")
 
 st.divider()
 

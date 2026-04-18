@@ -1760,6 +1760,180 @@ def load_cohort_quality_table():
 
 
 @st.cache_data(ttl=300)
+def load_churned_user_profile_summary():
+    """Aggregate distributions of churned users.
+
+    Returns three dataframes in one call is overkill; we return the raw
+    per-user table and aggregate in the dashboard. Keeps the SQL simple.
+    """
+    engine = get_database_connection()
+    query = """
+    SELECT
+        user_id,
+        cohort_week,
+        referral_source,
+        activation_trigger,
+        first_prompt_intent,
+        user_archetype,
+        days_since_last_activity,
+        total_sessions,
+        total_saves,
+        churned_without_save
+    FROM analytics_prod_gold.fct_churned_user_profile
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading churned user profile summary: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_churned_user_profile_detail(limit: int = 50):
+    """Top N most-recently-churned users with their profile."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        user_id,
+        cohort_week,
+        user_archetype,
+        referral_source,
+        activation_trigger,
+        first_prompt_intent,
+        last_prompt_intent,
+        total_sessions,
+        total_saves,
+        last_activity_date,
+        days_since_last_activity
+    FROM analytics_prod_gold.fct_churned_user_profile
+    ORDER BY last_activity_date DESC NULLS LAST
+    LIMIT :limit
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn, params={"limit": int(limit)})
+        return df
+    except Exception as e:
+        st.error(f"Error loading churned user profile detail: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_cohort_retention_floor():
+    """Per-cohort fitted retention floor + tau."""
+    engine = get_database_connection()
+    query = """
+    SELECT
+        f.cohort_week,
+        f.cohort_size,
+        f.fitted_floor,
+        f.fitted_tau_days,
+        f.sse,
+        f.retention_d180_estimate,
+        f.retention_d365_estimate,
+        c.retention_rate_d7,
+        c.retention_rate_d30,
+        c.retention_rate_d60,
+        c.retention_rate_d90
+    FROM analytics_prod_gold.fct_cohort_retention_floor f
+    LEFT JOIN analytics_prod_gold.fct_retention_by_cohort_week c
+      ON f.cohort_week = c.cohort_week
+    ORDER BY f.cohort_week ASC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading cohort retention floor: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_retention_by_connectivity():
+    """Retention curves by group-membership bucket at acquisition.
+
+    Aggregates across all mature cohorts to produce one row per
+    connectivity_bucket with summary counts and rates.
+    """
+    engine = get_database_connection()
+    query = """
+    SELECT
+        connectivity_bucket,
+        SUM(cohort_size)                          AS cohort_size,
+        SUM(mature_d7)                            AS mature_d7,
+        SUM(mature_d30)                           AS mature_d30,
+        SUM(mature_d60)                           AS mature_d60,
+        SUM(mature_d90)                           AS mature_d90,
+        SUM(retained_d7)                          AS retained_d7,
+        SUM(retained_d30)                         AS retained_d30,
+        SUM(retained_d60)                         AS retained_d60,
+        SUM(retained_d90)                         AS retained_d90,
+        CASE WHEN SUM(mature_d7)  > 0 THEN SUM(retained_d7)::numeric  / SUM(mature_d7)  END AS retention_rate_d7,
+        CASE WHEN SUM(mature_d30) > 0 THEN SUM(retained_d30)::numeric / SUM(mature_d30) END AS retention_rate_d30,
+        CASE WHEN SUM(mature_d60) > 0 THEN SUM(retained_d60)::numeric / SUM(mature_d60) END AS retention_rate_d60,
+        CASE WHEN SUM(mature_d90) > 0 THEN SUM(retained_d90)::numeric / SUM(mature_d90) END AS retention_rate_d90
+    FROM analytics_prod_gold.fct_retention_by_social_connectivity
+    GROUP BY connectivity_bucket
+    ORDER BY CASE connectivity_bucket
+        WHEN '0_groups'   THEN 0
+        WHEN '1-2_groups' THEN 1
+        WHEN '3+_groups'  THEN 2
+        ELSE 3
+    END
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading retention by connectivity: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_engagement_frequency_distribution(snapshot_months: list | None = None):
+    """Days-active-in-week distribution per calendar month.
+
+    If snapshot_months is provided, filter to those months only; otherwise
+    return all months. The model emits one row per (snapshot_month,
+    days_active_bucket) with bucket in 0..7.
+    """
+    engine = get_database_connection()
+    if snapshot_months:
+        # Cast to strings so pandas sends them as dates
+        placeholders = ", ".join(
+            f":m{i}" for i in range(len(snapshot_months))
+        )
+        params = {f"m{i}": m for i, m in enumerate(snapshot_months)}
+        where = f"WHERE snapshot_month IN ({placeholders})"
+    else:
+        params = {}
+        where = ""
+    query = f"""
+    SELECT
+        snapshot_month,
+        reference_week,
+        days_active_bucket,
+        users_in_bucket,
+        total_users_in_month,
+        pct_of_users
+    FROM analytics_prod_gold.fct_engagement_frequency_distribution
+    {where}
+    ORDER BY snapshot_month DESC, days_active_bucket ASC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn, params=params)
+        return df
+    except Exception as e:
+        st.error(f"Error loading engagement frequency distribution: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
 def load_retention_by_acquisition_attribute(attribute_name: str, min_cohort_size: int = 10):
     """Retention curves split by a single acquisition attribute.
 
