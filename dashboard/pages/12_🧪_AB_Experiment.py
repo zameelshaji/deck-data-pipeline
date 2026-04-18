@@ -89,6 +89,25 @@ if results_df.empty:
     st.info("No experiment data yet. Waiting for packs with `experiment_arm` set (requires iOS changes from Ash).")
     st.stop()
 
+# --- Restrict to days where BOTH arms have data ---
+# Avoids misleading totals/rates on days where only one arm was live.
+arm_dates = results_df.groupby('metric_date')['experiment_arm'].nunique()
+shared_dates = set(arm_dates[arm_dates >= 2].index)
+
+if not shared_dates:
+    st.info("No overlapping days with both control and treatment data yet.")
+    st.stop()
+
+results_df = results_df[results_df['metric_date'].isin(shared_dates)].copy()
+ts_df = ts_df[ts_df['metric_date'].isin(shared_dates)].copy() if not ts_df.empty else ts_df
+
+overlap_start = min(shared_dates)
+overlap_end = max(shared_dates)
+st.caption(
+    f"Showing {len(shared_dates)} day(s) where both arms were live "
+    f"({overlap_start} → {overlap_end})."
+)
+
 # --- Compute Totals ---
 totals = results_df.groupby('experiment_arm').agg({
     'packs_created': 'sum',
