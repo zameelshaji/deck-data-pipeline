@@ -131,21 +131,23 @@ Present as a compact table.
 
 ## Phase 5: Write the memo
 
+**Audience: the CEO.** Plain English, scannable, short. Every bullet leads
+with the finding, with a "so what" — the number is the evidence, not the
+point. Translate metric acronyms on first use (e.g. "save rate (SSR)", "Plan
+Survival Rate (PSR) — a session ending with save AND share").
+
 Follow `references/insight-memo-template.md` exactly. Sections:
 
-1. **Header** — page, period, active users, one-line headline.
-2. **Scorecard** — the 7-lens table from Phase 4.
-3. **What we're doing well (3–5 bullets)** — each bullet must cite a
-   **trajectory** (not a single number) or a **cohort**, per EQT principle.
-   Example shape: "Weekly engagement intensity climbed from 7.2 → 11.4 avg
-   swipes/active user over the last 6 weeks (intensity chart)" — NOT "swipes
-   were high this week."
-4. **Gaps vs EQT framework (3–5 bullets)** — each bullet must cite the specific
-   EQT principle it violates. Draw from `eqt-framework.md` Dos/Don'ts table.
-5. **Hypotheses to test next (2–3)** — use the PDF's scientific-method shape:
-   - **Hypothesis:** "...will lead to..."
-   - **How it'd manifest in data:** a specific measurable signal
-   - **What to pull:** the model/table to check
+1. **TL;DR** — one short paragraph, 2–3 sentences. Lead with the single most
+   important takeaway. End with the biggest open question.
+2. **What's going well (3 bullets)** — finding in plain English, with "so
+   what". Cite a trajectory or cohort, not a single number.
+3. **What to watch (3 bullets)** — concern + why it matters + which EQT
+   principle relates (draw from `eqt-framework.md` Dos/Don'ts table).
+4. **What we should test next (2–3)** — a question, then a 1-sentence
+   hypothesis + 1-sentence "how we'd check it".
+5. **Scorecard (at the bottom)** — the 8-lens table. This is detail, not
+   headline — the CEO should already have the picture from sections 1–4.
 
 Keep the whole memo ≤400 words. EQT rewards conciseness.
 
@@ -201,8 +203,8 @@ Use a dollar-quoted literal (`$memo$ ... $memo$`) for `memo_markdown` to
 handle embedded quotes and backticks safely. For `scorecard_json`, serialise
 to a compact JSON string and escape any `'` to `''` before interpolation.
 
-`model_version` — use the actual model id you're running as. If unknown,
-insert `'claude-unknown'`.
+`model_version` — use the actual model id you're running as (e.g.
+`'claude-opus-4-7'`). If unknown, insert `'claude-unknown'`.
 
 The table is **append-only** — do not UPSERT or DELETE prior rows. The
 dashboard always reads the latest by `generated_at`.
