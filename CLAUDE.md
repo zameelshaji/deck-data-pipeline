@@ -122,7 +122,7 @@ dashboard/          # Streamlit dashboard app
     10_🚀_Onboarding.py         # Onboarding funnel + first-session experience (checklist → spin wheel)
     11_🔍_Power_User_Deep_Dive.py # Power user diagnostics
     13_🧹_Place_Curation.py       # Admin: curate/delete low-quality places (write-capable)
-    14_🎁_Spin_Wheel_Winners.py   # Ops kanban: winner outreach + gift-card fulfillment (write-capable)
+    14_🎁_Spin_Wheel_Winners.py   # Ops list: sorted winners with per-row action selector for outreach + gift-card fulfillment (write-capable)
   utils/            # DB connection, data loading, styling, filters
   sql/              # Hand-applied migrations for dashboard-owned state (e.g. analytics_ops)
 ```

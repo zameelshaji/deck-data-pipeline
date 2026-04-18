@@ -1,4 +1,4 @@
-"""DECK Spin Wheel Winners — kanban for winner outreach + gift card fulfillment."""
+"""DECK Spin Wheel Winners — sorted list for winner outreach + gift card fulfillment."""
 
 import streamlit as st
 import pandas as pd
@@ -24,12 +24,22 @@ st.set_page_config(
 
 apply_deck_branding()
 
-STATUS_COLUMNS = [
-    ("to_contact", "To Contact"),
-    ("contacted",  "Contacted"),
-    ("sent",       "Gift Card Sent"),
-    ("redeemed",   "Redeemed"),
-]
+STATUS_ORDER = {"to_contact": 0, "contacted": 1, "sent": 2, "redeemed": 3, "skipped": 4}
+STATUS_LABELS = {
+    "to_contact": "To Contact",
+    "contacted":  "Contacted",
+    "sent":       "Gift Card Sent",
+    "redeemed":   "Redeemed",
+    "skipped":    "Skipped",
+}
+# For each status, the list of (target_status, label) the user can transition to.
+ACTIONS = {
+    "to_contact": [("contacted", "Mark contacted"), ("skipped", "Skip")],
+    "contacted":  [("sent", "Mark gift card sent"), ("to_contact", "Back to To Contact"), ("skipped", "Skip")],
+    "sent":       [("redeemed", "Mark redeemed"), ("skipped", "Skip")],
+    "redeemed":   [("sent", "Reopen (back to Sent)")],
+    "skipped":    [("to_contact", "Restore to To Contact")],
+}
 
 # ---------------------------------------------------------------------------
 # Session state
@@ -43,7 +53,7 @@ if "sending_form_for" not in st.session_state:
 # Title + operator selector
 # ---------------------------------------------------------------------------
 st.title("\U0001f381 Spin Wheel Winners")
-st.caption("Kanban board for winner outreach and gift card fulfillment.")
+st.caption("Sorted list of winners with per-row actions for outreach and gift card fulfillment.")
 
 op_col1, op_col2 = st.columns([3, 2])
 with op_col1:
@@ -135,7 +145,7 @@ with chart_col_b:
 st.divider()
 
 # ---------------------------------------------------------------------------
-# Section 2 — Kanban
+# Section 2 — Sorted winners list
 # ---------------------------------------------------------------------------
 st.subheader("Outreach")
 board = load_spin_wheel_winners_board(start_date, end_date, search_term, include_skipped=show_skipped)
@@ -143,11 +153,14 @@ board = load_spin_wheel_winners_board(start_date, end_date, search_term, include
 if board.empty:
     st.info("No winners in this range.")
 else:
-    by_status = {status: board[board["status"] == status] for status, _ in STATUS_COLUMNS}
-    skipped_df = board[board["status"] == "skipped"]
+    board = board.copy()
+    board["_order"] = board["status"].map(STATUS_ORDER).fillna(99)
+    board = board.sort_values(["_order", "won_at"], ascending=[True, False])
 
+    visible_statuses = [s for s in STATUS_ORDER if s != "skipped" or show_skipped]
     status_counts = " · ".join(
-        f"**{label}**: {len(by_status[status])}" for status, label in STATUS_COLUMNS
+        f"**{STATUS_LABELS[s]}**: {int((board['status'] == s).sum())}"
+        for s in visible_statuses
     )
     st.caption(status_counts)
 
@@ -164,43 +177,31 @@ else:
             return "1 day ago"
         return f"{delta_days} days ago"
 
-    def _render_card(row):
+    for _, row in board.iterrows():
         outreach_id = row["outreach_id"]
         status = row["status"]
+
         with st.container(border=True):
-            display_name = row["display_name"] or "(unknown user)"
-            st.markdown(f"**{display_name}**")
-            if row.get("email"):
-                st.caption(row["email"])
-            st.caption(f"\U0001f4cd {row['place_name']}")
-            st.caption(f"Won {_days_ago(row['won_at'])}")
+            info_col, meta_col, action_col = st.columns([3, 2, 3])
 
-            notes_preview = row.get("notes") or ""
-            if notes_preview:
-                preview = notes_preview[:80] + ("…" if len(notes_preview) > 80 else "")
-                st.caption(f"\U0001f4dd {preview}")
+            with info_col:
+                display_name = row["display_name"] or "(unknown user)"
+                st.markdown(f"**{display_name}**")
+                if row.get("email"):
+                    st.caption(row["email"])
+                st.caption(f"\U0001f4cd {row['place_name']}")
 
-            if status == "sent" and row.get("gift_card_code"):
-                amt = row.get("gift_card_value")
-                amt_str = f" · £{float(amt):.2f}" if amt is not None and pd.notna(amt) else ""
-                st.caption(f"\U0001f3ab `{row['gift_card_code']}`{amt_str}")
+            with meta_col:
+                st.markdown(f"`{STATUS_LABELS[status]}`")
+                st.caption(f"Won {_days_ago(row['won_at'])}")
+                if status == "sent" and row.get("gift_card_code"):
+                    amt = row.get("gift_card_value")
+                    amt_str = f" · £{float(amt):.2f}" if amt is not None and pd.notna(amt) else ""
+                    st.caption(f"\U0001f3ab `{row['gift_card_code']}`{amt_str}")
 
-            # ----- Action buttons per status -----
-            if status == "to_contact":
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("Mark contacted", key=f"contact_{outreach_id}", use_container_width=True):
-                        if not operator_email:
-                            st.warning("Enter your email above first.")
-                        elif update_winner_outreach_status(outreach_id, "contacted", operator_email):
-                            st.toast("Marked contacted")
-                            st.rerun()
-                with c2:
-                    if st.button("Skip", key=f"skip_{outreach_id}", use_container_width=True):
-                        if update_winner_outreach_status(outreach_id, "skipped", operator_email):
-                            st.rerun()
+            with action_col:
+                actions = ACTIONS.get(status, [])
 
-            elif status == "contacted":
                 if st.session_state.sending_form_for == outreach_id:
                     with st.form(f"sendform_{outreach_id}", clear_on_submit=True):
                         gc_code = st.text_input("Gift card code", key=f"gc_code_{outreach_id}")
@@ -228,43 +229,27 @@ else:
                         elif cancelled:
                             st.session_state.sending_form_for = None
                             st.rerun()
-                else:
-                    c1, c2, c3 = st.columns(3)
-                    with c1:
-                        if st.button("Mark sent", key=f"send_{outreach_id}", use_container_width=True):
+                elif actions:
+                    placeholder = "\u2014 Pick action \u2014"
+                    label_to_target = {label: target for target, label in actions}
+                    choice = st.selectbox(
+                        "Action",
+                        options=[placeholder] + list(label_to_target.keys()),
+                        key=f"action_{outreach_id}",
+                        label_visibility="collapsed",
+                    )
+                    apply_disabled = choice == placeholder
+                    if st.button("Apply", key=f"apply_{outreach_id}",
+                                 use_container_width=True, disabled=apply_disabled):
+                        target_status = label_to_target[choice]
+                        if target_status == "sent":
                             st.session_state.sending_form_for = outreach_id
                             st.rerun()
-                    with c2:
-                        if st.button("Undo", key=f"undo_{outreach_id}", use_container_width=True):
-                            if update_winner_outreach_status(outreach_id, "to_contact", operator_email):
-                                st.rerun()
-                    with c3:
-                        if st.button("Skip", key=f"skipc_{outreach_id}", use_container_width=True):
-                            if update_winner_outreach_status(outreach_id, "skipped", operator_email):
-                                st.rerun()
-
-            elif status == "sent":
-                c1, c2 = st.columns(2)
-                with c1:
-                    if st.button("Mark redeemed", key=f"redeem_{outreach_id}", use_container_width=True):
-                        if update_winner_outreach_status(outreach_id, "redeemed", operator_email):
-                            st.rerun()
-                with c2:
-                    if st.button("Skip", key=f"skips_{outreach_id}", use_container_width=True):
-                        if update_winner_outreach_status(outreach_id, "skipped", operator_email):
+                        elif not operator_email:
+                            st.warning("Enter your email above first.")
+                        elif update_winner_outreach_status(outreach_id, target_status, operator_email):
                             st.rerun()
 
-            elif status == "redeemed":
-                if st.button("Reopen", key=f"reopen_{outreach_id}", use_container_width=True):
-                    if update_winner_outreach_status(outreach_id, "sent", operator_email):
-                        st.rerun()
-
-            elif status == "skipped":
-                if st.button("Restore", key=f"restore_{outreach_id}", use_container_width=True):
-                    if update_winner_outreach_status(outreach_id, "to_contact", operator_email):
-                        st.rerun()
-
-            # Notes expander
             with st.expander("\U0001f4dd Notes"):
                 new_notes = st.text_area(
                     "Notes",
@@ -277,21 +262,6 @@ else:
                     if update_winner_outreach_notes(outreach_id, new_notes):
                         st.toast("Notes saved")
                         st.rerun()
-
-    cols = st.columns(4)
-    for (status, label), col in zip(STATUS_COLUMNS, cols):
-        with col:
-            count = len(by_status[status])
-            st.markdown(f"#### {label} ({count})")
-            if count == 0:
-                st.caption("—")
-            for _, row in by_status[status].iterrows():
-                _render_card(row)
-
-    if not skipped_df.empty:
-        with st.expander(f"Skipped ({len(skipped_df)})", expanded=False):
-            for _, row in skipped_df.iterrows():
-                _render_card(row)
 
 st.divider()
 
