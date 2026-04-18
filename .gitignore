@@ -13,8 +13,11 @@ dashboard/venv/
 *.xlsx
 .~lock.*#
 
-# Claude Code local state
-.claude/
+# Claude Code local state (settings.local.json, scheduled_tasks.lock, etc.)
+# Use a file glob rather than a directory so git still descends into .claude/
+# and honours the negation for shared skills.
+.claude/*
+!.claude/skills/
 
 # Python bytecode
 __pycache__/

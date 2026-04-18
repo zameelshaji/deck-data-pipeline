@@ -1760,6 +1760,71 @@ def load_cohort_quality_table():
 
 
 @st.cache_data(ttl=300)
+def load_retention_by_acquisition_attribute(attribute_name: str, min_cohort_size: int = 10):
+    """Retention curves split by a single acquisition attribute.
+
+    attribute_name ∈ {'referral_source', 'activation_trigger',
+                      'first_prompt_intent', 'app_version_at_signup'}.
+    The min_cohort_size gate filters out noisy tiny slices at read time.
+    """
+    engine = get_database_connection()
+    query = """
+    SELECT
+        cohort_week,
+        attribute_name,
+        attribute_value,
+        cohort_size,
+        mature_d7, mature_d30, mature_d60, mature_d90,
+        retained_d7, retained_d30, retained_d60, retained_d90,
+        retention_rate_d7, retention_rate_d30,
+        retention_rate_d60, retention_rate_d90
+    FROM analytics_prod_gold.fct_retention_by_acquisition_attribute
+    WHERE attribute_name = :attribute_name
+      AND cohort_size >= :min_cohort_size
+    ORDER BY cohort_week DESC, attribute_value
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(
+                text(query),
+                conn,
+                params={"attribute_name": attribute_name, "min_cohort_size": min_cohort_size},
+            )
+        return df
+    except Exception as e:
+        st.error(f"Error loading retention by acquisition attribute: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
+def load_organic_vs_referred_weekly():
+    """Weekly organic-vs-referred acquisition mix and D30 retention.
+
+    Surfaces columns already computed in fct_cohort_quality; no new aggregation.
+    Used by the Conversion & Viral page to show the network-effect signals
+    called out in the EQT coverage audit.
+    """
+    engine = get_database_connection()
+    query = """
+    SELECT
+        activation_week,
+        organic_count,
+        referral_count,
+        organic_retention_d30,
+        referral_retention_d30
+    FROM analytics_prod_gold.fct_cohort_quality
+    ORDER BY activation_week ASC
+    """
+    try:
+        with engine.connect() as conn:
+            df = pd.read_sql(text(query), conn)
+        return df
+    except Exception as e:
+        st.error(f"Error loading organic-vs-referred weekly: {str(e)}")
+        return pd.DataFrame()
+
+
+@st.cache_data(ttl=300)
 def load_retention_heatmap_data():
     """Load retention data for heatmap."""
     engine = get_database_connection()
@@ -1769,10 +1834,16 @@ def load_retention_heatmap_data():
         cohort_size,
         retention_rate_d7,
         retention_rate_d30,
+        retention_rate_d60,
+        retention_rate_d90,
         mature_d7,
         mature_d30,
+        mature_d60,
+        mature_d90,
         retained_d7,
-        retained_d30
+        retained_d30,
+        retained_d60,
+        retained_d90
     FROM analytics_prod_gold.fct_retention_by_cohort_week
     WHERE mature_d7 >= 3
     ORDER BY cohort_week DESC

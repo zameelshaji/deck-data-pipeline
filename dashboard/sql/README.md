@@ -26,3 +26,9 @@ All migrations in this folder are idempotent (`create ... if not exists`,
 - `001_spin_wheel_winner_outreach.sql` — creates `analytics_ops` schema and the
   `spin_wheel_winner_outreach` table used by page 14 (Spin Wheel Winners).
   Applied to `lzapzucmzvztogacckee` on 2026-04-18.
+- `002_eqt_insight_memos.sql` — creates `analytics_ops.eqt_insight_memos`,
+  an append-only store for EQT-framework insight memos. Populated by scheduled
+  Claude triggers (daily/weekly/monthly at 02:00 UTC, after the 01:00 UTC dbt
+  rebuild); read by pages 1/2/3 (Daily, Weekly, Monthly) to render the latest
+  memo inline for the selected period. Applied to `lzapzucmzvztogacckee` on
+  2026-04-18.

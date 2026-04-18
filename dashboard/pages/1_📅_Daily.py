@@ -23,6 +23,7 @@ from utils.data_loader import (
     load_daily_top_liked_places,
     load_daily_weekly_intensity,
     load_daily_user_activity,
+    load_latest_eqt_memo,
 )
 
 st.set_page_config(
@@ -101,6 +102,26 @@ with c3:
               help="Users who completed onboarding on this date (signed up AND finished onboarding)")
 with c4:
     st.metric("Total Events", _fmt_int(kpi.get('total_events', 0)))
+
+st.divider()
+
+# ============================================================================
+# Section A2: EQT Insight Memo
+# ============================================================================
+st.subheader("EQT Insight Memo")
+memo = load_latest_eqt_memo('daily', report_date_str)
+if memo:
+    ts = pd.to_datetime(memo['generated_at'])
+    st.caption(
+        f"Generated {ts.strftime('%b %d %Y %H:%M UTC')} · "
+        f"{memo.get('model_version') or 'unknown model'}"
+    )
+    st.markdown(memo['memo_markdown'])
+else:
+    st.info(
+        "No EQT memo for this date yet. Scheduled run: every day at 02:00 UTC "
+        "(after the 01:00 UTC dbt rebuild)."
+    )
 
 st.divider()
 
