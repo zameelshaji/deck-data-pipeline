@@ -104,15 +104,14 @@ models/
     _schema.yml     # Column-level docs for gold models
 seeds/              # Static reference data (test_accounts.csv, app_version_releases.csv, suppliers.csv)
 tests/              # Custom data tests (singular tests)
-analyses/           # Ad-hoc SQL analyses, data dictionaries, and Python inspection scripts
+analyses/           # Ad-hoc SQL (gold_layer_example_queries, gold_layer_cleanup) and Python inspection scripts
+docs/               # Project docs — investor/ (EQT audit + source), reference/ (gold-layer data dictionary, user segmentation)
 macros/             # (empty — no custom macros)
 snapshots/          # (empty — no snapshots configured)
 dashboard/          # Streamlit dashboard app
   Home.py           # Landing page
   pages/            # Multi-page Streamlit pages (11-page architecture)
-    1_📅_Daily.py               # CEO daily report — single-date picker, top-line KPIs, activation checklist, category/place breakdowns, per-user activity
-    2_📅_Weekly.py              # Weekly report — Mon–Sun aggregation, WAU, 8-week trend, full PDF with all 6 trend charts
-    3_📅_Monthly.py             # Monthly report — calendar month aggregation, MAU, 6-month trend, full PDF with all 6 trend charts
+    1_📅_Report.py              # Unified Daily/Weekly/Monthly report with top-of-page cadence toggle — all 9 sections (KPIs, EQT memo, trend, activation funnel, signup status, category popularity, flagged places, top liked, engagement intensity, user activity), full PDF export per cadence. Thin UI wrapper over the per-cadence loaders in utils/data_loader.py.
     4_🎯_North_Star.py          # PSR ladder funnel, metrics over time, surface attribution, active planners
     5_📈_Engagement.py          # Session trends, engagement metrics
     6_👥_Users_&_Cohorts.py     # Archetypes, leaderboard, activation/signup funnel, retention, churn
@@ -194,5 +193,5 @@ When referencing gold model columns in dashboard code, use the actual column nam
 - The `packages.txt` lists system dependencies (`libpq-dev`) for the Postgres adapter.
 - Gold layer output tables use schema `analytics_prod_gold` in the database.
 - Python utility scripts for ad-hoc database inspection are in `analyses/` (`check_tables.py`, `test_tables.py`, `show_summary.py`, etc.).
-- `analyses/` also contains gold layer reference docs: `gold_layer_data_dictionary.md`, `gold_layer_example_queries.sql`, `gold_layer_cleanup.sql`.
+- `analyses/` contains gold-layer SQL utilities: `gold_layer_example_queries.sql` (example queries for the Supabase MCP agent) and `gold_layer_cleanup.sql` (post-`dbt build` drop script). The companion data dictionary lives at `docs/reference/gold-layer-data-dictionary.md`.
 - `gold_recommendation_training_set` is an ML feature store with 28 engineered features across 4 groups (candidate, prompt context, session context, interaction) for place recommendation ranking. It has its own dedicated `.yml` schema file.
