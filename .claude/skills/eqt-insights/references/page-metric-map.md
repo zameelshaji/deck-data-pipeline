@@ -5,7 +5,12 @@ each of the three report pages. Line numbers are into
 `deck-data-pipeline/dashboard/utils/data_loader.py` (valid at skill creation;
 re-grep if they drift).
 
-## Daily page (`pages/1_📅_Daily.py`)
+> **Note:** Daily / Weekly / Monthly are now rendered by the unified
+> `pages/1_📅_Report.py` (cadence toggle at top of page). The three
+> per-cadence maps below still apply — they describe what each cadence view
+> shows — but file references are historical.
+
+## Daily cadence (formerly `pages/1_📅_Daily.py`, now `pages/1_📅_Report.py` → Daily)
 
 | EQT Lens | Evidence source | data_loader fn | Notes |
 |----------|----------------|----------------|-------|
@@ -17,7 +22,7 @@ re-grep if they drift).
 | Network effects | Shares in topline (count only) | `load_daily_topline_kpis` | No share→signup attribution. Pull `fct_viral_loop`. |
 | Growth | **Not on this page.** | — | Always Missing from Daily. |
 
-## Weekly page (`pages/2_📅_Weekly.py`)
+## Weekly cadence (formerly `pages/2_📅_Weekly.py`, now `pages/1_📅_Report.py` → Weekly)
 
 | EQT Lens | Evidence source | data_loader fn | Notes |
 |----------|----------------|----------------|-------|
@@ -29,7 +34,7 @@ re-grep if they drift).
 | Network effects | Shares count only | `load_weekly_topline_kpis` | Pull `fct_viral_loop` for attribution. |
 | Growth | **Not on this page.** | — | Always Missing from Weekly. |
 
-## Monthly page (`pages/3_📅_Monthly.py`)
+## Monthly cadence (formerly `pages/3_📅_Monthly.py`, now `pages/1_📅_Report.py` → Monthly)
 
 | EQT Lens | Evidence source | data_loader fn | Notes |
 |----------|----------------|----------------|-------|
